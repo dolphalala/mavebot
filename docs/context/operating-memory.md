@@ -40,6 +40,11 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Official Codex Slack requires `@Codex`, replies in threads, and chooses a
   cloud environment automatically. It cannot turn `#bot` into a normal channel
   session by itself.
+- A custom Slack bridge receives events at
+  `https://chat.urba.group/slack/events` and stores channel memory in
+  `/opt/urba-apps/discord-bot/shared/slack-memory.jsonl`.
+- Slack channel ID for `#bot`: `C0BCRVC2C6Q`.
+- Slack app ID for the custom bridge: `A0BCMC7JKRC`.
 - The intended default Codex cloud environment is `mavebot`, with
   `dolphalala/mavebot` as the target repo.
 - When Codex cloud works on this repo, it should read this file first, then
