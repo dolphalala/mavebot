@@ -4,6 +4,7 @@ set -Eeuo pipefail
 APP_ROOT="${APP_ROOT:-/opt/urba-apps/discord-bot/app}"
 APP_ENV="${APP_ENV:-/opt/urba-apps/discord-bot/.env}"
 SLACK_ENV="${SLACK_ENV:-/opt/urba-apps/discord-bot/slack-bridge.env}"
+SLACK_MEMORY_FILE="${SLACK_MEMORY_FILE:-/opt/urba-apps/discord-bot/shared/slack-memory.jsonl}"
 LOG_DIR="${LOG_DIR:-/opt/urba-apps/discord-bot/shared/logs}"
 LOCK_FILE="${LOCK_FILE:-/opt/urba-apps/discord-bot/shared/deploy.lock}"
 BRANCH="${BRANCH:-main}"
@@ -32,6 +33,12 @@ fi
 if [ ! -f "$SLACK_ENV" ]; then
   install -m 600 /dev/null "$SLACK_ENV"
 fi
+
+mkdir -p "$(dirname "$SLACK_MEMORY_FILE")"
+touch "$SLACK_MEMORY_FILE"
+chmod 755 "$(dirname "$SLACK_MEMORY_FILE")"
+chmod 600 "$SLACK_MEMORY_FILE"
+chown 1000:1000 "$SLACK_MEMORY_FILE" 2>/dev/null || true
 
 git -C "$APP_ROOT" fetch origin "$BRANCH"
 git -C "$APP_ROOT" checkout "$BRANCH"
