@@ -33,4 +33,4 @@ if [ "$local_sha" = "$remote_sha" ]; then
 fi
 
 echo "Deploying $local_sha -> $remote_sha."
-exec "$APP_ROOT/scripts/deploy-server.sh"
+exec bash "$APP_ROOT/scripts/deploy-server.sh"
