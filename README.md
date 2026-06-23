@@ -8,6 +8,7 @@ Minimal Dockerized Discord bot foundation for the shared `urba-chatwoot` host.
 - `/ping` slash command handler
 - slash command registration script
 - local-only `/healthz` HTTP endpoint on port `4188`
+- Slack Events bridge for the `#bot` channel on local port `4190`
 - Docker Compose service named `urba-discord-bot`
 
 ## Local Checks
@@ -22,6 +23,7 @@ npm run check
 ```text
 /opt/urba-apps/discord-bot/
   .env
+  slack-bridge.env
   app/
     docker-compose.yml
     Dockerfile
@@ -76,3 +78,29 @@ curl -i http://127.0.0.1:4188/healthz
 ```
 
 Global command registration can take longer to appear in Discord.
+
+## Slack Bridge
+
+The custom bridge is separate from the official Codex Slack app. It receives
+Slack Events API requests at:
+
+```text
+https://chat.urba.group/slack/events
+```
+
+Server-only config lives in `/opt/urba-apps/discord-bot/slack-bridge.env`:
+
+```text
+SLACK_APP_ID=
+SLACK_CLIENT_SECRET=
+SLACK_SIGNING_SECRET=
+SLACK_BOT_TOKEN=
+SLACK_CHANNEL_ID=C0BCRVC2C6Q
+SLACK_BRIDGE_AUTOREPLY=0
+```
+
+The bridge verifies Slack signatures, handles URL verification, and saves
+messages from `#bot` to `/opt/urba-apps/discord-bot/shared/slack-memory.jsonl`.
+
+The `SLACK_BOT_TOKEN` value must be the Bot User OAuth Token from Slack
+`OAuth & Permissions`; it starts with `xoxb-`.
