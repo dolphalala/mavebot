@@ -3,6 +3,10 @@
 This project is the Vibe mirror for the Discord bot intended to run on the
 `urba-chatwoot` shared host at `/opt/urba-apps/discord-bot`.
 
+Before making changes, read `docs/context/operating-memory.md` for the current
+Discord app, server deploy, command registration, and Slack/Codex workflow
+context.
+
 ## Rules
 
 - Do not commit `.env`, Discord bot tokens, client secrets, SSH keys, cookies, or
