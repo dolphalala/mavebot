@@ -26,7 +26,6 @@ npm run check
     docker-compose.yml
     Dockerfile
     package.json
-    package-lock.json
     src/
     scripts/
 ```
