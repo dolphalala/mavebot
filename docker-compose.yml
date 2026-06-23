@@ -31,3 +31,40 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+
+  slack-bridge:
+    build:
+      context: .
+    container_name: urba-slack-bridge
+    restart: unless-stopped
+    command: ["node", "src/slack-bridge.mjs"]
+    env_file:
+      - /opt/urba-apps/discord-bot/slack-bridge.env
+    environment:
+      NODE_ENV: production
+      SLACK_BRIDGE_HOST: 0.0.0.0
+      SLACK_BRIDGE_PORT: 4190
+      SLACK_BRIDGE_EVENT_PATH: /slack/events
+      SLACK_MEMORY_PATH: /shared/slack-memory.jsonl
+      SLACK_CONTEXT_PATH: /app/docs/context/operating-memory.md
+    ports:
+      - "127.0.0.1:4190:4190"
+    volumes:
+      - /opt/urba-apps/discord-bot/shared:/shared
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4190/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
