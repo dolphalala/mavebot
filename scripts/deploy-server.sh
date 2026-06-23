@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 APP_ROOT="${APP_ROOT:-/opt/urba-apps/discord-bot/app}"
 APP_ENV="${APP_ENV:-/opt/urba-apps/discord-bot/.env}"
+SLACK_ENV="${SLACK_ENV:-/opt/urba-apps/discord-bot/slack-bridge.env}"
 LOG_DIR="${LOG_DIR:-/opt/urba-apps/discord-bot/shared/logs}"
 LOCK_FILE="${LOCK_FILE:-/opt/urba-apps/discord-bot/shared/deploy.lock}"
 BRANCH="${BRANCH:-main}"
@@ -26,6 +27,10 @@ fi
 if [ ! -f "$APP_ENV" ]; then
   echo "ERROR: missing $APP_ENV."
   exit 1
+fi
+
+if [ ! -f "$SLACK_ENV" ]; then
+  install -m 600 /dev/null "$SLACK_ENV"
 fi
 
 git -C "$APP_ROOT" fetch origin "$BRANCH"
