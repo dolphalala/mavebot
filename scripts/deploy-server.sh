@@ -37,7 +37,16 @@ docker compose -f "$APP_ROOT/docker-compose.yml" build
 
 has_value() {
   local key="$1"
-  grep -Eq "^${key}=.+" "$APP_ENV"
+  awk -F= -v key="$key" '
+    $1 == key {
+      value = substr($0, length($1) + 2)
+      gsub(/[[:space:]]/, "", value)
+      if (value != "") {
+        found = 1
+      }
+    }
+    END { exit found ? 0 : 1 }
+  ' "$APP_ENV"
 }
 
 if ! has_value DISCORD_TOKEN || ! has_value DISCORD_CLIENT_ID; then
