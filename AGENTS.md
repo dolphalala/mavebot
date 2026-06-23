@@ -17,7 +17,8 @@ This project is the Vibe mirror for the Discord bot intended to run on the
 Run before finishing code changes:
 
 ```powershell
+npm install
 npm run check
 ```
 
-For dependency changes, refresh `package-lock.json` and verify Docker builds.
+For dependency changes, verify Docker builds.
