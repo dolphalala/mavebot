@@ -4,7 +4,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --chown=node:node package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 COPY --chown=node:node src ./src
 COPY --chown=node:node scripts ./scripts
