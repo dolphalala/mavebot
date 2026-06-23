@@ -21,10 +21,10 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Runtime env path: `/opt/urba-apps/discord-bot/.env`.
 - Docker Compose service/container: `urba-discord-bot`.
 - Health endpoint: `http://127.0.0.1:4188/healthz`.
-- GitHub push webhook: `https://chat.urba.group/discord-bot-deploy`.
-- Webhook service: `urba-discord-deploy-webhook.service`.
-- Webhook secret is stored only on the server in
-  `/opt/urba-apps/discord-bot/deploy.env`.
+- GitHub deploys should use the server-local
+  `urba-discord-poll-deploy.timer`, not a public webhook.
+- Do not add mavebot endpoints to `chat.urba.group`; that domain belongs to
+  Chatwoot.
 
 ## Discord Command Registration
 
@@ -40,9 +40,10 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Official Codex Slack requires `@Codex`, replies in threads, and chooses a
   cloud environment automatically. It cannot turn `#bot` into a normal channel
   session by itself.
-- A custom Slack bridge receives events at
-  `https://chat.urba.group/slack/events` and stores channel memory in
+- A custom Slack bridge stores channel memory in
   `/opt/urba-apps/discord-bot/shared/slack-memory.jsonl`.
+- The bridge should use Slack Socket Mode with `SLACK_APP_TOKEN` so Slack events
+  arrive over an outbound WebSocket and no public domain is required.
 - Slack channel ID for `#bot`: `C0BCRVC2C6Q`.
 - Slack app ID for the custom bridge: `A0BCMC7JKRC`.
 - The intended default Codex cloud environment is `mavebot`, with

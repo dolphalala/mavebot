@@ -6,10 +6,14 @@ import express from 'express';
 
 const signingSecret = process.env.SLACK_SIGNING_SECRET || '';
 const botToken = process.env.SLACK_BOT_TOKEN || '';
+const appToken = process.env.SLACK_APP_TOKEN || '';
 const channelId = process.env.SLACK_CHANNEL_ID || '';
 const host = process.env.SLACK_BRIDGE_HOST || '0.0.0.0';
 const port = Number.parseInt(process.env.SLACK_BRIDGE_PORT || '4190', 10);
 const eventPath = process.env.SLACK_BRIDGE_EVENT_PATH || '/slack/events';
+const socketMode =
+  process.env.SLACK_SOCKET_MODE === '1' ||
+  (Boolean(appToken) && process.env.SLACK_SOCKET_MODE !== '0');
 const memoryPath =
   process.env.SLACK_MEMORY_PATH || '/shared/slack-memory.jsonl';
 const contextPath =
@@ -18,8 +22,15 @@ const autoReply = process.env.SLACK_BRIDGE_AUTOREPLY === '1';
 
 let messageCount = 0;
 let lastEventAt = null;
+let socketConnected = false;
+let socketLastConnectedAt = null;
+let socketReconnects = 0;
 
 function hasSlackConfig() {
+  if (socketMode) {
+    return Boolean(appToken && channelId);
+  }
+
   return Boolean(signingSecret && channelId);
 }
 
@@ -103,7 +114,7 @@ async function postMessage(text) {
 
 async function handleSlackEvent(payload) {
   const event = payload.event;
-  if (!event || event.type !== 'message') {
+  if (!event || !['message', 'app_mention'].includes(event.type)) {
     return;
   }
 
@@ -126,6 +137,124 @@ async function handleSlackEvent(payload) {
   }
 }
 
+async function openSocketUrl() {
+  const response = await fetch('https://slack.com/api/apps.connections.open', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${appToken}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  });
+
+  const result = await response.json();
+  if (!result.ok || !result.url) {
+    throw new Error(
+      `apps.connections.open failed: ${result.error || 'missing url'}`
+    );
+  }
+
+  return result.url;
+}
+
+async function socketDataToText(data) {
+  if (typeof data === 'string') {
+    return data;
+  }
+
+  if (Buffer.isBuffer(data)) {
+    return data.toString('utf8');
+  }
+
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data).toString('utf8');
+  }
+
+  if (data && typeof data.text === 'function') {
+    return data.text();
+  }
+
+  return String(data);
+}
+
+function acknowledgeSocketEnvelope(socket, envelope) {
+  if (!envelope.envelope_id || socket.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  socket.send(JSON.stringify({ envelope_id: envelope.envelope_id }));
+}
+
+async function handleSocketMessage(socket, data) {
+  const envelope = JSON.parse(await socketDataToText(data));
+
+  if (envelope.type === 'disconnect') {
+    console.log(`Slack Socket Mode disconnect: ${envelope.reason || 'unknown'}`);
+    socket.close();
+    return;
+  }
+
+  acknowledgeSocketEnvelope(socket, envelope);
+
+  if (envelope.type === 'events_api' && envelope.payload) {
+    await handleSlackEvent(envelope.payload);
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function runSocketMode() {
+  if (!appToken) {
+    console.log('SLACK_APP_TOKEN is missing; Socket Mode is disabled.');
+    return;
+  }
+
+  let retryDelayMs = 1000;
+
+  for (;;) {
+    try {
+      const socketUrl = await openSocketUrl();
+
+      await new Promise((resolve) => {
+        const socket = new WebSocket(socketUrl);
+
+        socket.addEventListener('open', () => {
+          socketConnected = true;
+          socketLastConnectedAt = new Date().toISOString();
+          retryDelayMs = 1000;
+          console.log('Slack Socket Mode connected.');
+        });
+
+        socket.addEventListener('message', (event) => {
+          void handleSocketMessage(socket, event.data).catch((error) => {
+            console.error('Slack Socket Mode message failed:', error);
+          });
+        });
+
+        socket.addEventListener('close', () => {
+          socketConnected = false;
+          socketReconnects += 1;
+          resolve();
+        });
+
+        socket.addEventListener('error', (error) => {
+          socketConnected = false;
+          console.error('Slack Socket Mode socket error:', error.message);
+          socket.close();
+        });
+      });
+    } catch (error) {
+      socketConnected = false;
+      socketReconnects += 1;
+      console.error('Slack Socket Mode connection failed:', error.message);
+    }
+
+    await sleep(retryDelayMs);
+    retryDelayMs = Math.min(retryDelayMs * 2, 30000);
+  }
+}
+
 const app = express();
 
 app.get('/healthz', (_req, res) => {
@@ -133,7 +262,12 @@ app.get('/healthz', (_req, res) => {
     ok: hasSlackConfig(),
     channelIdConfigured: Boolean(channelId),
     signingSecretConfigured: Boolean(signingSecret),
+    appTokenConfigured: Boolean(appToken),
     botTokenConfigured: Boolean(botToken),
+    socketMode,
+    socketConnected,
+    socketLastConnectedAt,
+    socketReconnects,
     autoReply,
     messageCount,
     lastEventAt
@@ -174,6 +308,12 @@ app.post(eventPath, express.raw({ type: '*/*', limit: '1mb' }), (req, res) => {
 app.listen(port, host, () => {
   console.log(`Slack bridge listening on ${host}:${port}${eventPath}.`);
   if (!hasSlackConfig()) {
-    console.log('Slack bridge is waiting for SLACK_SIGNING_SECRET and SLACK_CHANNEL_ID.');
+    console.log(
+      'Slack bridge is waiting for Slack config. HTTP mode needs SLACK_SIGNING_SECRET and SLACK_CHANNEL_ID; Socket Mode needs SLACK_APP_TOKEN and SLACK_CHANNEL_ID.'
+    );
+  }
+
+  if (socketMode) {
+    void runSocketMode();
   }
 });
