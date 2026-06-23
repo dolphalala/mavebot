@@ -4,4 +4,6 @@ npm-debug.log
 .git
 .gitignore
 README.md
-docs
+docs/*
+!docs/context
+!docs/context/operating-memory.md
