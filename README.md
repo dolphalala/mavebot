@@ -59,6 +59,8 @@ Create `/opt/urba-apps/discord-bot/.env` from `.env.example` and fill in:
 DISCORD_TOKEN=
 DISCORD_CLIENT_ID=1519063290058117170
 DISCORD_GUILD_ID=
+COC_API_BASE_URL=https://api.clashofclans.com/v1
+COC_API_TOKEN=
 ```
 
 Leave `DISCORD_GUILD_ID` blank for global slash commands that work in every
@@ -77,6 +79,9 @@ curl -i http://127.0.0.1:4188/healthz
 ```
 
 Global command registration can take longer to appear in Discord.
+
+The Clash of Clans developer API token must be created for the server public IP
+`5.78.127.221` and stored only in the server `.env` file.
 
 ## Slack Bridge
 

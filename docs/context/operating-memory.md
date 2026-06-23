@@ -12,6 +12,9 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   - `/ping`: replies with websocket latency.
   - `/iloveyou`: sends a randomized embed love letter for Lana and Allen.
 - Allen is Korean and Lana is Croatian; `/iloveyou` copy can use that context.
+- The app is Clash of Clans focused. CoC API calls should use the official API
+  base URL `https://api.clashofclans.com/v1` and the server-only
+  `COC_API_TOKEN`.
 
 ## Deployment
 
@@ -19,6 +22,8 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Production server alias: `urba-chatwoot`, host `5.78.127.221`.
 - Server app path: `/opt/urba-apps/discord-bot/app`.
 - Runtime env path: `/opt/urba-apps/discord-bot/.env`.
+- CoC API env keys live in the same server-only env file:
+  `COC_API_BASE_URL` and `COC_API_TOKEN`.
 - Docker Compose service/container: `urba-discord-bot`.
 - Health endpoint: `http://127.0.0.1:4188/healthz`.
 - GitHub deploys should use the server-local
