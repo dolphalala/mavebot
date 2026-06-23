@@ -8,8 +8,9 @@
   },
   "scripts": {
     "start": "node src/index.mjs",
+    "slack-bridge": "node src/slack-bridge.mjs",
     "register": "node scripts/register-commands.mjs",
-    "check": "node --check src/index.mjs && node --check src/commands.mjs && node --check scripts/register-commands.mjs && python -m py_compile scripts/deploy-webhook.py"
+    "check": "node --check src/index.mjs && node --check src/slack-bridge.mjs && node --check src/commands.mjs && node --check scripts/register-commands.mjs && python -m py_compile scripts/deploy-webhook.py"
   },
   "dependencies": {
     "discord.js": "14.26.4",
