@@ -99,6 +99,12 @@ SLACK_APP_TOKEN=
 SLACK_BOT_TOKEN=
 SLACK_CHANNEL_ID=C0BCRVC2C6Q
 SLACK_SOCKET_MODE=1
+SLACK_CODEX_FORWARD=1
+SLACK_CODEX_USER_ID=
+SLACK_CODEX_ENVIRONMENT=mavebot
+SLACK_CODEX_REPOSITORY=dolphalala/mavebot
+SLACK_CODEX_MIRROR_REPLIES=1
+SLACK_CODEX_STATE_PATH=/shared/codex-forward-state.json
 SLACK_BRIDGE_AUTOREPLY=0
 ```
 
@@ -120,3 +126,8 @@ In Slack `Event Subscriptions`, enable events and subscribe the bot to:
 - `app_mention`
 
 For Socket Mode, do not enter a Request URL.
+
+When `SLACK_CODEX_FORWARD=1`, normal human messages in `#bot` are reposted by
+`mavebot` as mentions to the official Codex Slack app. That path uses Codex
+cloud through the connected ChatGPT/Codex account and does not require an
+OpenAI API key.

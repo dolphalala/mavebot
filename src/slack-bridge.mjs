@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
-import { mkdir, readFile, appendFile } from 'node:fs/promises';
+import { mkdir, readFile, appendFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import express from 'express';
 
@@ -18,7 +18,14 @@ const memoryPath =
   process.env.SLACK_MEMORY_PATH || '/shared/slack-memory.jsonl';
 const contextPath =
   process.env.SLACK_CONTEXT_PATH || '/app/docs/context/operating-memory.md';
+const codexStatePath =
+  process.env.SLACK_CODEX_STATE_PATH || '/shared/codex-forward-state.json';
 const autoReply = process.env.SLACK_BRIDGE_AUTOREPLY === '1';
+const codexForward = process.env.SLACK_CODEX_FORWARD === '1';
+const codexMirrorReplies = process.env.SLACK_CODEX_MIRROR_REPLIES !== '0';
+const codexUserId = process.env.SLACK_CODEX_USER_ID || '';
+const codexEnvironment = process.env.SLACK_CODEX_ENVIRONMENT || 'mavebot';
+const codexRepository = process.env.SLACK_CODEX_REPOSITORY || 'dolphalala/mavebot';
 
 let messageCount = 0;
 let lastEventAt = null;
@@ -76,6 +83,19 @@ async function readContext() {
   }
 }
 
+async function readBridgeState() {
+  try {
+    return JSON.parse(await readFile(codexStatePath, 'utf8'));
+  } catch {
+    return { forwarded: {} };
+  }
+}
+
+async function writeBridgeState(state) {
+  await mkdir(path.dirname(codexStatePath), { recursive: true });
+  await writeFile(codexStatePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+}
+
 async function rememberMessage(payload, event) {
   await mkdir(path.dirname(memoryPath), { recursive: true });
   const row = {
@@ -92,10 +112,10 @@ async function rememberMessage(payload, event) {
   lastEventAt = row.receivedAt;
 }
 
-async function postMessage(text) {
+async function postMessage({ text, threadTs }) {
   if (!botToken) {
     console.log('SLACK_BOT_TOKEN is missing; memory saved without Slack reply.');
-    return;
+    return null;
   }
 
   const response = await fetch('https://slack.com/api/chat.postMessage', {
@@ -106,14 +126,68 @@ async function postMessage(text) {
     },
     body: JSON.stringify({
       channel: channelId,
-      text
+      text,
+      ...(threadTs ? { thread_ts: threadTs } : {})
     })
   });
 
   const result = await response.json();
   if (!result.ok) {
     console.error('chat.postMessage failed:', result.error);
+    return null;
   }
+
+  return result;
+}
+
+function buildCodexPrompt(event) {
+  return [
+    `<@${codexUserId}>`,
+    `Use the Codex cloud environment "${codexEnvironment}" for repository "${codexRepository}".`,
+    'This came from Allen in the #bot Slack channel through mavebot, so Allen did not type @Codex directly.',
+    'Read docs/context/operating-memory.md first. If this requires code changes, work in the connected GitHub repo so the server auto-deploy path can pick it up.',
+    '',
+    `Allen said: ${event.text || ''}`
+  ].join('\n');
+}
+
+async function forwardToCodex(event) {
+  if (!codexUserId) {
+    await postMessage({
+      text: 'Codex forwarding is enabled, but SLACK_CODEX_USER_ID is not configured.'
+    });
+    return;
+  }
+
+  const result = await postMessage({ text: buildCodexPrompt(event) });
+  if (!result?.ts) {
+    return;
+  }
+
+  const state = await readBridgeState();
+  state.forwarded ||= {};
+  state.forwarded[result.ts] = {
+    sourceTs: event.ts,
+    sourceUser: event.user,
+    sourceText: event.text || '',
+    createdAt: new Date().toISOString()
+  };
+  await writeBridgeState(state);
+}
+
+async function mirrorCodexReply(event) {
+  if (!codexMirrorReplies || event.user !== codexUserId || !event.thread_ts) {
+    return false;
+  }
+
+  const state = await readBridgeState();
+  const forwarded = state.forwarded?.[event.thread_ts];
+  if (!forwarded) {
+    return false;
+  }
+
+  await postMessage({ text: `Codex: ${event.text || ''}` });
+  return true;
 }
 
 async function handleSlackEvent(payload) {
@@ -126,18 +200,27 @@ async function handleSlackEvent(payload) {
     return;
   }
 
+  if (await mirrorCodexReply(event)) {
+    return;
+  }
+
   if (event.bot_id || event.subtype) {
     return;
   }
 
   await rememberMessage(payload, event);
 
+  if (codexForward) {
+    await forwardToCodex(event);
+    return;
+  }
+
   if (autoReply) {
     const context = await readContext();
     const contextHint = context
       ? 'I saved this to mavebot memory. The coding runner is not wired yet.'
       : 'I saved this message, but repo context was not readable.';
-    await postMessage(contextHint);
+    await postMessage({ text: contextHint });
   }
 }
 
@@ -277,6 +360,11 @@ app.get('/healthz', async (_req, res) => {
     contextReadable,
     contextPath,
     autoReply,
+    codexForward,
+    codexMirrorReplies,
+    codexUserIdConfigured: Boolean(codexUserId),
+    codexEnvironment,
+    codexRepository,
     messageCount,
     lastEventAt
   });

@@ -49,8 +49,13 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   `/opt/urba-apps/discord-bot/shared/slack-memory.jsonl`.
 - The bridge should use Slack Socket Mode with `SLACK_APP_TOKEN` so Slack events
   arrive over an outbound WebSocket and no public domain is required.
+- The bridge can forward normal #bot user messages to the official Codex Slack
+  app by posting a hidden `@Codex` mention as `mavebot`. This uses Codex cloud
+  through Allen's ChatGPT/Codex subscription after Codex is connected in Slack;
+  it does not require an OpenAI API key.
 - Slack channel ID for `#bot`: `C0BCRVC2C6Q`.
 - Slack app ID for the custom bridge: `A0BCMC7JKRC`.
+- Official Codex Slack user ID observed in #bot: `U0BCS1LE1B6`.
 - The intended default Codex cloud environment is `mavebot`, with
   `dolphalala/mavebot` as the target repo.
 - When Codex cloud works on this repo, it should read this file first, then
