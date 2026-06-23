@@ -56,9 +56,13 @@ Create `/opt/urba-apps/discord-bot/.env` from `.env.example` and fill in:
 
 ```text
 DISCORD_TOKEN=
-DISCORD_CLIENT_ID=
+DISCORD_CLIENT_ID=1519063290058117170
 DISCORD_GUILD_ID=
 ```
+
+Leave `DISCORD_GUILD_ID` blank for global slash commands that work in every
+server where the bot is installed. Set it only when you want faster command
+updates in one development server.
 
 Then register commands and start the bot:
 
@@ -71,5 +75,4 @@ docker compose ps
 curl -i http://127.0.0.1:4188/healthz
 ```
 
-Use `DISCORD_GUILD_ID` first for fast command registration while developing.
 Global command registration can take longer to appear in Discord.
