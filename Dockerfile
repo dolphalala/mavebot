@@ -8,6 +8,7 @@ RUN npm install --omit=dev
 
 COPY --chown=node:node src ./src
 COPY --chown=node:node scripts ./scripts
+COPY --chown=node:node docs ./docs
 
 USER node
 EXPOSE 4188

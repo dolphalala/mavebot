@@ -25,6 +25,7 @@ let lastEventAt = null;
 let socketConnected = false;
 let socketLastConnectedAt = null;
 let socketReconnects = 0;
+let contextReadable = false;
 
 function hasSlackConfig() {
   if (socketMode) {
@@ -66,8 +67,11 @@ function verifySlackRequest(req, body) {
 
 async function readContext() {
   try {
-    return await readFile(contextPath, 'utf8');
+    const context = await readFile(contextPath, 'utf8');
+    contextReadable = true;
+    return context;
   } catch {
+    contextReadable = false;
     return '';
   }
 }
@@ -257,7 +261,9 @@ async function runSocketMode() {
 
 const app = express();
 
-app.get('/healthz', (_req, res) => {
+app.get('/healthz', async (_req, res) => {
+  await readContext();
+
   res.status(hasSlackConfig() ? 200 : 503).json({
     ok: hasSlackConfig(),
     channelIdConfigured: Boolean(channelId),
@@ -268,6 +274,8 @@ app.get('/healthz', (_req, res) => {
     socketConnected,
     socketLastConnectedAt,
     socketReconnects,
+    contextReadable,
+    contextPath,
     autoReply,
     messageCount,
     lastEventAt
