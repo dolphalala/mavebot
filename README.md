@@ -37,6 +37,7 @@ GitHub push deploys are handled by a server-local webhook:
 ```text
 GitHub push to main
   -> https://chat.urba.group/discord-bot-deploy
+  -> /opt/urba-apps/discord-bot/app/scripts/deploy-webhook.py
   -> /opt/urba-apps/discord-bot/app/scripts/deploy-server.sh
   -> docker compose build
   -> register slash commands when Discord credentials exist
