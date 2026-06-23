@@ -30,6 +30,25 @@ npm run check
     scripts/
 ```
 
+## Auto Deploy
+
+GitHub push deploys are handled by a server-local webhook:
+
+```text
+GitHub push to main
+  -> https://chat.urba.group/discord-bot-deploy
+  -> /opt/urba-apps/discord-bot/app/scripts/deploy-server.sh
+  -> docker compose build
+  -> register slash commands when Discord credentials exist
+  -> restart only urba-discord-bot
+```
+
+The webhook secret lives only on the server in
+`/opt/urba-apps/discord-bot/deploy.env`. Do not commit or paste it into chat.
+
+If Discord credentials are not complete yet, the deploy script pulls and builds
+the latest image but skips starting the bot.
+
 ## Server Setup
 
 Create `/opt/urba-apps/discord-bot/.env` from `.env.example` and fill in:
