@@ -40,9 +40,15 @@ has_value() {
   grep -Eq "^${key}=.+" "$APP_ENV"
 }
 
-if ! has_value DISCORD_TOKEN || ! has_value DISCORD_CLIENT_ID || ! has_value DISCORD_GUILD_ID; then
-  echo "Discord credentials are not complete. Built image only; runtime start skipped."
+if ! has_value DISCORD_TOKEN || ! has_value DISCORD_CLIENT_ID; then
+  echo "Discord token/client ID are not complete. Built image only; runtime start skipped."
   exit 0
+fi
+
+if has_value DISCORD_GUILD_ID; then
+  echo "Registering guild-scoped slash commands."
+else
+  echo "Registering global slash commands because DISCORD_GUILD_ID is blank."
 fi
 
 docker compose -f "$APP_ROOT/docker-compose.yml" run --rm discord-bot npm run register
