@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node src/index.mjs",
     "register": "node scripts/register-commands.mjs",
-    "check": "node --check src/index.mjs && node --check src/commands.mjs && node --check scripts/register-commands.mjs"
+    "check": "node --check src/index.mjs && node --check src/commands.mjs && node --check scripts/register-commands.mjs && node --check scripts/deploy-webhook.mjs"
   },
   "dependencies": {
     "discord.js": "14.26.4",
