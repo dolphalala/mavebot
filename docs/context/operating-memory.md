@@ -50,16 +50,32 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - The bridge should use Slack Socket Mode with `SLACK_APP_TOKEN` so Slack events
   arrive over an outbound WebSocket and no public domain is required.
 - The bridge can forward normal #bot user messages to the official Codex Slack
-  app by posting a hidden `@Codex` mention as `mavebot`. This uses Codex cloud
-  through Allen's ChatGPT/Codex subscription after Codex is connected in Slack;
-  it does not require an OpenAI API key.
+  app by posting a hidden `@Codex` mention as the Slack user who spoke. This
+  uses Codex cloud through that user's connected ChatGPT/Codex account after
+  they authorize mavebot once; it does not require an OpenAI API key.
+- Forwarded Codex prompts should include recent saved `#bot` messages from
+  bridge memory so Slack feels like a running session. The default prompt memory
+  window is controlled by `SLACK_CODEX_MEMORY_LIMIT`.
+- Codex cloud tasks should treat `docs/context/slack-session.md` as durable
+  `#bot` session memory. Each task should read it after this file and update it
+  when a turn adds facts, decisions, open work, deployment changes, or user
+  preferences future tasks should know.
+- If Allen or Lana asks to reset/start a new session, create a new dated section
+  in `docs/context/slack-session.md` instead of deleting older memory.
+- Per-user Slack user tokens are stored server-side at
+  `/opt/urba-apps/discord-bot/shared/slack-user-tokens.json`. Do not commit or
+  print this file.
+- Slack OAuth redirect URI:
+  `https://mavebot.lanawee.com/mavebot/slack/oauth/callback`.
+- Required Slack user scope for per-user forwarding: `chat:write`.
 - Slack channel ID for `#bot`: `C0BCRVC2C6Q`.
 - Slack app ID for the custom bridge: `A0BCMC7JKRC`.
 - Official Codex Slack user ID observed in #bot: `U0BCS1LE1B6`.
 - The intended default Codex cloud environment is `mavebot`, with
   `dolphalala/mavebot` as the target repo.
 - When Codex cloud works on this repo, it should read this file first, then
-  inspect the current code before changing behavior.
+  `docs/context/slack-session.md`, then inspect the current code before changing
+  behavior.
 - Do not ask Allen for generic setup context already captured here. Ask only for
   missing secrets or external UI actions that cannot be done from the repo or
   server.

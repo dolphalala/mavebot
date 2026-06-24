@@ -5,17 +5,25 @@ import path from 'node:path';
 import express from 'express';
 
 const signingSecret = process.env.SLACK_SIGNING_SECRET || '';
+const clientId = process.env.SLACK_CLIENT_ID || '';
+const clientSecret = process.env.SLACK_CLIENT_SECRET || '';
 const botToken = process.env.SLACK_BOT_TOKEN || '';
 const appToken = process.env.SLACK_APP_TOKEN || '';
 const channelId = process.env.SLACK_CHANNEL_ID || '';
 const host = process.env.SLACK_BRIDGE_HOST || '0.0.0.0';
 const port = Number.parseInt(process.env.SLACK_BRIDGE_PORT || '4190', 10);
 const eventPath = process.env.SLACK_BRIDGE_EVENT_PATH || '/slack/events';
+const oauthStartPath =
+  process.env.SLACK_OAUTH_START_PATH || '/mavebot/slack/oauth/start';
+const oauthCallbackPath =
+  process.env.SLACK_OAUTH_CALLBACK_PATH || '/mavebot/slack/oauth/callback';
 const socketMode =
   process.env.SLACK_SOCKET_MODE === '1' ||
   (Boolean(appToken) && process.env.SLACK_SOCKET_MODE !== '0');
 const memoryPath =
   process.env.SLACK_MEMORY_PATH || '/shared/slack-memory.jsonl';
+const userTokenPath =
+  process.env.SLACK_USER_TOKEN_PATH || '/shared/slack-user-tokens.json';
 const contextPath =
   process.env.SLACK_CONTEXT_PATH || '/app/docs/context/operating-memory.md';
 const codexStatePath =
@@ -23,13 +31,33 @@ const codexStatePath =
 const autoReply = process.env.SLACK_BRIDGE_AUTOREPLY === '1';
 const codexForward = process.env.SLACK_CODEX_FORWARD === '1';
 const codexMirrorReplies = process.env.SLACK_CODEX_MIRROR_REPLIES !== '0';
+const codexForwardInThread = process.env.SLACK_CODEX_FORWARD_IN_THREAD !== '0';
+const codexDeleteForward = process.env.SLACK_CODEX_DELETE_FORWARD === '1';
+const codexDeleteForwardDelayMs = Number.parseInt(
+  process.env.SLACK_CODEX_DELETE_FORWARD_DELAY_MS || '5000',
+  10
+);
 const codexUserId = process.env.SLACK_CODEX_USER_ID || '';
 const codexEnvironment = process.env.SLACK_CODEX_ENVIRONMENT || 'mavebot';
 const codexRepository = process.env.SLACK_CODEX_REPOSITORY || 'dolphalala/mavebot';
 const codexMemoryLimit = Number.parseInt(
-  process.env.SLACK_CODEX_MEMORY_LIMIT || '12',
+  process.env.SLACK_CODEX_MEMORY_LIMIT || '30',
   10
 );
+const oauthRedirectUri = process.env.SLACK_OAUTH_REDIRECT_URI || '';
+const userScopes =
+  process.env.SLACK_USER_SCOPES || 'chat:write';
+
+const workingMessages = [
+  'Working on it. I will bring the answer back here.',
+  'On it. Little mavebot is padding through the repo now.',
+  'I am checking it now and will come back to #bot.',
+  'Got it. I am doing the quiet repo work now.',
+  'I am on it. Tiny heart engine running.',
+  'Working on it for you now.',
+  'I will check the repo and report back here.',
+  'On it. I will keep the answer in this channel.'
+];
 
 let messageCount = 0;
 let lastEventAt = null;
@@ -100,6 +128,94 @@ async function writeBridgeState(state) {
   await writeFile(codexStatePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
 }
 
+function base64UrlEncode(value) {
+  return Buffer.from(value).toString('base64url');
+}
+
+function base64UrlDecode(value) {
+  return Buffer.from(value, 'base64url').toString('utf8');
+}
+
+function oauthStateSecret() {
+  return signingSecret || clientSecret || botToken || appToken;
+}
+
+function signStatePayload(encodedPayload) {
+  return crypto
+    .createHmac('sha256', oauthStateSecret())
+    .update(encodedPayload)
+    .digest('base64url');
+}
+
+function createOAuthState({ userId, teamId }) {
+  const payload = base64UrlEncode(
+    JSON.stringify({
+      userId,
+      teamId,
+      ts: Date.now(),
+      nonce: crypto.randomBytes(12).toString('hex')
+    })
+  );
+  return `${payload}.${signStatePayload(payload)}`;
+}
+
+function parseOAuthState(state) {
+  const [payload, signature] = String(state || '').split('.');
+  if (!payload || !signature) {
+    throw new Error('missing OAuth state');
+  }
+
+  const expected = signStatePayload(payload);
+  const expectedBuffer = Buffer.from(expected);
+  const actualBuffer = Buffer.from(signature);
+  if (
+    expectedBuffer.length !== actualBuffer.length ||
+    !crypto.timingSafeEqual(expectedBuffer, actualBuffer)
+  ) {
+    throw new Error('invalid OAuth state signature');
+  }
+
+  const parsed = JSON.parse(base64UrlDecode(payload));
+  if (Date.now() - parsed.ts > 10 * 60 * 1000) {
+    throw new Error('OAuth state expired');
+  }
+
+  return parsed;
+}
+
+async function readUserTokens() {
+  try {
+    const parsed = JSON.parse(await readFile(userTokenPath, 'utf8'));
+    parsed.users ||= {};
+    return parsed;
+  } catch {
+    return { users: {} };
+  }
+}
+
+async function writeUserTokens(tokens) {
+  await mkdir(path.dirname(userTokenPath), { recursive: true });
+  await writeFile(userTokenPath, `${JSON.stringify(tokens, null, 2)}\n`, 'utf8');
+}
+
+async function getUserToken(userId) {
+  const tokens = await readUserTokens();
+  const entry = tokens.users?.[userId];
+  return entry?.accessToken || '';
+}
+
+async function saveUserToken({ userId, teamId, accessToken, scopes }) {
+  const tokens = await readUserTokens();
+  tokens.users ||= {};
+  tokens.users[userId] = {
+    accessToken,
+    teamId,
+    scopes,
+    authedAt: new Date().toISOString()
+  };
+  await writeUserTokens(tokens);
+}
+
 async function rememberMessage(payload, event) {
   await mkdir(path.dirname(memoryPath), { recursive: true });
   const row = {
@@ -140,39 +256,95 @@ async function readRecentMemory(limit = codexMemoryLimit) {
   }
 }
 
-async function postMessage({ text, threadTs }) {
-  if (!botToken) {
-    console.log('SLACK_BOT_TOKEN is missing; memory saved without Slack reply.');
+async function postSlackApi({ method, token = botToken, body }) {
+  if (!token) {
+    console.log(`${method} skipped because a Slack token is missing.`);
     return null;
   }
 
-  const response = await fetch('https://slack.com/api/chat.postMessage', {
+  const response = await fetch(`https://slack.com/api/${method}`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${botToken}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json; charset=utf-8'
     },
-    body: JSON.stringify({
-      channel: channelId,
-      text,
-      ...(threadTs ? { thread_ts: threadTs } : {})
-    })
+    body: JSON.stringify(body)
   });
 
   const result = await response.json();
   if (!result.ok) {
-    console.error('chat.postMessage failed:', result.error);
+    console.error(`${method} failed:`, result.error);
     return null;
   }
 
   return result;
 }
 
+async function postMessage({ text, threadTs, token = botToken }) {
+  if (!token) {
+    console.log('Slack token is missing; memory saved without Slack reply.');
+    return null;
+  }
+
+  return postSlackApi({
+    method: 'chat.postMessage',
+    token,
+    body: {
+      channel: channelId,
+      text,
+      unfurl_links: false,
+      unfurl_media: false,
+      ...(threadTs ? { thread_ts: threadTs } : {})
+    }
+  });
+}
+
+async function deleteMessage({ ts, token = botToken }) {
+  return postSlackApi({
+    method: 'chat.delete',
+    token,
+    body: {
+      channel: channelId,
+      ts
+    }
+  });
+}
+
+function scheduleForwardDelete({ ts, token }) {
+  if (!codexDeleteForward || !ts || !token) {
+    return;
+  }
+
+  const delayMs =
+    Number.isFinite(codexDeleteForwardDelayMs) && codexDeleteForwardDelayMs >= 0
+      ? codexDeleteForwardDelayMs
+      : 5000;
+
+  const timer = setTimeout(() => {
+    deleteMessage({ ts, token }).catch((error) => {
+      console.error('Failed to delete Codex forwarding message:', error);
+    });
+  }, delayMs);
+  timer.unref?.();
+}
+
+async function postEphemeral({ text, user, threadTs }) {
+  return postSlackApi({
+    method: 'chat.postEphemeral',
+    body: {
+      channel: channelId,
+      user,
+      text,
+      ...(threadTs ? { thread_ts: threadTs } : {})
+    }
+  });
+}
+
 async function buildCodexPrompt(event) {
   const recentMemory = await readRecentMemory();
   const memoryLines = recentMemory
     .map((row) => {
-      const speaker = row.user === event.user ? 'Allen' : row.user || 'unknown';
+      const speaker = row.user === event.user ? 'current user' : row.user || 'unknown';
       return `- ${row.receivedAt || row.ts || 'unknown time'} ${speaker}: ${row.text || ''}`;
     })
     .filter(Boolean);
@@ -180,8 +352,16 @@ async function buildCodexPrompt(event) {
   const parts = [
     `<@${codexUserId}>`,
     `Use the Codex cloud environment "${codexEnvironment}" for repository "${codexRepository}".`,
-    'This came from Allen in the #bot Slack channel through mavebot, so Allen did not type @Codex directly.',
-    'Read docs/context/operating-memory.md first. If this requires code changes, work in the connected GitHub repo so the server auto-deploy path can pick it up.',
+    `This came from Slack user <@${event.user}> in the #bot channel through mavebot, so they did not type @Codex directly.`,
+    '',
+    'Mavebot Slack session contract:',
+    '- Treat this as one turn in the persistent #bot Slack session, even if Codex cloud starts a new task for each Slack mention.',
+    '- Read docs/context/operating-memory.md first for stable project facts.',
+    '- Read docs/context/slack-session.md next for durable channel memory, current goals, decisions, and open threads.',
+    '- If the user asks to reset, start over, or create a new session, add a new dated section in docs/context/slack-session.md and use that as the active context.',
+    '- Otherwise keep continuity by appending durable facts, decisions, and next steps to docs/context/slack-session.md whenever the turn changes what future Codex runs should know.',
+    '- If code changes are needed, work in the connected GitHub repo so the server auto-deploy path can pick it up.',
+    '- Reply for Slack as mavebot: direct, helpful, no ChatGPT promo text, no task links, no need to explain this bridge unless asked.',
     ''
   ];
 
@@ -190,10 +370,38 @@ async function buildCodexPrompt(event) {
   }
 
   parts.push(
-    `Allen said: ${event.text || ''}`
+    `User <@${event.user}> said: ${event.text || ''}`
   );
 
   return parts.join('\n');
+}
+
+function buildOAuthAuthorizeUrl(event) {
+  if (!clientId || !oauthRedirectUri || !oauthStateSecret()) {
+    return '';
+  }
+
+  const url = new URL('https://slack.com/oauth/v2/authorize');
+  url.searchParams.set('client_id', clientId);
+  url.searchParams.set('user_scope', userScopes);
+  url.searchParams.set('redirect_uri', oauthRedirectUri);
+  url.searchParams.set(
+    'state',
+    createOAuthState({ userId: event.user, teamId: event.team })
+  );
+  if (event.team) {
+    url.searchParams.set('team', event.team);
+  }
+  return url.toString();
+}
+
+async function askUserToAuthorize(event) {
+  const authorizeUrl = buildOAuthAuthorizeUrl(event);
+  const text = authorizeUrl
+    ? `<@${event.user}> I got your message. To forward #bot messages to Codex as you, authorize mavebot once: ${authorizeUrl}`
+    : `<@${event.user}> I got your message and saved it, but I cannot forward it to Codex yet. Slack requires each user to authorize mavebot before it can post the @Codex forwarding message as that user. No Slack OAuth redirect URL is configured right now.`;
+
+  await postMessage({ text });
 }
 
 async function forwardToCodex(event) {
@@ -204,10 +412,18 @@ async function forwardToCodex(event) {
     return;
   }
 
+  const userToken = await getUserToken(event.user);
+  if (!userToken) {
+    await askUserToAuthorize(event);
+    return;
+  }
+
   const parentThreadTs = event.thread_ts || event.ts;
+  const forwardThreadTs = codexForwardInThread ? parentThreadTs : undefined;
   const result = await postMessage({
     text: await buildCodexPrompt(event),
-    threadTs: parentThreadTs
+    threadTs: forwardThreadTs,
+    token: userToken
   });
   if (!result?.ts) {
     return;
@@ -222,8 +438,51 @@ async function forwardToCodex(event) {
     createdAt: new Date().toISOString()
   };
   state.forwarded[result.ts] = forwarded;
-  state.forwarded[parentThreadTs] = forwarded;
+  if (forwardThreadTs) {
+    state.forwarded[forwardThreadTs] = forwarded;
+  }
   await writeBridgeState(state);
+  scheduleForwardDelete({ ts: result.ts, token: userToken });
+}
+
+function randomWorkingMessage() {
+  return workingMessages[crypto.randomInt(workingMessages.length)];
+}
+
+function cleanCodexMirrorText(text) {
+  return String(text || '')
+    .replace(/<https:\/\/chatgpt\.com\/codex\/[^>|]+(?:\|[^>]+)?>/g, '')
+    .split('\n')
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return true;
+      }
+
+      return !(
+        trimmed === 'View task' ||
+        trimmed.startsWith('ChatGPT helps you get answers,') ||
+        trimmed.startsWith('Wrong environment? Tag me again') ||
+        /^Today at .+ Added by /i.test(trimmed) ||
+        /https:\/\/chatgpt\.com\/codex\//i.test(trimmed)
+      );
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function isCodexKickoffStatus(text) {
+  return String(text || '').trim().startsWith('On it. Kicked off a task in the');
+}
+
+function isCodexStatusNoise(text) {
+  const trimmed = String(text || '').trim();
+  return (
+    !cleanCodexMirrorText(trimmed) ||
+    isCodexKickoffStatus(trimmed) ||
+    trimmed.startsWith('Wrong environment? Tag me again')
+  );
 }
 
 async function mirrorCodexReply(event) {
@@ -237,8 +496,31 @@ async function mirrorCodexReply(event) {
     return false;
   }
 
-  await postMessage({ text: `Codex: ${event.text || ''}` });
+  if (isCodexKickoffStatus(event.text)) {
+    if (!forwarded.statusAckedAt) {
+      const acked = { ...forwarded, statusAckedAt: new Date().toISOString() };
+      state.forwarded[event.thread_ts] = acked;
+      await writeBridgeState(state);
+      await postMessage({ text: randomWorkingMessage() });
+    }
+    return true;
+  }
+
+  if (isCodexStatusNoise(event.text)) {
+    return true;
+  }
+
+  const text = cleanCodexMirrorText(event.text);
+  await postMessage({ text });
   return true;
+}
+
+function isBridgeForward(event) {
+  const text = event.text || '';
+  return (
+    text.startsWith(`<@${codexUserId}>`) &&
+    text.includes('through mavebot')
+  );
 }
 
 async function handleSlackEvent(payload) {
@@ -246,12 +528,17 @@ async function handleSlackEvent(payload) {
   if (!event || !['message', 'app_mention'].includes(event.type)) {
     return;
   }
+  event.team ||= payload.team_id;
 
   if (event.channel !== channelId) {
     return;
   }
 
   if (await mirrorCodexReply(event)) {
+    return;
+  }
+
+  if (isBridgeForward(event)) {
     return;
   }
 
@@ -342,6 +629,31 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+async function exchangeOAuthCode(code) {
+  const response = await fetch('https://slack.com/api/oauth.v2.access', {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams({
+      code,
+      redirect_uri: oauthRedirectUri
+    })
+  });
+
+  return response.json();
+}
+
 async function runSocketMode() {
   if (!appToken) {
     console.log('SLACK_APP_TOKEN is missing; Socket Mode is disabled.');
@@ -395,15 +707,98 @@ async function runSocketMode() {
 
 const app = express();
 
+app.get(oauthStartPath, (req, res) => {
+  const user = String(req.query.user || '');
+  const team = String(req.query.team || '');
+  if (!user) {
+    res.status(400).send('missing user\n');
+    return;
+  }
+
+  const authorizeUrl = buildOAuthAuthorizeUrl({ user, team });
+  if (!authorizeUrl) {
+    res.status(503).send('Slack OAuth is not configured.\n');
+    return;
+  }
+
+  res.redirect(authorizeUrl);
+});
+
+app.get(oauthCallbackPath, async (req, res) => {
+  try {
+    if (!clientId || !clientSecret || !oauthRedirectUri) {
+      res.status(503).send('Slack OAuth is not configured.\n');
+      return;
+    }
+
+    const code = String(req.query.code || '');
+    if (!code) {
+      res.status(400).send('missing OAuth code\n');
+      return;
+    }
+
+    const state = parseOAuthState(req.query.state);
+    const result = await exchangeOAuthCode(code);
+    if (!result.ok) {
+      throw new Error(result.error || 'oauth.v2.access failed');
+    }
+
+    const authedUser = result.authed_user || {};
+    if (!authedUser.id || authedUser.id !== state.userId) {
+      throw new Error('Slack authorized user did not match the requesting user');
+    }
+
+    const teamId = result.team?.id || state.teamId || '';
+    if (state.teamId && teamId && teamId !== state.teamId) {
+      throw new Error('Slack authorized team did not match the requesting team');
+    }
+
+    if (!authedUser.access_token) {
+      throw new Error('Slack did not return a user access token');
+    }
+
+    await saveUserToken({
+      userId: authedUser.id,
+      teamId,
+      accessToken: authedUser.access_token,
+      scopes: authedUser.scope || result.scope || userScopes
+    });
+
+    res.type('html').send(
+      '<!doctype html><meta charset="utf-8"><title>mavebot connected</title>' +
+        '<body style="font-family: system-ui, sans-serif; margin: 2rem;">' +
+        '<h1>mavebot is connected</h1>' +
+        '<p>You can close this tab and go back to Slack. Your normal messages in #bot can now be forwarded to Codex as you.</p>' +
+        '</body>'
+    );
+  } catch (error) {
+    res.status(400).type('html').send(
+      '<!doctype html><meta charset="utf-8"><title>mavebot connection failed</title>' +
+        '<body style="font-family: system-ui, sans-serif; margin: 2rem;">' +
+        '<h1>mavebot connection failed</h1>' +
+        `<p>${escapeHtml(error.message)}</p>` +
+        '</body>'
+    );
+  }
+});
+
 app.get('/healthz', async (_req, res) => {
   await readContext();
+  const userTokens = await readUserTokens();
 
   res.status(hasSlackConfig() ? 200 : 503).json({
     ok: hasSlackConfig(),
     channelIdConfigured: Boolean(channelId),
     signingSecretConfigured: Boolean(signingSecret),
+    clientIdConfigured: Boolean(clientId),
+    clientSecretConfigured: Boolean(clientSecret),
     appTokenConfigured: Boolean(appToken),
     botTokenConfigured: Boolean(botToken),
+    oauthRedirectConfigured: Boolean(oauthRedirectUri),
+    oauthStartPath,
+    oauthCallbackPath,
+    userScopes,
+    userTokenCount: Object.keys(userTokens.users || {}).length,
     socketMode,
     socketConnected,
     socketLastConnectedAt,
@@ -413,6 +808,9 @@ app.get('/healthz', async (_req, res) => {
     autoReply,
     codexForward,
     codexMirrorReplies,
+    codexForwardInThread,
+    codexDeleteForward,
+    codexDeleteForwardDelayMs,
     codexUserIdConfigured: Boolean(codexUserId),
     codexEnvironment,
     codexRepository,

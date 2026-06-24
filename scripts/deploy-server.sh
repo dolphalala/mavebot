@@ -6,6 +6,7 @@ APP_ENV="${APP_ENV:-/opt/urba-apps/discord-bot/.env}"
 SLACK_ENV="${SLACK_ENV:-/opt/urba-apps/discord-bot/slack-bridge.env}"
 SLACK_MEMORY_FILE="${SLACK_MEMORY_FILE:-/opt/urba-apps/discord-bot/shared/slack-memory.jsonl}"
 SLACK_CODEX_STATE_FILE="${SLACK_CODEX_STATE_FILE:-/opt/urba-apps/discord-bot/shared/codex-forward-state.json}"
+SLACK_USER_TOKEN_FILE="${SLACK_USER_TOKEN_FILE:-/opt/urba-apps/discord-bot/shared/slack-user-tokens.json}"
 LOG_DIR="${LOG_DIR:-/opt/urba-apps/discord-bot/shared/logs}"
 LOCK_FILE="${LOCK_FILE:-/opt/urba-apps/discord-bot/shared/deploy.lock}"
 BRANCH="${BRANCH:-main}"
@@ -45,6 +46,11 @@ if [ ! -s "$SLACK_CODEX_STATE_FILE" ]; then
 fi
 chmod 600 "$SLACK_CODEX_STATE_FILE"
 chown 1000:1000 "$SLACK_CODEX_STATE_FILE" 2>/dev/null || true
+if [ ! -s "$SLACK_USER_TOKEN_FILE" ]; then
+  printf '{"users":{}}\n' >"$SLACK_USER_TOKEN_FILE"
+fi
+chmod 600 "$SLACK_USER_TOKEN_FILE"
+chown 1000:1000 "$SLACK_USER_TOKEN_FILE" 2>/dev/null || true
 
 git -C "$APP_ROOT" fetch origin "$BRANCH"
 git -C "$APP_ROOT" checkout "$BRANCH"
