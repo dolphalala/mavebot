@@ -6,7 +6,9 @@ import {
   cleanCodexMirrorText,
   defaultCodexDeleteForwardDelayMs,
   markUndeployedCodexWork,
+  selectCodexForwardThreadTs,
   selectCodexThreadReplies,
+  selectForwardMessageTsFromHistory,
   selectForwardForCodexEvent,
   isCodexStatusNoise
 } from '../src/slack-bridge.mjs';
@@ -92,6 +94,29 @@ test('buildCodexForwardPostArgs sends the real prompt as visible message text', 
   assert.equal(Object.hasOwn(args, 'blocks'), false);
 });
 
+test('selectCodexForwardThreadTs only threads when the trigger is in the bot channel', () => {
+  assert.equal(
+    selectCodexForwardThreadTs({
+      sourceTs: '1782339000.100000',
+      sourceThreadTs: undefined,
+      triggerChannelId: 'CTRIGGER',
+      botChannelId: 'CBOT',
+      forwardInThread: true
+    }),
+    undefined
+  );
+  assert.equal(
+    selectCodexForwardThreadTs({
+      sourceTs: '1782339000.100000',
+      sourceThreadTs: '1782338999.000000',
+      triggerChannelId: 'CBOT',
+      botChannelId: 'CBOT',
+      forwardInThread: true
+    }),
+    '1782338999.000000'
+  );
+});
+
 test('defaultCodexDeleteForwardDelayMs keeps same-channel triggers long enough for Codex pickup', () => {
   assert.equal(
     defaultCodexDeleteForwardDelayMs({
@@ -107,6 +132,39 @@ test('defaultCodexDeleteForwardDelayMs keeps same-channel triggers long enough f
     }),
     10000
   );
+});
+
+test('selectForwardMessageTsFromHistory resolves Slack user-token timestamp drift', () => {
+  const promptText = [
+    '<@UCODEX>',
+    'Use the Codex cloud environment "mavebot" for repository "dolphalala/mavebot".',
+    'This came from Slack user <@UALLEN> in the #bot channel through mavebot, so they did not type @Codex directly.',
+    '',
+    'Mavebot Slack session contract:'
+  ].join('\n');
+
+  const ts = selectForwardMessageTsFromHistory(
+    [
+      {
+        ts: '1782339650.000000',
+        user: 'UOTHER',
+        text: 'unrelated'
+      },
+      {
+        ts: '1782339655.223439',
+        user: 'UALLEN',
+        app_id: 'A0BCMC7JKRC',
+        text: promptText
+      }
+    ],
+    {
+      promptText,
+      resultTs: '1782339655.244419',
+      codexUser: 'UCODEX'
+    }
+  );
+
+  assert.equal(ts, '1782339655.223439');
 });
 
 test('selectForwardForCodexEvent maps standalone Codex replies from hidden trigger channel', () => {
@@ -134,6 +192,36 @@ test('selectForwardForCodexEvent maps standalone Codex replies from hidden trigg
 
   assert.equal(selected.key, '1782325000.000000');
   assert.equal(selected.forwarded.sourceTs, '1782324999.000000');
+});
+
+test('selectForwardForCodexEvent maps threaded Codex replies by resolved thread timestamp', () => {
+  const selected = selectForwardForCodexEvent(
+    {
+      forwarded: {
+        '1782339655.244419': {
+          forwardTs: '1782339655.244419',
+          messageTs: '1782339655.223439',
+          threadTs: '1782339655.223439',
+          sourceTs: '1782339654.563763',
+          triggerChannel: 'CTRIGGER',
+          createdAt: '2026-06-24T22:20:55.000Z'
+        }
+      }
+    },
+    {
+      ts: '1782339661.000000',
+      thread_ts: '1782339655.223439',
+      channel: 'CTRIGGER',
+      text: 'Done.'
+    },
+    {
+      triggerChannelId: 'CTRIGGER',
+      botChannelId: 'CBOT'
+    }
+  );
+
+  assert.equal(selected.forwarded.sourceTs, '1782339654.563763');
+  assert.equal(selected.forwarded.threadTs, '1782339655.223439');
 });
 
 test('selectForwardForCodexEvent does not duplicate standalone Codex replies in #bot fallback mode', () => {

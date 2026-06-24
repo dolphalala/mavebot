@@ -478,8 +478,18 @@ function isSameForwardedTurn(entry, forwarded, key = '') {
     return true;
   }
 
+  if (forwarded.threadTs && entry.threadTs === forwarded.threadTs) {
+    return true;
+  }
+
+  if (forwarded.messageTs && entry.messageTs === forwarded.messageTs) {
+    return true;
+  }
+
   return (
     key === forwarded.forwardTs ||
+    key === forwarded.threadTs ||
+    key === forwarded.messageTs ||
     (entry.sourceTs === forwarded.sourceTs && entry.createdAt === forwarded.createdAt)
   );
 }
@@ -537,11 +547,131 @@ async function fetchThreadReplies({ channel, threadTs }) {
   return Array.isArray(result.messages) ? result.messages : [];
 }
 
+async function fetchChannelHistory({ channel, latest, oldest, limit = 20 }) {
+  if (!botToken || !channel) {
+    return [];
+  }
+
+  const url = new URL('https://slack.com/api/conversations.history');
+  url.searchParams.set('channel', channel);
+  url.searchParams.set('limit', String(limit));
+  url.searchParams.set('inclusive', 'true');
+  if (latest) {
+    url.searchParams.set('latest', latest);
+  }
+  if (oldest) {
+    url.searchParams.set('oldest', oldest);
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${botToken}`
+    }
+  });
+  const result = await response.json();
+  if (!result.ok) {
+    console.error('conversations.history failed:', result.error);
+    return [];
+  }
+
+  return Array.isArray(result.messages) ? result.messages : [];
+}
+
 export function selectCodexThreadReplies(messages, { codexUser = codexUserId, threadTs } = {}) {
   return (messages || [])
     .filter((message) => message?.user === codexUser)
     .filter((message) => message.ts && message.ts !== threadTs)
     .sort((a, b) => slackTsToEpochMs(a.ts) - slackTsToEpochMs(b.ts));
+}
+
+function normalizeSlackTextForMatch(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
+
+function isCodexForwardPromptMessage(message, { promptText, codexUser = codexUserId } = {}) {
+  const text = String(message?.text || '');
+  if (!text) {
+    return false;
+  }
+
+  if (promptText && normalizeSlackTextForMatch(text) === normalizeSlackTextForMatch(promptText)) {
+    return true;
+  }
+
+  return (
+    (!codexUser || text.startsWith(`<@${codexUser}>`)) &&
+    text.includes('through mavebot') &&
+    text.includes('Mavebot Slack session contract:')
+  );
+}
+
+export function selectForwardMessageTsFromHistory(
+  messages,
+  { promptText, resultTs, codexUser = codexUserId } = {}
+) {
+  const resultMs = slackTsToEpochMs(resultTs);
+  const candidates = (messages || [])
+    .filter((message) => message?.ts)
+    .filter((message) => isCodexForwardPromptMessage(message, { promptText, codexUser }))
+    .sort((a, b) => {
+      if (!resultMs) {
+        return slackTsToEpochMs(b.ts) - slackTsToEpochMs(a.ts);
+      }
+
+      return (
+        Math.abs(slackTsToEpochMs(a.ts) - resultMs) -
+        Math.abs(slackTsToEpochMs(b.ts) - resultMs)
+      );
+    });
+
+  return candidates[0]?.ts || '';
+}
+
+function addSlackTsSeconds(ts, seconds) {
+  const value = Number.parseFloat(ts);
+  if (!Number.isFinite(value)) {
+    return '';
+  }
+
+  return (value + seconds).toFixed(6);
+}
+
+async function resolvePostedMessageTs({ result, channel, promptText }) {
+  const resultTs = result?.ts || '';
+  const directMessageTs = result?.message?.ts || '';
+  if (directMessageTs && directMessageTs !== resultTs) {
+    return directMessageTs;
+  }
+
+  const anchorTs = directMessageTs || resultTs;
+  if (!anchorTs || !channel) {
+    return anchorTs;
+  }
+
+  const history = await fetchChannelHistory({
+    channel,
+    oldest: addSlackTsSeconds(anchorTs, -10),
+    latest: addSlackTsSeconds(anchorTs, 10),
+    limit: 30
+  });
+  return selectForwardMessageTsFromHistory(history, {
+    promptText,
+    resultTs: anchorTs
+  }) || anchorTs;
+}
+
+export function selectCodexForwardThreadTs({
+  sourceTs,
+  sourceThreadTs,
+  triggerChannelId,
+  botChannelId,
+  forwardInThread = true
+}) {
+  if (!forwardInThread || triggerChannelId !== botChannelId) {
+    return undefined;
+  }
+
+  return sourceThreadTs || sourceTs || undefined;
 }
 
 function buildThreadReplyEvent(message, { channel, threadTs }) {
@@ -553,7 +683,7 @@ function buildThreadReplyEvent(message, { channel, threadTs }) {
 }
 
 async function mirrorThreadRepliesForForward(forwarded) {
-  const threadTs = forwarded?.forwardTs;
+  const threadTs = forwarded?.threadTs || forwarded?.forwardTs;
   const triggerChannel = forwarded?.triggerChannel;
   if (!threadTs || !triggerChannel) {
     return false;
@@ -690,11 +820,17 @@ async function forwardToCodex(event) {
     return;
   }
 
-  const parentThreadTs = event.thread_ts || event.ts;
-  const forwardThreadTs = codexForwardInThread ? parentThreadTs : undefined;
+  const forwardThreadTs = selectCodexForwardThreadTs({
+    sourceTs: event.ts,
+    sourceThreadTs: event.thread_ts,
+    triggerChannelId: codexTriggerChannelId,
+    botChannelId: channelId,
+    forwardInThread: codexForwardInThread
+  });
   const workingText = randomWorkingMessage();
+  const promptText = await buildCodexPrompt(event);
   const result = await postMessage(buildCodexForwardPostArgs({
-    promptText: await buildCodexPrompt(event),
+    promptText,
     threadTs: forwardThreadTs,
     token: userToken,
     channel: codexTriggerChannelId
@@ -703,8 +839,16 @@ async function forwardToCodex(event) {
     return;
   }
 
+  const messageTs = await resolvePostedMessageTs({
+    result,
+    channel: codexTriggerChannelId,
+    promptText
+  });
+  const threadTs = forwardThreadTs || messageTs || result.ts;
   const forwarded = {
     forwardTs: result.ts,
+    messageTs,
+    threadTs,
     sourceTs: event.ts,
     sourceUser: event.user,
     sourceText: event.text || '',
@@ -715,11 +859,17 @@ async function forwardToCodex(event) {
   await updateBridgeState((state) => {
     state.forwarded ||= {};
     state.forwarded[result.ts] = forwarded;
+    if (messageTs) {
+      state.forwarded[messageTs] = forwarded;
+    }
+    if (threadTs) {
+      state.forwarded[threadTs] = forwarded;
+    }
     if (forwardThreadTs) {
       state.forwarded[forwardThreadTs] = forwarded;
     }
   });
-  scheduleForwardDelete({ ts: result.ts, token: userToken, channel: codexTriggerChannelId });
+  scheduleForwardDelete({ ts: messageTs || result.ts, token: userToken, channel: codexTriggerChannelId });
   scheduleForwardStaleCheck({ forwarded });
   await postMessage({ text: workingText });
 }
@@ -841,6 +991,16 @@ export function selectForwardForCodexEvent(
     };
   }
 
+  if (event.thread_ts) {
+    const matched = Object.entries(state.forwarded || {}).find(
+      ([, entry]) => entry?.threadTs === event.thread_ts
+    );
+    if (matched) {
+      const [key, forwarded] = matched;
+      return { key, forwarded };
+    }
+  }
+
   if (
     event.thread_ts ||
     event.channel !== triggerChannelId ||
@@ -854,7 +1014,7 @@ export function selectForwardForCodexEvent(
   const seen = new Set();
   const candidates = Object.entries(state.forwarded || {})
     .filter(([key, entry]) => {
-      const dedupeKey = entry.forwardTs || key;
+      const dedupeKey = entry.forwardTs || entry.threadTs || entry.messageTs || key;
       if (seen.has(dedupeKey)) {
         return false;
       }
@@ -923,7 +1083,7 @@ async function mirrorCodexReply(event) {
       await updateBridgeState((currentState) => {
         currentState.mirrored ||= {};
         currentState.mirrored[event.ts] = {
-          threadTs: event.thread_ts || forwarded.forwardTs || selected.key,
+          threadTs: event.thread_ts || forwarded.threadTs || forwarded.forwardTs || selected.key,
           mirroredAt: new Date().toISOString()
         };
         currentState.forwarded ||= {};
