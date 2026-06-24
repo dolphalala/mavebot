@@ -6,6 +6,7 @@ import {
   cleanCodexMirrorText,
   defaultCodexDeleteForwardDelayMs,
   markUndeployedCodexWork,
+  selectCodexThreadReplies,
   selectForwardForCodexEvent,
   isCodexStatusNoise
 } from '../src/slack-bridge.mjs';
@@ -159,4 +160,40 @@ test('selectForwardForCodexEvent does not duplicate standalone Codex replies in 
   );
 
   assert.equal(selected, null);
+});
+
+test('selectCodexThreadReplies finds Codex replies under a trigger thread', () => {
+  const replies = selectCodexThreadReplies(
+    [
+      {
+        ts: '1782339066.338139',
+        user: 'UALLEN',
+        text: '<@UCODEX> prompt'
+      },
+      {
+        ts: '1782339070.000000',
+        user: 'UOTHER',
+        text: 'not Codex'
+      },
+      {
+        ts: '1782339072.000000',
+        user: 'UCODEX',
+        text: 'On it.'
+      },
+      {
+        ts: '1782339071.000000',
+        user: 'UCODEX',
+        text: 'Earlier Codex reply'
+      }
+    ],
+    {
+      codexUser: 'UCODEX',
+      threadTs: '1782339066.338139'
+    }
+  );
+
+  assert.deepEqual(
+    replies.map((reply) => reply.text),
+    ['Earlier Codex reply', 'On it.']
+  );
 });

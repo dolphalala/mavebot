@@ -513,30 +513,104 @@ function scheduleForwardDelete({ ts, token, channel = channelId }) {
   timer.unref?.();
 }
 
+async function fetchThreadReplies({ channel, threadTs }) {
+  if (!botToken || !channel || !threadTs) {
+    return [];
+  }
+
+  const url = new URL('https://slack.com/api/conversations.replies');
+  url.searchParams.set('channel', channel);
+  url.searchParams.set('ts', threadTs);
+  url.searchParams.set('limit', '20');
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${botToken}`
+    }
+  });
+  const result = await response.json();
+  if (!result.ok) {
+    console.error('conversations.replies failed:', result.error);
+    return [];
+  }
+
+  return Array.isArray(result.messages) ? result.messages : [];
+}
+
+export function selectCodexThreadReplies(messages, { codexUser = codexUserId, threadTs } = {}) {
+  return (messages || [])
+    .filter((message) => message?.user === codexUser)
+    .filter((message) => message.ts && message.ts !== threadTs)
+    .sort((a, b) => slackTsToEpochMs(a.ts) - slackTsToEpochMs(b.ts));
+}
+
+function buildThreadReplyEvent(message, { channel, threadTs }) {
+  return {
+    ...message,
+    channel,
+    thread_ts: message.thread_ts || threadTs
+  };
+}
+
+async function mirrorThreadRepliesForForward(forwarded) {
+  const threadTs = forwarded?.forwardTs;
+  const triggerChannel = forwarded?.triggerChannel;
+  if (!threadTs || !triggerChannel) {
+    return false;
+  }
+
+  const replies = selectCodexThreadReplies(
+    await fetchThreadReplies({ channel: triggerChannel, threadTs }),
+    { threadTs }
+  );
+  let mirrored = false;
+  for (const reply of replies) {
+    mirrored = (await mirrorCodexReply(
+      buildThreadReplyEvent(reply, {
+        channel: triggerChannel,
+        threadTs
+      })
+    )) || mirrored;
+  }
+  return mirrored;
+}
+
 function scheduleForwardStaleCheck({ forwarded }) {
   if (!Number.isFinite(codexStaleAfterMs) || codexStaleAfterMs <= 0 || !forwarded?.forwardTs) {
     return;
   }
 
   const timer = setTimeout(() => {
-    updateBridgeState(async (state) => {
+    (async () => {
+      const state = await readBridgeState();
       const current = state.forwarded?.[forwarded.forwardTs];
       if (!current || current.statusAckedAt || current.mirroredAt || current.staleNotifiedAt) {
         return;
       }
 
-      const staleNotifiedAt = new Date().toISOString();
-      for (const [key, entry] of Object.entries(state.forwarded || {})) {
-        if (isSameForwardedTurn(entry, current, key)) {
-          state.forwarded[key] = { ...entry, staleNotifiedAt };
-        }
+      if (await mirrorThreadRepliesForForward(current)) {
+        return;
       }
 
-      await postMessage({
-        text:
-          'I saved that, but Codex did not pick up the trigger yet. I can keep trying, but the reliable setup is a separate trigger channel with both mavebot and Codex invited.'
+      await updateBridgeState(async (currentState) => {
+        const latest = currentState.forwarded?.[forwarded.forwardTs];
+        if (!latest || latest.statusAckedAt || latest.mirroredAt || latest.staleNotifiedAt) {
+          return;
+        }
+
+        const staleNotifiedAt = new Date().toISOString();
+        for (const [key, entry] of Object.entries(currentState.forwarded || {})) {
+          if (isSameForwardedTurn(entry, latest, key)) {
+            currentState.forwarded[key] = { ...entry, staleNotifiedAt };
+          }
+        }
+
+        await postMessage({
+          text:
+            'I sent that to Codex, but I still do not see a usable reply. I will keep #bot clean; try sending it again, or tag Codex directly in the bridge channel if it keeps stalling.'
+        });
       });
-    }).catch((error) => {
+    })().catch((error) => {
       console.error('Failed to check stale Codex forward:', error);
     });
   }, codexStaleAfterMs);
