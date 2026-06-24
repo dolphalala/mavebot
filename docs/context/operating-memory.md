@@ -9,8 +9,9 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Main Discord server observed from the bot token: `mevo`
   (`1431280201068843171`).
 - Current slash commands:
-  - `/ping`: replies with websocket latency.
   - `/iloveyou`: sends a randomized embed love letter for Lana and Allen.
+  - `/player`: looks up a Clash of Clans player by tag using the server-side
+    CoC API token.
 - Allen is Korean and Lana is Croatian; `/iloveyou` copy can use that context.
 - The app is Clash of Clans focused. CoC API calls should use the official API
   base URL `https://api.clashofclans.com/v1` and the server-only
@@ -39,6 +40,11 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - If duplicate commands appear in Discord, clear guild-specific commands and
   reload Discord. Also disable User Install in the Developer Portal if it is not
   needed.
+- To clear stale guild-specific commands during deploy while keeping global
+  commands active, set `DISCORD_CLEAR_GUILD_COMMANDS_ID` to the affected server
+  ID and leave `DISCORD_GUILD_ID` blank.
+- `/ping` was removed as a public test command; use the local HTTP `/healthz`
+  endpoint for process health instead.
 
 ## Slack Codex Workflow
 

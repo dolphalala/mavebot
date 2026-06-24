@@ -5,7 +5,8 @@ Minimal Dockerized Discord bot foundation for the shared `urba-chatwoot` host.
 ## What It Includes
 
 - `discord.js` v14 bot process
-- `/ping` slash command handler
+- `/iloveyou` slash command with randomized Lana/Allen embeds
+- `/player` slash command for Clash of Clans player lookups
 - slash command registration script
 - local-only `/healthz` HTTP endpoint on port `4188`
 - Slack bridge for the `#bot` channel on local port `4190`, with Socket Mode
@@ -59,13 +60,16 @@ Create `/opt/urba-apps/discord-bot/.env` from `.env.example` and fill in:
 DISCORD_TOKEN=
 DISCORD_CLIENT_ID=1519063290058117170
 DISCORD_GUILD_ID=
+DISCORD_CLEAR_GUILD_COMMANDS_ID=
 COC_API_BASE_URL=https://api.clashofclans.com/v1
 COC_API_TOKEN=
 ```
 
 Leave `DISCORD_GUILD_ID` blank for global slash commands that work in every
 server where the bot is installed. Set it only when you want faster command
-updates in one development server.
+updates in one development server. If Discord still shows duplicate commands
+from an older guild-scoped registration, set `DISCORD_CLEAR_GUILD_COMMANDS_ID`
+to that Discord server ID for one deploy while `DISCORD_GUILD_ID` stays blank.
 
 Then register commands and start the bot:
 
@@ -81,7 +85,8 @@ curl -i http://127.0.0.1:4188/healthz
 Global command registration can take longer to appear in Discord.
 
 The Clash of Clans developer API token must be created for the server public IP
-`5.78.127.221` and stored only in the server `.env` file.
+`5.78.127.221` and stored only in the server `.env` file. The `/player` command
+uses that token to call the official Clash of Clans API.
 
 ## Slack Bridge
 
@@ -111,6 +116,8 @@ SLACK_CODEX_DELETE_FORWARD=1
 SLACK_CODEX_DELETE_FORWARD_DELAY_MS=250
 SLACK_CODEX_STATE_PATH=/shared/codex-forward-state.json
 SLACK_CODEX_MEMORY_LIMIT=30
+SLACK_CODEX_MEMORY_TEXT_LIMIT=1500
+SLACK_CODEX_STATE_ENTRY_LIMIT=200
 SLACK_OAUTH_REDIRECT_URI=https://mavebot.lanawee.com/mavebot/slack/oauth/callback
 SLACK_USER_SCOPES=chat:write
 SLACK_USER_TOKEN_PATH=/shared/slack-user-tokens.json

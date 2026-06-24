@@ -12,5 +12,6 @@ COPY --chown=node:node docs ./docs
 
 USER node
 EXPOSE 4188
+EXPOSE 4190
 
 CMD ["node", "src/index.mjs"]

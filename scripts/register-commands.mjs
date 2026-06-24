@@ -5,6 +5,7 @@ import { commands } from '../src/commands.mjs';
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
 const guildId = process.env.DISCORD_GUILD_ID;
+const clearGuildCommandsId = process.env.DISCORD_CLEAR_GUILD_COMMANDS_ID;
 
 if (!token) {
   throw new Error('DISCORD_TOKEN is required.');
@@ -26,5 +27,14 @@ console.log(
 );
 
 await rest.put(route, { body: commands });
+
+if (!guildId && clearGuildCommandsId) {
+  console.log(
+    `Clearing stale guild command(s) for ${clearGuildCommandsId} because global commands are active.`
+  );
+  await rest.put(Routes.applicationGuildCommands(clientId, clearGuildCommandsId), {
+    body: []
+  });
+}
 
 console.log('Discord slash commands registered.');

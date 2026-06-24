@@ -37,6 +37,8 @@ future tasks should know.
   lightly affectionate when appropriate.
 - The Discord bot is Clash of Clans focused and should use the official Clash
   of Clans API from server-side environment variables.
+- `/ping` is no longer a public Discord slash command. `/player` is the first
+  CoC lookup command and should stay token-backed from the server.
 
 ### Open Work
 

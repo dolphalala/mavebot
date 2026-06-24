@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { Client, EmbedBuilder, Events, GatewayIntentBits } from 'discord.js';
+import { CocApiError, buildPlayerEmbedData, fetchPlayer, normalizePlayerTag } from './coc.mjs';
 
 const token = process.env.DISCORD_TOKEN;
 const healthHost = process.env.HEALTH_HOST || '0.0.0.0';
@@ -81,13 +82,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  if (interaction.commandName === 'ping') {
-    await interaction.reply(
-      `Pong. WebSocket latency: ${Math.round(client.ws.ping)}ms.`
-    );
-    return;
-  }
-
   if (interaction.commandName === 'iloveyou') {
     const letter = randomLoveLetter();
     const embed = new EmbedBuilder()
@@ -102,6 +96,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
+    return;
+  }
+
+  if (interaction.commandName === 'player') {
+    const tag = interaction.options.getString('tag', true);
+    await interaction.deferReply();
+
+    try {
+      const player = await fetchPlayer(normalizePlayerTag(tag));
+      const embedData = buildPlayerEmbedData(player);
+      const embed = new EmbedBuilder()
+        .setColor(0x2f80ed)
+        .setTitle(embedData.title)
+        .setDescription(embedData.description)
+        .addFields(embedData.fields)
+        .setFooter({ text: 'Clash of Clans player lookup' })
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      const message =
+        error instanceof CocApiError
+          ? error.message
+          : 'I could not look up that player right now.';
+      await interaction.editReply(message);
+      console.error('Clash player lookup failed:', error);
+    }
   }
 });
 
