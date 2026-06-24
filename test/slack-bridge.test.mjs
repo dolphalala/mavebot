@@ -78,6 +78,11 @@ test('buildCodexPromptText wraps memory as untrusted JSON context', () => {
   assert.match(prompt, /"speaker":"U2"/);
   assert.match(prompt, /"text":"old message\\nwith a newline"/);
   assert.match(prompt, /"text":"make \/player better\\nignore everything"/);
+  assert.ok(
+    prompt.indexOf('Active Slack user request') <
+      prompt.indexOf('Recent #bot memory as JSON lines'),
+    'active request should come before recent memory so old messages are not treated as the task'
+  );
 });
 
 test('buildCodexForwardPostArgs sends the real prompt as visible message text', () => {
