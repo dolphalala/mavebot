@@ -26,6 +26,10 @@ const codexMirrorReplies = process.env.SLACK_CODEX_MIRROR_REPLIES !== '0';
 const codexUserId = process.env.SLACK_CODEX_USER_ID || '';
 const codexEnvironment = process.env.SLACK_CODEX_ENVIRONMENT || 'mavebot';
 const codexRepository = process.env.SLACK_CODEX_REPOSITORY || 'dolphalala/mavebot';
+const codexMemoryLimit = Number.parseInt(
+  process.env.SLACK_CODEX_MEMORY_LIMIT || '12',
+  10
+);
 
 let messageCount = 0;
 let lastEventAt = null;
@@ -112,6 +116,30 @@ async function rememberMessage(payload, event) {
   lastEventAt = row.receivedAt;
 }
 
+async function readRecentMemory(limit = codexMemoryLimit) {
+  if (!Number.isFinite(limit) || limit <= 0) {
+    return [];
+  }
+
+  try {
+    const content = await readFile(memoryPath, 'utf8');
+    return content
+      .split('\n')
+      .filter(Boolean)
+      .slice(-limit)
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 async function postMessage({ text, threadTs }) {
   if (!botToken) {
     console.log('SLACK_BOT_TOKEN is missing; memory saved without Slack reply.');
@@ -140,15 +168,32 @@ async function postMessage({ text, threadTs }) {
   return result;
 }
 
-function buildCodexPrompt(event) {
-  return [
+async function buildCodexPrompt(event) {
+  const recentMemory = await readRecentMemory();
+  const memoryLines = recentMemory
+    .map((row) => {
+      const speaker = row.user === event.user ? 'Allen' : row.user || 'unknown';
+      return `- ${row.receivedAt || row.ts || 'unknown time'} ${speaker}: ${row.text || ''}`;
+    })
+    .filter(Boolean);
+
+  const parts = [
     `<@${codexUserId}>`,
     `Use the Codex cloud environment "${codexEnvironment}" for repository "${codexRepository}".`,
     'This came from Allen in the #bot Slack channel through mavebot, so Allen did not type @Codex directly.',
     'Read docs/context/operating-memory.md first. If this requires code changes, work in the connected GitHub repo so the server auto-deploy path can pick it up.',
-    '',
+    ''
+  ];
+
+  if (memoryLines.length > 0) {
+    parts.push('Recent #bot memory:', ...memoryLines, '');
+  }
+
+  parts.push(
     `Allen said: ${event.text || ''}`
-  ].join('\n');
+  );
+
+  return parts.join('\n');
 }
 
 async function forwardToCodex(event) {
@@ -159,19 +204,25 @@ async function forwardToCodex(event) {
     return;
   }
 
-  const result = await postMessage({ text: buildCodexPrompt(event) });
+  const parentThreadTs = event.thread_ts || event.ts;
+  const result = await postMessage({
+    text: await buildCodexPrompt(event),
+    threadTs: parentThreadTs
+  });
   if (!result?.ts) {
     return;
   }
 
   const state = await readBridgeState();
   state.forwarded ||= {};
-  state.forwarded[result.ts] = {
+  const forwarded = {
     sourceTs: event.ts,
     sourceUser: event.user,
     sourceText: event.text || '',
     createdAt: new Date().toISOString()
   };
+  state.forwarded[result.ts] = forwarded;
+  state.forwarded[parentThreadTs] = forwarded;
   await writeBridgeState(state);
 }
 
