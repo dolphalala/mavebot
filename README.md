@@ -102,12 +102,13 @@ SLACK_CHANNEL_ID=C0BCRVC2C6Q
 SLACK_SOCKET_MODE=1
 SLACK_CODEX_FORWARD=1
 SLACK_CODEX_USER_ID=
+SLACK_CODEX_TRIGGER_CHANNEL_ID=
 SLACK_CODEX_ENVIRONMENT=mavebot
 SLACK_CODEX_REPOSITORY=dolphalala/mavebot
 SLACK_CODEX_MIRROR_REPLIES=1
 SLACK_CODEX_FORWARD_IN_THREAD=0
 SLACK_CODEX_DELETE_FORWARD=1
-SLACK_CODEX_DELETE_FORWARD_DELAY_MS=5000
+SLACK_CODEX_DELETE_FORWARD_DELAY_MS=250
 SLACK_CODEX_STATE_PATH=/shared/codex-forward-state.json
 SLACK_CODEX_MEMORY_LIMIT=30
 SLACK_OAUTH_REDIRECT_URI=https://mavebot.lanawee.com/mavebot/slack/oauth/callback
@@ -141,6 +142,14 @@ That path uses Codex cloud through each user's connected ChatGPT/Codex account
 and does not require an OpenAI API key. The forwarded prompt includes recent
 saved `#bot` messages, controlled by `SLACK_CODEX_MEMORY_LIMIT`, so the channel
 behaves more like a running session.
+
+Set `SLACK_CODEX_TRIGGER_CHANNEL_ID` to a separate public bridge channel when
+the official Codex app's task cards or ephemeral status text should stay out of
+`#bot`. Invite both mavebot and Codex to that bridge channel. The bridge posts
+the hidden `@Codex` trigger there, listens for Codex replies there, and mirrors
+only the cleaned useful answer back into `#bot`. If no trigger channel is set,
+the bridge falls back to `#bot`, hides the long prompt behind a short visible
+message, and deletes that trigger quickly.
 
 Codex cloud still creates task-style runs, so durable Slack session memory lives
 in `docs/context/slack-session.md`. Forwarded prompts tell Codex to read and

@@ -53,6 +53,14 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   app by posting a hidden `@Codex` mention as the Slack user who spoke. This
   uses Codex cloud through that user's connected ChatGPT/Codex account after
   they authorize mavebot once; it does not require an OpenAI API key.
+- To keep `#bot` clean, set `SLACK_CODEX_TRIGGER_CHANNEL_ID` to a separate
+  public bridge channel where both mavebot and Codex are present. Official Codex
+  task cards, "wrong environment" status text, and promo copy should stay there;
+  mavebot mirrors only cleaned useful replies back into `#bot`.
+- If no separate trigger channel is configured, the bridge falls back to `#bot`,
+  shows only a short mavebot working message for the trigger, and deletes the
+  trigger quickly. This fallback can still allow official Codex ephemeral UI to
+  appear in `#bot`, so the separate trigger channel is preferred.
 - Forwarded Codex prompts should include recent saved `#bot` messages from
   bridge memory so Slack feels like a running session. The default prompt memory
   window is controlled by `SLACK_CODEX_MEMORY_LIMIT`.

@@ -10,6 +10,7 @@ const clientSecret = process.env.SLACK_CLIENT_SECRET || '';
 const botToken = process.env.SLACK_BOT_TOKEN || '';
 const appToken = process.env.SLACK_APP_TOKEN || '';
 const channelId = process.env.SLACK_CHANNEL_ID || '';
+const codexTriggerChannelId = process.env.SLACK_CODEX_TRIGGER_CHANNEL_ID || channelId;
 const host = process.env.SLACK_BRIDGE_HOST || '0.0.0.0';
 const port = Number.parseInt(process.env.SLACK_BRIDGE_PORT || '4190', 10);
 const eventPath = process.env.SLACK_BRIDGE_EVENT_PATH || '/slack/events';
@@ -33,8 +34,9 @@ const codexForward = process.env.SLACK_CODEX_FORWARD === '1';
 const codexMirrorReplies = process.env.SLACK_CODEX_MIRROR_REPLIES !== '0';
 const codexForwardInThread = process.env.SLACK_CODEX_FORWARD_IN_THREAD !== '0';
 const codexDeleteForward = process.env.SLACK_CODEX_DELETE_FORWARD === '1';
+const codexTriggerInBotChannel = codexTriggerChannelId === channelId;
 const codexDeleteForwardDelayMs = Number.parseInt(
-  process.env.SLACK_CODEX_DELETE_FORWARD_DELAY_MS || '5000',
+  process.env.SLACK_CODEX_DELETE_FORWARD_DELAY_MS || (codexTriggerInBotChannel ? '250' : '5000'),
   10
 );
 const codexUserId = process.env.SLACK_CODEX_USER_ID || '';
@@ -49,14 +51,14 @@ const userScopes =
   process.env.SLACK_USER_SCOPES || 'chat:write';
 
 const workingMessages = [
-  'Working on it. I will bring the answer back here.',
-  'On it. Little mavebot is padding through the repo now.',
-  'I am checking it now and will come back to #bot.',
-  'Got it. I am doing the quiet repo work now.',
+  'On it. I will bring it back here.',
   'I am on it. Tiny heart engine running.',
+  'Got it. I am checking the repo now.',
   'Working on it for you now.',
-  'I will check the repo and report back here.',
-  'On it. I will keep the answer in this channel.'
+  'I will check this and come right back.',
+  'On it. Keeping everything right here in #bot.',
+  'I am looking now. Soft little focus mode.',
+  'Got you. I will make this feel like a real session.'
 ];
 
 let messageCount = 0;
@@ -280,7 +282,7 @@ async function postSlackApi({ method, token = botToken, body }) {
   return result;
 }
 
-async function postMessage({ text, threadTs, token = botToken }) {
+async function postMessage({ text, threadTs, token = botToken, channel = channelId, blocks }) {
   if (!token) {
     console.log('Slack token is missing; memory saved without Slack reply.');
     return null;
@@ -290,8 +292,9 @@ async function postMessage({ text, threadTs, token = botToken }) {
     method: 'chat.postMessage',
     token,
     body: {
-      channel: channelId,
+      channel,
       text,
+      ...(blocks ? { blocks } : {}),
       unfurl_links: false,
       unfurl_media: false,
       ...(threadTs ? { thread_ts: threadTs } : {})
@@ -299,18 +302,18 @@ async function postMessage({ text, threadTs, token = botToken }) {
   });
 }
 
-async function deleteMessage({ ts, token = botToken }) {
+async function deleteMessage({ ts, token = botToken, channel = channelId }) {
   return postSlackApi({
     method: 'chat.delete',
     token,
     body: {
-      channel: channelId,
+      channel,
       ts
     }
   });
 }
 
-function scheduleForwardDelete({ ts, token }) {
+function scheduleForwardDelete({ ts, token, channel = channelId }) {
   if (!codexDeleteForward || !ts || !token) {
     return;
   }
@@ -321,7 +324,7 @@ function scheduleForwardDelete({ ts, token }) {
       : 5000;
 
   const timer = setTimeout(() => {
-    deleteMessage({ ts, token }).catch((error) => {
+    deleteMessage({ ts, token, channel }).catch((error) => {
       console.error('Failed to delete Codex forwarding message:', error);
     });
   }, delayMs);
@@ -395,6 +398,18 @@ function buildOAuthAuthorizeUrl(event) {
   return url.toString();
 }
 
+function buildVisibleForwardBlocks(text) {
+  return [
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text
+      }
+    }
+  ];
+}
+
 async function askUserToAuthorize(event) {
   const authorizeUrl = buildOAuthAuthorizeUrl(event);
   const text = authorizeUrl
@@ -420,10 +435,13 @@ async function forwardToCodex(event) {
 
   const parentThreadTs = event.thread_ts || event.ts;
   const forwardThreadTs = codexForwardInThread ? parentThreadTs : undefined;
+  const workingText = randomWorkingMessage();
   const result = await postMessage({
     text: await buildCodexPrompt(event),
     threadTs: forwardThreadTs,
-    token: userToken
+    token: userToken,
+    channel: codexTriggerChannelId,
+    blocks: buildVisibleForwardBlocks(workingText)
   });
   if (!result?.ts) {
     return;
@@ -435,6 +453,8 @@ async function forwardToCodex(event) {
     sourceTs: event.ts,
     sourceUser: event.user,
     sourceText: event.text || '',
+    triggerChannel: codexTriggerChannelId,
+    statusAckedAt: new Date().toISOString(),
     createdAt: new Date().toISOString()
   };
   state.forwarded[result.ts] = forwarded;
@@ -442,7 +462,8 @@ async function forwardToCodex(event) {
     state.forwarded[forwardThreadTs] = forwarded;
   }
   await writeBridgeState(state);
-  scheduleForwardDelete({ ts: result.ts, token: userToken });
+  scheduleForwardDelete({ ts: result.ts, token: userToken, channel: codexTriggerChannelId });
+  await postMessage({ text: workingText });
 }
 
 function randomWorkingMessage() {
@@ -461,8 +482,11 @@ function cleanCodexMirrorText(text) {
 
       return !(
         trimmed === 'View task' ||
+        trimmed === 'Show more' ||
         trimmed.startsWith('ChatGPT helps you get answers,') ||
-        trimmed.startsWith('Wrong environment? Tag me again') ||
+        /^Wrong .*environment.*Tag me again mentioning the right one\.?$/i.test(trimmed) ||
+        /^On it\. Kicked off a task in the .* environment\.?$/i.test(trimmed) ||
+        /^Use mavebot environment for deployment$/i.test(trimmed) ||
         /^Today at .+ Added by /i.test(trimmed) ||
         /https:\/\/chatgpt\.com\/codex\//i.test(trimmed)
       );
@@ -481,7 +505,7 @@ function isCodexStatusNoise(text) {
   return (
     !cleanCodexMirrorText(trimmed) ||
     isCodexKickoffStatus(trimmed) ||
-    trimmed.startsWith('Wrong environment? Tag me again')
+    /^Wrong .*environment.*Tag me again mentioning the right one\.?$/i.test(trimmed)
   );
 }
 
@@ -530,11 +554,17 @@ async function handleSlackEvent(payload) {
   }
   event.team ||= payload.team_id;
 
-  if (event.channel !== channelId) {
+  const isBotChannel = event.channel === channelId;
+  const isCodexTriggerChannel = event.channel === codexTriggerChannelId;
+  if (!isBotChannel && !isCodexTriggerChannel) {
     return;
   }
 
   if (await mirrorCodexReply(event)) {
+    return;
+  }
+
+  if (!isBotChannel) {
     return;
   }
 
@@ -789,6 +819,8 @@ app.get('/healthz', async (_req, res) => {
   res.status(hasSlackConfig() ? 200 : 503).json({
     ok: hasSlackConfig(),
     channelIdConfigured: Boolean(channelId),
+    codexTriggerChannelIdConfigured: Boolean(codexTriggerChannelId),
+    codexTriggerChannelMatchesBot: codexTriggerInBotChannel,
     signingSecretConfigured: Boolean(signingSecret),
     clientIdConfigured: Boolean(clientId),
     clientSecretConfigured: Boolean(clientSecret),
@@ -811,6 +843,7 @@ app.get('/healthz', async (_req, res) => {
     codexForwardInThread,
     codexDeleteForward,
     codexDeleteForwardDelayMs,
+    codexMemoryLimit,
     codexUserIdConfigured: Boolean(codexUserId),
     codexEnvironment,
     codexRepository,

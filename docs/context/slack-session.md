@@ -20,6 +20,10 @@ future tasks should know.
 - Do not mirror task links unless the user asks for them.
 - Do not prefix mirrored answers with `Codex:`.
 - Do not post the Codex trigger as a reply under the user's original prompt.
+- Prefer a separate Codex trigger channel so the long hidden prompt, task cards,
+  wrong-environment text, and ChatGPT promo copy never appear in `#bot`.
+- If the bridge must fall back to `#bot`, hide the long prompt behind a short
+  mavebot working message and delete the trigger quickly.
 - Brief "working" status messages should sound like mavebot, not Codex.
 - Keep replies in the main channel whenever possible so users do not have to
   open Slack thread replies to follow the session.
