@@ -7,6 +7,15 @@ test('public command list excludes the old ping test command', () => {
   assert.equal(commands.some((command) => command.name === 'ping'), false);
 });
 
+test('lana command replaces the old iloveyou command', () => {
+  const lana = commands.find((command) => command.name === 'lana');
+
+  assert.ok(lana);
+  assert.equal(commands.some((command) => command.name === 'iloveyou'), false);
+  assert.deepEqual(lana.integration_types, [0]);
+  assert.deepEqual(lana.contexts, [0]);
+});
+
 test('player command is guild-install only and requires a tag option', () => {
   const player = commands.find((command) => command.name === 'player');
 

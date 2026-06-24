@@ -36,8 +36,28 @@ const codexMirrorReplies = process.env.SLACK_CODEX_MIRROR_REPLIES !== '0';
 const codexForwardInThread = process.env.SLACK_CODEX_FORWARD_IN_THREAD !== '0';
 const codexDeleteForward = process.env.SLACK_CODEX_DELETE_FORWARD === '1';
 const codexTriggerInBotChannel = codexTriggerChannelId === channelId;
+const sameChannelDeleteDelayMs = 60000;
+const separateChannelDeleteDelayMs = 10000;
+export function defaultCodexDeleteForwardDelayMs({
+  triggerChannelId,
+  botChannelId
+}) {
+  return triggerChannelId === botChannelId
+    ? sameChannelDeleteDelayMs
+    : separateChannelDeleteDelayMs;
+}
 const codexDeleteForwardDelayMs = Number.parseInt(
-  process.env.SLACK_CODEX_DELETE_FORWARD_DELAY_MS || (codexTriggerInBotChannel ? '250' : '5000'),
+  process.env.SLACK_CODEX_DELETE_FORWARD_DELAY_MS ||
+    String(
+      defaultCodexDeleteForwardDelayMs({
+        triggerChannelId: codexTriggerChannelId,
+        botChannelId: channelId
+      })
+    ),
+  10
+);
+const codexStaleAfterMs = Number.parseInt(
+  process.env.SLACK_CODEX_STALE_AFTER_MS || '90000',
   10
 );
 const codexUserId = process.env.SLACK_CODEX_USER_ID || '';
@@ -391,7 +411,10 @@ export function buildCodexPromptText({
     '- Read docs/context/slack-session.md next for durable channel memory, current goals, decisions, and open threads.',
     '- If the user asks to reset, start over, or create a new session, add a new dated section in docs/context/slack-session.md and use that as the active context.',
     '- Otherwise keep continuity by appending durable facts, decisions, and next steps to docs/context/slack-session.md whenever the turn changes what future Codex runs should know.',
-    '- If code changes are needed, work in the connected GitHub repo so the server auto-deploy path can pick it up.',
+    '- If code changes are needed, commit and push them to the connected GitHub repo main branch when you are allowed to do so; the production server only auto-deploys origin/main.',
+    '- If you cannot push/merge to main and only opened a PR or changed a task workspace, say that clearly: the change is not deployed yet.',
+    '- Do not say a Discord command, Slack bridge behavior, or server feature works unless the code is on origin/main or you explicitly verified the live server/runtime.',
+    '- Discord slash command changes require src/commands.mjs, the interaction handler in src/index.mjs, and command registration during server deploy.',
     '- Reply for Slack as mavebot: direct, helpful, no ChatGPT promo text, no task links, no need to explain this bridge unless asked.',
     ''
   ];
@@ -446,6 +469,32 @@ async function deleteMessage({ ts, token = botToken, channel = channelId }) {
   });
 }
 
+function isSameForwardedTurn(entry, forwarded, key = '') {
+  if (!entry || !forwarded) {
+    return false;
+  }
+
+  if (forwarded.forwardTs && entry.forwardTs === forwarded.forwardTs) {
+    return true;
+  }
+
+  return (
+    key === forwarded.forwardTs ||
+    (entry.sourceTs === forwarded.sourceTs && entry.createdAt === forwarded.createdAt)
+  );
+}
+
+async function updateForwardedTurn(forwarded, fields) {
+  await updateBridgeState((state) => {
+    state.forwarded ||= {};
+    for (const [key, entry] of Object.entries(state.forwarded)) {
+      if (isSameForwardedTurn(entry, forwarded, key)) {
+        state.forwarded[key] = { ...entry, ...fields };
+      }
+    }
+  });
+}
+
 function scheduleForwardDelete({ ts, token, channel = channelId }) {
   if (!codexDeleteForward || !ts || !token) {
     return;
@@ -461,6 +510,36 @@ function scheduleForwardDelete({ ts, token, channel = channelId }) {
       console.error('Failed to delete Codex forwarding message:', error);
     });
   }, delayMs);
+  timer.unref?.();
+}
+
+function scheduleForwardStaleCheck({ forwarded }) {
+  if (!Number.isFinite(codexStaleAfterMs) || codexStaleAfterMs <= 0 || !forwarded?.forwardTs) {
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    updateBridgeState(async (state) => {
+      const current = state.forwarded?.[forwarded.forwardTs];
+      if (!current || current.statusAckedAt || current.mirroredAt || current.staleNotifiedAt) {
+        return;
+      }
+
+      const staleNotifiedAt = new Date().toISOString();
+      for (const [key, entry] of Object.entries(state.forwarded || {})) {
+        if (isSameForwardedTurn(entry, current, key)) {
+          state.forwarded[key] = { ...entry, staleNotifiedAt };
+        }
+      }
+
+      await postMessage({
+        text:
+          'I saved that, but Codex did not pick up the trigger yet. I can keep trying, but the reliable setup is a separate trigger channel with both mavebot and Codex invited.'
+      });
+    }).catch((error) => {
+      console.error('Failed to check stale Codex forward:', error);
+    });
+  }, codexStaleAfterMs);
   timer.unref?.();
 }
 
@@ -500,18 +579,6 @@ function buildOAuthAuthorizeUrl(event) {
   return url.toString();
 }
 
-function buildVisibleForwardBlocks(text) {
-  return [
-    {
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text
-      }
-    }
-  ];
-}
-
 async function askUserToAuthorize(event) {
   const authorizeUrl = buildOAuthAuthorizeUrl(event);
   const text = authorizeUrl
@@ -519,6 +586,20 @@ async function askUserToAuthorize(event) {
     : `<@${event.user}> I got your message and saved it, but I cannot forward it to Codex yet. Slack requires each user to authorize mavebot before it can post the @Codex forwarding message as that user. No Slack OAuth redirect URL is configured right now.`;
 
   await postMessage({ text });
+}
+
+export function buildCodexForwardPostArgs({
+  promptText,
+  threadTs,
+  token,
+  channel
+}) {
+  return {
+    text: promptText,
+    threadTs,
+    token,
+    channel
+  };
 }
 
 async function forwardToCodex(event) {
@@ -538,23 +619,23 @@ async function forwardToCodex(event) {
   const parentThreadTs = event.thread_ts || event.ts;
   const forwardThreadTs = codexForwardInThread ? parentThreadTs : undefined;
   const workingText = randomWorkingMessage();
-  const result = await postMessage({
-    text: await buildCodexPrompt(event),
+  const result = await postMessage(buildCodexForwardPostArgs({
+    promptText: await buildCodexPrompt(event),
     threadTs: forwardThreadTs,
     token: userToken,
-    channel: codexTriggerChannelId,
-    blocks: buildVisibleForwardBlocks(workingText)
-  });
+    channel: codexTriggerChannelId
+  }));
   if (!result?.ts) {
     return;
   }
 
   const forwarded = {
+    forwardTs: result.ts,
     sourceTs: event.ts,
     sourceUser: event.user,
     sourceText: event.text || '',
     triggerChannel: codexTriggerChannelId,
-    statusAckedAt: new Date().toISOString(),
+    localAckedAt: new Date().toISOString(),
     createdAt: new Date().toISOString()
   };
   await updateBridgeState((state) => {
@@ -565,6 +646,7 @@ async function forwardToCodex(event) {
     }
   });
   scheduleForwardDelete({ ts: result.ts, token: userToken, channel: codexTriggerChannelId });
+  scheduleForwardStaleCheck({ forwarded });
   await postMessage({ text: workingText });
 }
 
@@ -576,13 +658,22 @@ function stripCodexPrefix(text) {
   return String(text || '').replace(/^Codex:\s*/i, '');
 }
 
+function normalizeCodexStatusText(text) {
+  return stripCodexPrefix(text)
+    .replace(/<https:\/\/chatgpt\.com\/(?:codex|s)\/[^>|]+\|([^>]+)>/g, '$1')
+    .replace(/<https:\/\/chatgpt\.com\/(?:codex|s)\/[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function cleanCodexMirrorText(text) {
   return String(text || '')
-    .replace(/<https:\/\/chatgpt\.com\/codex\/[^>|]+(?:\|[^>]+)?>/g, '')
+    .replace(/_?<https:\/\/chatgpt\.com\/(?:codex|s)\/[^>|]+(?:\|[^>]+)?>_?/g, '')
     .split('\n')
     .map(stripCodexPrefix)
     .filter((line) => {
       const trimmed = line.trim();
+      const normalizedStatus = normalizeCodexStatusText(trimmed);
       if (!trimmed) {
         return true;
       }
@@ -591,12 +682,12 @@ export function cleanCodexMirrorText(text) {
         trimmed === 'View task' ||
         trimmed === 'Show more' ||
         trimmed.startsWith('ChatGPT helps you get answers,') ||
-        /^Wrong .*environment.*Tag me again mentioning the right one\.?$/i.test(trimmed) ||
-        /^On it\. Kicked off a task in the .* environment\.?$/i.test(trimmed) ||
+        /^Wrong .*environment.*Tag me again mentioning the right one\.?$/i.test(normalizedStatus) ||
+        /^On it\. Kicked off a(?: .*)? in the .* environment\.?$/i.test(normalizedStatus) ||
         /^Use mavebot environment for deployment$/i.test(trimmed) ||
         /^Added by OpenAI Codex$/i.test(trimmed) ||
         /^Today at .+ Added by /i.test(trimmed) ||
-        /https:\/\/chatgpt\.com\/codex\//i.test(trimmed)
+        /https:\/\/chatgpt\.com\/(?:codex|s)\//i.test(trimmed)
       );
     })
     .join('\n')
@@ -605,7 +696,9 @@ export function cleanCodexMirrorText(text) {
 }
 
 function isCodexKickoffStatus(text) {
-  return stripCodexPrefix(text).trim().startsWith('On it. Kicked off a task in the');
+  return /^On it\. Kicked off a(?: .*)? in the .* environment\.?$/i.test(
+    normalizeCodexStatusText(text)
+  );
 }
 
 export function isCodexStatusNoise(text) {
@@ -617,16 +710,82 @@ export function isCodexStatusNoise(text) {
   );
 }
 
+function slackTsToEpochMs(ts) {
+  const value = Number.parseFloat(ts);
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return value * 1000;
+}
+
+export function selectForwardForCodexEvent(
+  state,
+  event,
+  {
+    triggerChannelId = codexTriggerChannelId,
+    botChannelId = channelId,
+    maxStandaloneAgeMs = 30 * 60 * 1000
+  } = {}
+) {
+  if (event.thread_ts && state.forwarded?.[event.thread_ts]) {
+    return {
+      key: event.thread_ts,
+      forwarded: state.forwarded[event.thread_ts]
+    };
+  }
+
+  if (
+    event.thread_ts ||
+    event.channel !== triggerChannelId ||
+    triggerChannelId === botChannelId
+  ) {
+    return null;
+  }
+
+  const eventMs = slackTsToEpochMs(event.ts) || Date.now();
+  const isStatus = isCodexStatusNoise(event.text);
+  const seen = new Set();
+  const candidates = Object.entries(state.forwarded || {})
+    .filter(([key, entry]) => {
+      const dedupeKey = entry.forwardTs || key;
+      if (seen.has(dedupeKey)) {
+        return false;
+      }
+      seen.add(dedupeKey);
+      return true;
+    })
+    .filter(([, entry]) => entry.triggerChannel === triggerChannelId)
+    .filter(([, entry]) => {
+      const createdMs = Date.parse(entry.createdAt || '');
+      return (
+        Number.isFinite(createdMs) &&
+        createdMs <= eventMs + 5000 &&
+        eventMs - createdMs <= maxStandaloneAgeMs
+      );
+    })
+    .filter(([, entry]) => (isStatus ? !entry.statusAckedAt : !entry.mirroredAt))
+    .sort(([, a], [, b]) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+
+  if (!candidates.length) {
+    return null;
+  }
+
+  const [key, forwarded] = candidates[0];
+  return { key, forwarded };
+}
+
 async function mirrorCodexReply(event) {
-  if (!codexMirrorReplies || event.user !== codexUserId || !event.thread_ts) {
+  if (!codexMirrorReplies || event.user !== codexUserId) {
     return false;
   }
 
   const state = await readBridgeState();
-  const forwarded = state.forwarded?.[event.thread_ts];
-  if (!forwarded) {
+  const selected = selectForwardForCodexEvent(state, event);
+  if (!selected?.forwarded) {
     return false;
   }
+  const { forwarded } = selected;
 
   state.mirrored ||= {};
   if (event.ts && (state.mirrored[event.ts] || inFlightMirrors.has(event.ts))) {
@@ -635,10 +794,8 @@ async function mirrorCodexReply(event) {
 
   if (isCodexKickoffStatus(event.text)) {
     if (!forwarded.statusAckedAt) {
-      const acked = { ...forwarded, statusAckedAt: new Date().toISOString() };
-      await updateBridgeState((currentState) => {
-        currentState.forwarded ||= {};
-        currentState.forwarded[event.thread_ts] = acked;
+      await updateForwardedTurn(forwarded, {
+        statusAckedAt: new Date().toISOString()
       });
       await postMessage({ text: randomWorkingMessage() });
     }
@@ -660,9 +817,18 @@ async function mirrorCodexReply(event) {
       await updateBridgeState((currentState) => {
         currentState.mirrored ||= {};
         currentState.mirrored[event.ts] = {
-          threadTs: event.thread_ts,
+          threadTs: event.thread_ts || forwarded.forwardTs || selected.key,
           mirroredAt: new Date().toISOString()
         };
+        currentState.forwarded ||= {};
+        for (const [key, entry] of Object.entries(currentState.forwarded)) {
+          if (isSameForwardedTurn(entry, forwarded, key)) {
+            currentState.forwarded[key] = {
+              ...entry,
+              mirroredAt: new Date().toISOString()
+            };
+          }
+        }
       });
     }
   } finally {

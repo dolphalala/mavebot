@@ -82,17 +82,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
-  if (interaction.commandName === 'iloveyou') {
+  if (interaction.commandName === 'lana') {
     const letter = randomLoveLetter();
     const embed = new EmbedBuilder()
       .setColor(0xe2557b)
       .setTitle(letter.title)
-      .setDescription(letter.body)
+      .setDescription([
+        ':sparkling_heart: :heart: :sparkling_heart:',
+        '',
+        letter.body,
+        '',
+        ':heart: :sparkling_heart: :heart:'
+      ].join('\n'))
       .addFields({
-        name: 'Little note',
+        name: 'For Lana',
         value: letter.note
       })
-      .setFooter({ text: 'For Lana and Allen' })
+      .setFooter({ text: 'From Allen, always' })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });

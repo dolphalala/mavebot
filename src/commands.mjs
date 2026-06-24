@@ -2,8 +2,8 @@ import { ApplicationCommandOptionType } from 'discord.js';
 
 export const commands = [
   {
-    name: 'iloveyou',
-    description: 'Sends a random love letter for Lana and Allen.',
+    name: 'lana',
+    description: 'Draws a heart-filled love note for Lana.',
     integration_types: [0],
     contexts: [0]
   },

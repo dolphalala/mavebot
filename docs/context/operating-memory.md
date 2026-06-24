@@ -9,10 +9,10 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Main Discord server observed from the bot token: `mevo`
   (`1431280201068843171`).
 - Current slash commands:
-  - `/iloveyou`: sends a randomized embed love letter for Lana and Allen.
+  - `/lana`: draws a randomized heart-filled embed love note for Lana and Allen.
   - `/player`: looks up a Clash of Clans player by tag using the server-side
     CoC API token.
-- Allen is Korean and Lana is Croatian; `/iloveyou` copy can use that context.
+- Allen is Korean and Lana is Croatian; `/lana` copy can use that context.
 - The app is Clash of Clans focused. CoC API calls should use the official API
   base URL `https://api.clashofclans.com/v1` and the server-only
   `COC_API_TOKEN`.
@@ -29,6 +29,10 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Health endpoint: `http://127.0.0.1:4188/healthz`.
 - GitHub deploys should use the server-local
   `urba-discord-poll-deploy.timer`, not a public webhook.
+- The server poll deploy only follows `origin/main`. A Codex cloud task that
+  only edits its task workspace, branch, or PR is not deployed and must not be
+  described as live. Code-changing Slack tasks should push/merge to `main` when
+  permitted, or clearly tell the user that a PR/manual merge is still required.
 - Do not add mavebot endpoints to `chat.urba.group`; that domain belongs to
   Chatwoot.
 
@@ -40,6 +44,10 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - If duplicate commands appear in Discord, clear guild-specific commands and
   reload Discord. Also disable User Install in the Developer Portal if it is not
   needed.
+- When changing a slash command, update both `src/commands.mjs` and the
+  `InteractionCreate` handler in `src/index.mjs`; then run command registration
+  during deploy. Registering the command without deploying a matching runtime
+  handler causes Discord's "The application did not respond" error.
 - To clear stale guild-specific commands during deploy while keeping global
   commands active, set `DISCORD_CLEAR_GUILD_COMMANDS_ID` to the affected server
   ID and leave `DISCORD_GUILD_ID` blank.
@@ -63,10 +71,23 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   public bridge channel where both mavebot and Codex are present. Official Codex
   task cards, "wrong environment" status text, and promo copy should stay there;
   mavebot mirrors only cleaned useful replies back into `#bot`.
+- The forwarded trigger must be a real visible `@Codex` message in the trigger
+  channel. Putting `@Codex` only in Slack fallback text while showing a harmless
+  block such as "Working on it" does not reliably notify the official Codex app.
+- If the trigger channel is still `#bot`, the bridge is in fallback mode. In
+  fallback mode it keeps the temporary Codex trigger around long enough for
+  Codex pickup and posts a stale warning instead of silently hanging, but it
+  cannot fully hide official Codex UI. The clean session UX requires a separate
+  trigger channel.
+- The current Slack app scopes do not let mavebot join or invite apps to other
+  channels by API. A Slack admin/user must invite both `mavebot` and the
+  official `Codex` app to the trigger channel before setting
+  `SLACK_CODEX_TRIGGER_CHANNEL_ID`.
 - If no separate trigger channel is configured, the bridge falls back to `#bot`,
-  shows only a short mavebot working message for the trigger, and deletes the
-  trigger quickly. This fallback can still allow official Codex ephemeral UI to
-  appear in `#bot`, so the separate trigger channel is preferred.
+  shows a short mavebot working message for the trigger, and deletes the
+  temporary trigger after the configured delay. This fallback can still allow
+  official Codex UI to appear in `#bot`, so the separate trigger channel is
+  preferred.
 - Forwarded Codex prompts should include recent saved `#bot` messages from
   bridge memory so Slack feels like a running session. The default prompt memory
   window is controlled by `SLACK_CODEX_MEMORY_LIMIT`.
@@ -82,7 +103,10 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Slack OAuth redirect URI:
   `https://mavebot.lanawee.com/mavebot/slack/oauth/callback`.
 - Required Slack user scope for per-user forwarding: `chat:write`.
-- Slack channel ID for `#bot`: `C0BCRVC2C6Q`.
+- Slack channel ID for user-facing `#bot`: `C0BCG0T838B`.
+- Slack trigger channel ID for visible official Codex prompts: `C0BCRVC2C6Q`
+  (`#chet` as of 2026-06-24). The bridge should keep
+  `SLACK_CODEX_TRIGGER_CHANNEL_ID=C0BCRVC2C6Q` so `#bot` stays clean.
 - Slack app ID for the custom bridge: `A0BCMC7JKRC`.
 - Official Codex Slack user ID observed in #bot: `U0BCS1LE1B6`.
 - The intended default Codex cloud environment is `mavebot`, with

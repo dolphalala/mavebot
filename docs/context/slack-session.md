@@ -27,6 +27,12 @@ future tasks should know.
 - Brief "working" status messages should sound like mavebot, not Codex.
 - Keep replies in the main channel whenever possible so users do not have to
   open Slack thread replies to follow the session.
+- Do not tell Allen a code change is live just because a Codex cloud task
+  changed files in its workspace. The server deploy path follows GitHub
+  `origin/main`; if a task only creates a PR or branch, say it is not deployed.
+- Discord slash command changes must include both command registration data and
+  the runtime interaction handler, otherwise Discord shows "The application did
+  not respond."
 
 ### Persistent Context
 
@@ -37,13 +43,15 @@ future tasks should know.
   lightly affectionate when appropriate.
 - The Discord bot is Clash of Clans focused and should use the official Clash
   of Clans API from server-side environment variables.
-- `/ping` is no longer a public Discord slash command. `/player` is the first
-  CoC lookup command and should stay token-backed from the server.
+- `/ping` is no longer a public Discord slash command.
+- `/lana` replaced `/iloveyou` and sends a heart-filled Lana/Allen embed.
+- `/player` is the first CoC lookup command and should stay token-backed from
+  the server.
 
 ### Open Work
 
-- Keep the GitHub repository synchronized with live server bridge changes so
-  Codex cloud tasks and server auto-deploys use the same code.
+- Keep the GitHub repository synchronized with live server changes so Codex
+  cloud tasks and server auto-deploys use the same code.
 - Continue improving Discord commands for Clash of Clans workflows.
 - If a user asks to reset or start a new session, add a new dated section here
   instead of deleting older notes.
