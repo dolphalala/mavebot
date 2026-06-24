@@ -11,6 +11,7 @@ test('lana command replaces the old iloveyou command', () => {
   const lana = commands.find((command) => command.name === 'lana');
 
   assert.ok(lana);
+  assert.match(lana.description, /heart image/i);
   assert.equal(commands.some((command) => command.name === 'iloveyou'), false);
   assert.deepEqual(lana.integration_types, [0]);
   assert.deepEqual(lana.contexts, [0]);

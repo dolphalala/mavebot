@@ -3,7 +3,7 @@ import { ApplicationCommandOptionType } from 'discord.js';
 export const commands = [
   {
     name: 'lana',
-    description: 'Draws a heart-filled love note for Lana.',
+    description: 'Draws a glowing heart image and love note for Lana.',
     integration_types: [0],
     contexts: [0]
   },

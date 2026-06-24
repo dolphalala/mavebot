@@ -9,7 +9,8 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Main Discord server observed from the bot token: `mevo`
   (`1431280201068843171`).
 - Current slash commands:
-  - `/lana`: draws a randomized heart-filled embed love note for Lana and Allen.
+  - `/lana`: draws a generated PNG heart image plus a randomized embed love
+    note for Lana and Allen.
   - `/player`: looks up a Clash of Clans player by tag using the server-side
     CoC API token.
 - Allen is Korean and Lana is Croatian; `/lana` copy can use that context.
@@ -33,6 +34,10 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   only edits its task workspace, branch, or PR is not deployed and must not be
   described as live. Code-changing Slack tasks should push/merge to `main` when
   permitted, or clearly tell the user that a PR/manual merge is still required.
+- If a mirrored Codex response says it committed locally, opened PR metadata, or
+  could not push to `origin/main`, it is not live. Discord will not reflect that
+  change until a real GitHub `main` commit deploys and command registration
+  runs.
 - Do not add mavebot endpoints to `chat.urba.group`; that domain belongs to
   Chatwoot.
 

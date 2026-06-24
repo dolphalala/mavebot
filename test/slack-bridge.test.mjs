@@ -5,6 +5,7 @@ import {
   buildCodexPromptText,
   cleanCodexMirrorText,
   defaultCodexDeleteForwardDelayMs,
+  markUndeployedCodexWork,
   selectForwardForCodexEvent,
   isCodexStatusNoise
 } from '../src/slack-bridge.mjs';
@@ -32,6 +33,23 @@ test('isCodexStatusNoise detects status-only messages', () => {
     true
   );
   assert.equal(isCodexStatusNoise('Implemented the player lookup command.'), false);
+});
+
+test('markUndeployedCodexWork makes task-only commits visibly not live', () => {
+  const marked = markUndeployedCodexWork([
+    'Summary',
+    'Committed the change locally: `23036b5 Make lana command draw a heart image`.',
+    'I could not push this to `origin/main` from this workspace.'
+  ].join('\n'));
+
+  assert.match(marked, /^Not live yet\./);
+  assert.match(marked, /Discord will not change until the code reaches `origin\/main`/);
+});
+
+test('cleanCodexMirrorText keeps normal conversational answers clean', () => {
+  const cleaned = cleanCodexMirrorText('Codex: Yep, Lana is very pretty.');
+
+  assert.equal(cleaned, 'Yep, Lana is very pretty.');
 });
 
 test('buildCodexPromptText wraps memory as untrusted JSON context', () => {

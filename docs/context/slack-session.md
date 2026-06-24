@@ -44,7 +44,8 @@ future tasks should know.
 - The Discord bot is Clash of Clans focused and should use the official Clash
   of Clans API from server-side environment variables.
 - `/ping` is no longer a public Discord slash command.
-- `/lana` replaced `/iloveyou` and sends a heart-filled Lana/Allen embed.
+- `/lana` replaced `/iloveyou` and sends a generated PNG heart image with a
+  Lana/Allen embed. It should not regress to a text-only love letter.
 - `/player` is the first CoC lookup command and should stay token-backed from
   the server.
 

@@ -667,7 +667,7 @@ function normalizeCodexStatusText(text) {
 }
 
 export function cleanCodexMirrorText(text) {
-  return String(text || '')
+  const cleaned = String(text || '')
     .replace(/_?<https:\/\/chatgpt\.com\/(?:codex|s)\/[^>|]+(?:\|[^>]+)?>_?/g, '')
     .split('\n')
     .map(stripCodexPrefix)
@@ -693,6 +693,38 @@ export function cleanCodexMirrorText(text) {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+
+  return markUndeployedCodexWork(cleaned);
+}
+
+export function markUndeployedCodexWork(text) {
+  const value = String(text || '').trim();
+  if (!value || /^Not live yet\./i.test(value)) {
+    return value;
+  }
+
+  const normalized = value.replace(/\s+/g, ' ');
+  const undeployedSignal =
+    /could not push/i.test(normalized) ||
+    /cannot push/i.test(normalized) ||
+    /can't push/i.test(normalized) ||
+    /not deployed/i.test(normalized) ||
+    /only opened a PR/i.test(normalized) ||
+    /manual merge/i.test(normalized) ||
+    /created the PR record/i.test(normalized) ||
+    /opened the PR metadata/i.test(normalized) ||
+    /committed .* locally/i.test(normalized) ||
+    /committed .* on the current branch/i.test(normalized);
+
+  if (!undeployedSignal) {
+    return value;
+  }
+
+  return [
+    'Not live yet. Codex did work in a task workspace or branch, but Discord will not change until the code reaches `origin/main` and the server deploy passes.',
+    '',
+    value
+  ].join('\n');
 }
 
 function isCodexKickoffStatus(text) {

@@ -5,7 +5,7 @@ Minimal Dockerized Discord bot foundation for the shared `urba-chatwoot` host.
 ## What It Includes
 
 - `discord.js` v14 bot process
-- `/iloveyou` slash command with randomized Lana/Allen embeds
+- `/lana` slash command with a generated heart PNG and randomized Lana/Allen embeds
 - `/player` slash command for Clash of Clans player lookups
 - slash command registration script
 - local-only `/healthz` HTTP endpoint on port `4188`
@@ -103,7 +103,7 @@ SLACK_CLIENT_SECRET=
 SLACK_SIGNING_SECRET=
 SLACK_APP_TOKEN=
 SLACK_BOT_TOKEN=
-SLACK_CHANNEL_ID=C0BCRVC2C6Q
+SLACK_CHANNEL_ID=C0BCG0T838B
 SLACK_SOCKET_MODE=1
 SLACK_CODEX_FORWARD=1
 SLACK_CODEX_USER_ID=
@@ -113,7 +113,7 @@ SLACK_CODEX_REPOSITORY=dolphalala/mavebot
 SLACK_CODEX_MIRROR_REPLIES=1
 SLACK_CODEX_FORWARD_IN_THREAD=0
 SLACK_CODEX_DELETE_FORWARD=1
-SLACK_CODEX_DELETE_FORWARD_DELAY_MS=250
+SLACK_CODEX_DELETE_FORWARD_DELAY_MS=60000
 SLACK_CODEX_STATE_PATH=/shared/codex-forward-state.json
 SLACK_CODEX_MEMORY_LIMIT=30
 SLACK_CODEX_MEMORY_TEXT_LIMIT=1500
