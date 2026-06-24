@@ -50,24 +50,70 @@ test('fetchPlayer fails clearly when token is missing', async () => {
   });
 });
 
-test('buildPlayerEmbedData formats core player stats', () => {
+test('buildPlayerEmbedData formats a rich player stat card', () => {
   const embed = buildPlayerEmbedData({
     name: 'Allen',
     tag: '#ABC123',
     townHallLevel: 16,
+    townHallWeaponLevel: 5,
+    expLevel: 244,
     trophies: 5123,
     bestTrophies: 6000,
     warStars: 321,
     attackWins: 44,
+    defenseWins: 12,
     builderHallLevel: 10,
-    clan: { name: 'mave' },
-    role: 'leader'
+    builderBaseTrophies: 4100,
+    bestBuilderBaseTrophies: 4500,
+    clan: {
+      name: 'mave',
+      tag: '#CLAN',
+      clanLevel: 18,
+      badgeUrls: { medium: 'https://example.test/clan.png' }
+    },
+    role: 'leader',
+    warPreference: 'in',
+    donations: 1234,
+    donationsReceived: 987,
+    league: {
+      name: 'Legend League',
+      iconUrls: { medium: 'https://example.test/legend.png' }
+    },
+    builderBaseLeague: { name: 'Emerald League' },
+    legendStatistics: {
+      legendTrophies: 500,
+      currentSeason: { trophies: 5400, rank: 12345 },
+      bestSeason: { trophies: 6010, rank: 900 }
+    },
+    labels: [{ name: 'Clan Wars' }, { name: 'Trophy Pushing' }],
+    heroes: [
+      { name: 'Barbarian King', level: 95, maxLevel: 100 },
+      { name: 'Archer Queen', level: 96, maxLevel: 100 }
+    ],
+    heroEquipment: [{ name: 'Giant Gauntlet', level: 18, maxLevel: 27 }],
+    troops: [
+      { name: 'Root Rider', level: 3, maxLevel: 3, village: 'home' },
+      { name: 'Electro Dragon', level: 7, maxLevel: 7, village: 'home' },
+      { name: 'Night Witch', level: 20, maxLevel: 20, village: 'builderBase' }
+    ],
+    spells: [{ name: 'Rage Spell', level: 6, maxLevel: 6 }],
+    achievements: [
+      { name: 'War Hero', stars: 3, value: 321, target: 1000 },
+      { name: 'Friend in Need', stars: 2, value: 5000, target: 25000 }
+    ]
   });
 
   assert.equal(embed.title, 'Allen #ABC123');
-  assert.equal(embed.description, 'mave (leader)');
-  assert.deepEqual(
-    embed.fields.map((field) => field.value),
-    ['16', '5,123', '6,000', '321', '44', '10']
-  );
+  assert.match(embed.description, /mave - #CLAN - Level 18 \(Leader\)/);
+  assert.match(embed.description, /Legend League - TH 16 weapon 5 - XP 244/);
+  assert.equal(embed.thumbnailUrl, 'https://example.test/legend.png');
+  assert.equal(embed.footer, 'Official Clash of Clans API');
+  assert.ok(embed.fields.length >= 12);
+  assert.match(embed.fields.find((field) => field.name === 'Home village').value, /Trophies: 5,123 \/ best 6,000/);
+  assert.match(embed.fields.find((field) => field.name === 'Builder base').value, /Emerald League/);
+  assert.match(embed.fields.find((field) => field.name === 'War and attacks').value, /Defense wins: 12/);
+  assert.match(embed.fields.find((field) => field.name === 'Clan and donations').value, /Donated: 1,234/);
+  assert.match(embed.fields.find((field) => field.name === 'Heroes').value, /Archer Queen 96\/100/);
+  assert.match(embed.fields.find((field) => field.name === 'Top home troops').value, /Electro Dragon 7\/7/);
+  assert.match(embed.fields.find((field) => field.name === 'Top achievements').value, /War Hero \(3\/3\)/);
 });

@@ -21,6 +21,7 @@ test('player command is guild-install only and requires a tag option', () => {
   const player = commands.find((command) => command.name === 'player');
 
   assert.ok(player);
+  assert.match(player.description, /pretty Clash of Clans player stat card/i);
   assert.deepEqual(player.integration_types, [0]);
   assert.deepEqual(player.contexts, [0]);
   assert.deepEqual(player.options, [

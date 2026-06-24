@@ -89,8 +89,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTitle(embedData.title)
         .setDescription(embedData.description)
         .addFields(embedData.fields)
-        .setFooter({ text: 'Clash of Clans player lookup' })
+        .setFooter({ text: embedData.footer || 'Clash of Clans player lookup' })
         .setTimestamp();
+      if (embedData.thumbnailUrl) {
+        embed.setThumbnail(embedData.thumbnailUrl);
+      }
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {

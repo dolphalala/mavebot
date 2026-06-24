@@ -88,43 +88,237 @@ function numberText(value) {
   return Number.isFinite(value) ? value.toLocaleString('en-US') : 'Unknown';
 }
 
+function textValue(value, fallback = 'Unknown') {
+  const text = String(value || '').trim();
+  return text || fallback;
+}
+
+function labelText(value) {
+  return textValue(value)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function truncateText(value, limit = 1024) {
+  const text = String(value || '').trim();
+  if (text.length <= limit) {
+    return text || 'None';
+  }
+
+  return `${text.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
+}
+
+function formatLevelItem(item) {
+  const level = Number.isFinite(item?.level) ? item.level : null;
+  const maxLevel = Number.isFinite(item?.maxLevel) ? item.maxLevel : null;
+  const levelText = level === null ? '' : maxLevel ? ` ${level}/${maxLevel}` : ` ${level}`;
+  return `${textValue(item?.name, 'Unknown')}${levelText}`;
+}
+
+function formatLevelList(items, { village, limit = 8 } = {}) {
+  const filtered = (items || [])
+    .filter((item) => !village || item?.village === village)
+    .sort((a, b) => (b.level || 0) - (a.level || 0))
+    .slice(0, limit)
+    .map(formatLevelItem);
+
+  return truncateText(filtered.join(', '));
+}
+
+function formatHeroList(items, { limit = 8 } = {}) {
+  const heroes = (items || [])
+    .sort((a, b) => (b.level || 0) - (a.level || 0))
+    .slice(0, limit)
+    .map(formatLevelItem);
+
+  return truncateText(heroes.join(', '));
+}
+
+function formatLabels(labels) {
+  return truncateText((labels || []).map((label) => label.name).filter(Boolean).join(', '));
+}
+
+function achievementProgress(achievement) {
+  const value = Number.isFinite(achievement?.value) ? achievement.value : null;
+  const target = Number.isFinite(achievement?.target) ? achievement.target : null;
+  if (value === null && target === null) {
+    return '';
+  }
+
+  if (target === null) {
+    return ` - ${numberText(value)}`;
+  }
+
+  return ` - ${numberText(value)}/${numberText(target)}`;
+}
+
+function formatAchievements(achievements, { limit = 5 } = {}) {
+  const rows = (achievements || [])
+    .slice()
+    .sort((a, b) => (b.stars || 0) - (a.stars || 0) || (b.value || 0) - (a.value || 0))
+    .slice(0, limit)
+    .map((achievement) => {
+      const stars = Number.isFinite(achievement.stars) ? `${achievement.stars}/3` : '?/3';
+      return `${achievement.name || 'Achievement'} (${stars})${achievementProgress(achievement)}`;
+    });
+
+  return truncateText(rows.join('\n'));
+}
+
+function formatLegendStats(stats) {
+  if (!stats) {
+    return 'None';
+  }
+
+  const rows = [];
+  if (Number.isFinite(stats.legendTrophies)) {
+    rows.push(`Legend trophies: ${numberText(stats.legendTrophies)}`);
+  }
+  if (stats.currentSeason) {
+    rows.push(
+      `Current: ${numberText(stats.currentSeason.trophies)} trophies${
+        Number.isFinite(stats.currentSeason.rank) ? `, rank ${numberText(stats.currentSeason.rank)}` : ''
+      }`
+    );
+  }
+  if (stats.bestSeason) {
+    rows.push(
+      `Best season: ${numberText(stats.bestSeason.trophies)} trophies${
+        Number.isFinite(stats.bestSeason.rank) ? `, rank ${numberText(stats.bestSeason.rank)}` : ''
+      }`
+    );
+  }
+  if (stats.previousSeason) {
+    rows.push(
+      `Previous: ${numberText(stats.previousSeason.trophies)} trophies${
+        Number.isFinite(stats.previousSeason.rank) ? `, rank ${numberText(stats.previousSeason.rank)}` : ''
+      }`
+    );
+  }
+
+  return truncateText(rows.join('\n'));
+}
+
+function clanDescription(clan) {
+  if (!clan?.name) {
+    return 'No clan';
+  }
+
+  const parts = [clan.name];
+  if (clan.tag) {
+    parts.push(clan.tag);
+  }
+  if (Number.isFinite(clan.clanLevel)) {
+    parts.push(`Level ${clan.clanLevel}`);
+  }
+  return parts.join(' - ');
+}
+
+function thumbnailUrl(player) {
+  return (
+    player.league?.iconUrls?.medium ||
+    player.league?.iconUrls?.small ||
+    player.clan?.badgeUrls?.medium ||
+    player.clan?.badgeUrls?.small ||
+    null
+  );
+}
+
 export function buildPlayerEmbedData(player) {
-  const clanName = player.clan?.name || 'No clan';
-  const role = player.role ? ` (${player.role})` : '';
+  const league = player.league?.name || 'Unranked';
+  const builderLeague = player.builderBaseLeague?.name || 'Unranked';
+  const townHall = player.townHallWeaponLevel
+    ? `${player.townHallLevel || 'Unknown'} weapon ${player.townHallWeaponLevel}`
+    : String(player.townHallLevel || 'Unknown');
+  const description = [
+    `${clanDescription(player.clan)}${player.role ? ` (${labelText(player.role)})` : ''}`,
+    `${league} - TH ${townHall} - XP ${numberText(player.expLevel)}`
+  ].join('\n');
 
   return {
     title: `${player.name || 'Unknown player'} ${player.tag || ''}`.trim(),
-    description: `${clanName}${role}`,
+    description,
+    thumbnailUrl: thumbnailUrl(player),
+    footer: 'Official Clash of Clans API',
     fields: [
       {
-        name: 'Town Hall',
-        value: String(player.townHallLevel || 'Unknown'),
+        name: 'Home village',
+        value: [
+          `Town Hall: ${townHall}`,
+          `Trophies: ${numberText(player.trophies)} / best ${numberText(player.bestTrophies)}`,
+          `League: ${league}`,
+          `War preference: ${labelText(player.warPreference)}`
+        ].join('\n'),
         inline: true
       },
       {
-        name: 'Trophies',
-        value: numberText(player.trophies),
+        name: 'Builder base',
+        value: [
+          `Builder Hall: ${player.builderHallLevel || 'Unknown'}`,
+          `Trophies: ${numberText(player.builderBaseTrophies)} / best ${numberText(player.bestBuilderBaseTrophies)}`,
+          `League: ${builderLeague}`
+        ].join('\n'),
         inline: true
       },
       {
-        name: 'Best',
-        value: numberText(player.bestTrophies),
+        name: 'War and attacks',
+        value: [
+          `War stars: ${numberText(player.warStars)}`,
+          `Attack wins: ${numberText(player.attackWins)}`,
+          `Defense wins: ${numberText(player.defenseWins)}`
+        ].join('\n'),
         inline: true
       },
       {
-        name: 'War stars',
-        value: numberText(player.warStars),
+        name: 'Clan and donations',
+        value: [
+          clanDescription(player.clan),
+          `Donated: ${numberText(player.donations)}`,
+          `Received: ${numberText(player.donationsReceived)}`
+        ].join('\n'),
         inline: true
       },
       {
-        name: 'Attack wins',
-        value: numberText(player.attackWins),
+        name: 'Labels',
+        value: formatLabels(player.labels),
         inline: true
       },
       {
-        name: 'Builder Hall',
-        value: String(player.builderHallLevel || 'Unknown'),
+        name: 'Legend League',
+        value: formatLegendStats(player.legendStatistics),
         inline: true
+      },
+      {
+        name: 'Heroes',
+        value: formatHeroList(player.heroes),
+        inline: false
+      },
+      {
+        name: 'Hero equipment',
+        value: formatLevelList(player.heroEquipment, { limit: 10 }),
+        inline: false
+      },
+      {
+        name: 'Top home troops',
+        value: formatLevelList(player.troops, { village: 'home', limit: 12 }),
+        inline: false
+      },
+      {
+        name: 'Top Builder Base troops',
+        value: formatLevelList(player.troops, { village: 'builderBase', limit: 8 }),
+        inline: false
+      },
+      {
+        name: 'Spells',
+        value: formatLevelList(player.spells, { limit: 10 }),
+        inline: false
+      },
+      {
+        name: 'Top achievements',
+        value: formatAchievements(player.achievements),
+        inline: false
       }
     ]
   };
