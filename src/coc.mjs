@@ -110,129 +110,11 @@ function truncateText(value, limit = 1024) {
   return `${text.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
 }
 
-const UNIT_ICONS = new Map(
-  [
-    ['apprentice warden', '🔮'],
-    ['archer', '🏹'],
-    ['archer puppet', '🏹'],
-    ['archer queen', '🏹'],
-    ['baby dragon', '🐲'],
-    ['balloon', '🎈'],
-    ['barbarian', '⚔️'],
-    ['barbarian king', '👑'],
-    ['battle copter', '🚁'],
-    ['battle machine', '🔨'],
-    ['beta minion', '🦇'],
-    ['bomber', '💣'],
-    ['bowler', '🪨'],
-    ['boxer giant', '🥊'],
-    ['cannon cart', '🛞'],
-    ['dark orb', '🟣'],
-    ['dragon', '🐉'],
-    ['dragon rider', '🐉'],
-    ['druid', '🌿'],
-    ['earthquake boots', '🥾'],
-    ['electro boots', '⚡'],
-    ['electro dragon', '⚡'],
-    ['electro titan', '⚡'],
-    ['electrofire wizard', '🔥'],
-    ['eternal tome', '📖'],
-    ['fireball', '🔥'],
-    ['giant', '🪨'],
-    ['giant arrow', '🏹'],
-    ['giant gauntlet', '🧤'],
-    ['goblin', '💰'],
-    ['golem', '🪨'],
-    ['grand warden', '🔮'],
-    ['haste vial', '🧪'],
-    ['head hunter', '🎯'],
-    ['healer', '✨'],
-    ['healer puppet', '✨'],
-    ['healing tome', '📖'],
-    ['henchmen puppet', '🦇'],
-    ['hog glider', '🐗'],
-    ['hog rider', '🐗'],
-    ['hog rider puppet', '🐗'],
-    ['ice golem', '❄️'],
-    ['invisibility vial', '🧪'],
-    ['lava hound', '🌋'],
-    ['life gem', '💎'],
-    ['magic mirror', '🪞'],
-    ['miner', '⛏️'],
-    ['minion', '🦇'],
-    ['minion prince', '🦇'],
-    ['night witch', '💀'],
-    ['pekka', '🛡️'],
-    ['raged barbarian', '⚔️'],
-    ['rage gem', '💎'],
-    ['rage vial', '🧪'],
-    ['rocket spear', '🚀'],
-    ['root rider', '🌿'],
-    ['royal champion', '🛡️'],
-    ['royal gem', '💎'],
-    ['seeking shield', '🛡️'],
-    ['sneaky archer', '🏹'],
-    ['spiky ball', '🏐'],
-    ['super pekka', '⚡'],
-    ['thrower', '🪓'],
-    ['valkyrie', '🪓'],
-    ['vampstache', '🩸'],
-    ['wall breaker', '💣'],
-    ['witch', '💀'],
-    ['wizard', '🔥'],
-    ['yeti', '❄️']
-  ].map(([name, icon]) => [name, icon])
-);
-
-function unitIcon(item, fallback = '▫️') {
-  const name = String(item?.name || '').trim().toLowerCase();
-  if (UNIT_ICONS.has(name)) {
-    return UNIT_ICONS.get(name);
-  }
-
-  if (name.includes('dragon')) {
-    return '🐉';
-  }
-  if (name.includes('spell') || name.includes('vial')) {
-    return '🧪';
-  }
-  if (name.includes('tome')) {
-    return '📖';
-  }
-  if (name.includes('gem')) {
-    return '💎';
-  }
-  if (name.includes('machine') || name.includes('siege')) {
-    return '🛠️';
-  }
-
-  return fallback;
-}
-
 function formatLevelItem(item) {
   const level = Number.isFinite(item?.level) ? item.level : null;
   const maxLevel = Number.isFinite(item?.maxLevel) ? item.maxLevel : null;
   const levelText = level === null ? '' : maxLevel ? ` ${level}/${maxLevel}` : ` ${level}`;
-  return `${unitIcon(item)} ${textValue(item?.name, 'Unknown')}${levelText}`;
-}
-
-function formatLevelList(items, { village, limit = 8 } = {}) {
-  const filtered = (items || [])
-    .filter((item) => !village || item?.village === village)
-    .sort((a, b) => (b.level || 0) - (a.level || 0))
-    .slice(0, limit)
-    .map(formatLevelItem);
-
-  return truncateText(filtered.join(', '));
-}
-
-function formatHeroList(items, { limit = 8 } = {}) {
-  const heroes = (items || [])
-    .sort((a, b) => (b.level || 0) - (a.level || 0))
-    .slice(0, limit)
-    .map(formatLevelItem);
-
-  return truncateText(heroes.join(', '));
+  return `${textValue(item?.name, 'Unknown')}${levelText}`;
 }
 
 function formatLabels(labels) {
@@ -375,66 +257,139 @@ function formatAttackProfile(player) {
   ].join('\n');
 }
 
-function formatArmyComposition(player) {
-  return [
-    `Main: ${formatLevelList(player.troops, { village: 'home', limit: 8 })}`,
-    `Spells: ${formatLevelList(player.spells, { limit: 8 })}`,
-    `Builder: ${formatLevelList(player.troops, { village: 'builderBase', limit: 5 })}`
-  ].join('\n');
+function topItems(items, limit = 10) {
+  return (items || [])
+    .slice()
+    .sort((a, b) => (b.level || 0) - (a.level || 0))
+    .slice(0, limit);
 }
 
-export function buildPlayerEmbedData(player) {
-  const league = player.league?.name || 'Unranked';
-  const builderLeague = player.builderBaseLeague?.name || 'Unranked';
-  const townHall = player.townHallWeaponLevel
-    ? `${player.townHallLevel || 'Unknown'} weapon ${player.townHallWeaponLevel}`
-    : String(player.townHallLevel || 'Unknown');
-  const profileUrl = player.tag ? buildPlayerProfileUrl(player.tag) : null;
-  const description = [
+function formatGroupedLevelList(items, { village, limit = 12, columns = 3 } = {}) {
+  const rows = topItems(
+    (items || []).filter((item) => !village || item?.village === village),
+    limit
+  ).map(formatLevelItem);
+
+  if (!rows.length) {
+    return 'None';
+  }
+
+  const lines = [];
+  for (let index = 0; index < rows.length; index += columns) {
+    lines.push(rows.slice(index, index + columns).join(' | '));
+  }
+  return truncateText(lines.join('\n'));
+}
+
+function field(name, value, inline = false) {
+  return {
+    name,
+    value: truncateText(value),
+    inline
+  };
+}
+
+function pageThumbnail(player, assetUrls, preferredNames = []) {
+  for (const name of preferredNames) {
+    const url = assetUrls?.get?.(name) || assetUrls?.get?.(String(name).toLowerCase());
+    if (url) {
+      return url;
+    }
+  }
+  return thumbnailUrl(player);
+}
+
+function profileDescription(player, { league, townHall, profileUrl }) {
+  return [
     `TH ${townHall} - XP ${numberText(player.expLevel)} - ${league}`,
     `${clanDescription(player.clan)}${player.role ? ` (${labelText(player.role)})` : ''}`,
     profileUrl ? `[Open profile in Clash](${profileUrl})` : null
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+export function buildPlayerProfilePages(player, { assetUrls = new Map(), armyImageAttachment = null } = {}) {
+  const league = player.league?.name || 'Unranked';
+  const builderLeague = player.builderBaseLeague?.name || 'Unranked';
+  const townHall = player.townHallWeaponLevel
+    ? `${player.townHallLevel || 'Unknown'} weapon ${player.townHallWeaponLevel}`
+    : String(player.townHallLevel || 'Unknown');
+  const profileUrl = player.tag ? buildPlayerProfileUrl(player.tag) : null;
+  const description = profileDescription(player, { league, townHall, profileUrl });
 
   return {
-    title: `${player.name || 'Unknown player'} ${player.tag || ''}`.trim(),
-    description,
-    thumbnailUrl: thumbnailUrl(player),
     profileUrl,
-    footer: 'Official Clash of Clans API',
-    fields: [
+    footer: 'Official Clash of Clans API + Clash Wiki/Fandom icons when available',
+    pages: [
       {
-        name: '🏆 Trophies',
-        value: formatTrophySnapshot(player, { league, builderLeague }),
-        inline: true
+        id: 'overview',
+        label: 'Overview',
+        title: `${player.name || 'Unknown player'} - Overview`,
+        description,
+        thumbnailUrl: thumbnailUrl(player),
+        fields: [
+          field('Trophies', formatTrophySnapshot(player, { league, builderLeague }), true),
+          field('Clan', clanSummary(player), true),
+          field('War', formatAttackProfile(player), true)
+        ]
       },
       {
-        name: '🏰 Clan',
-        value: clanSummary(player),
-        inline: true
+        id: 'army',
+        label: 'Army',
+        title: `${player.name || 'Unknown player'} - Army`,
+        description: [
+          `Fast scan of the strongest visible army levels for ${player.tag || 'this player'}.`,
+          armyImageAttachment ? 'Rendered icon card attached below.' : 'Icon card unavailable; using text rows.'
+        ].join('\n'),
+        thumbnailUrl: pageThumbnail(player, assetUrls, ['Lightning Spell', 'Archer Queen', 'Barbarian King']),
+        imageUrl: armyImageAttachment ? `attachment://${armyImageAttachment}` : null,
+        fields: [
+          field('Home Troops', formatGroupedLevelList(player.troops, { village: 'home', limit: 18 })),
+          field('Spells', formatGroupedLevelList(player.spells, { limit: 18 })),
+          field('Builder Base', formatGroupedLevelList(player.troops, { village: 'builderBase', limit: 12 }))
+        ]
       },
       {
-        name: '⚔️ Attack Profile',
-        value: formatAttackProfile(player),
-        inline: true
+        id: 'heroes',
+        label: 'Heroes',
+        title: `${player.name || 'Unknown player'} - Heroes`,
+        description: 'Hero, pet, and equipment levels split away from the main overview.',
+        thumbnailUrl: pageThumbnail(player, assetUrls, ['Archer Queen', 'Barbarian King', 'Spiky Ball']),
+        fields: [
+          field('Heroes', formatGroupedLevelList(player.heroes, { limit: 8 })),
+          field('Hero Equipment', formatGroupedLevelList(player.heroEquipment, { limit: 12 })),
+          field('Labels', formatLabels(player.labels))
+        ]
       },
       {
-        name: '🛡️ Heroes',
-        value: formatHeroList(player.heroes, { limit: 6 }),
-        inline: false
-      },
-      {
-        name: '🧰 Hero Equipment',
-        value: formatLevelList(player.heroEquipment, { limit: 8 }),
-        inline: false
-      },
-      {
-        name: '🏹 Army Composition',
-        value: formatArmyComposition(player),
-        inline: false
+        id: 'progress',
+        label: 'Progress',
+        title: `${player.name || 'Unknown player'} - Progress`,
+        description: 'Achievements, Legend stats, and long-term account progress.',
+        thumbnailUrl: thumbnailUrl(player),
+        fields: [
+          field('Achievements', formatAchievements(player.achievements, { limit: 8 })),
+          field('Legend League', formatLegendStats(player.legendStatistics)),
+          field(
+            'Donations',
+            `Troops donated: ${numberText(player.donations)}\nTroops received: ${numberText(player.donationsReceived)}`
+          )
+        ]
       }
     ]
+  };
+}
+
+export function buildPlayerEmbedData(player) {
+  const profile = buildPlayerProfilePages(player);
+  const page = profile.pages[0];
+  return {
+    title: page.title,
+    description: page.description,
+    thumbnailUrl: page.thumbnailUrl,
+    profileUrl: profile.profileUrl,
+    footer: profile.footer,
+    fields: page.fields
   };
 }

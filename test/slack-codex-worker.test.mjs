@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import {
   buildCodexWorkerPrompt,
   checkUrl,
-  compactTranscriptRows
+  compactTranscriptRows,
+  readRepoContextBundle
 } from '../src/slack-codex-worker.mjs';
 
 test('compactTranscriptRows keeps recent turns bounded and older turns summarized', () => {
@@ -43,6 +47,7 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
     recent: 'recent request: check /ping',
     operatingMemory: 'operating memory',
     slackSession: 'slack session',
+    repoContextBundle: 'clash ui guidance',
     slackMemoryTail: 'raw memory'
   });
 
@@ -56,6 +61,23 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   );
   assert.match(prompt, /Do not commit or push/);
   assert.match(prompt, /Discord command changes must update both src\/commands\.mjs and src\/index\.mjs/);
+  assert.match(prompt, /# Extra Repo Context Files/);
+  assert.match(prompt, /clash ui guidance/);
+});
+
+test('readRepoContextBundle loads bounded extra docs/context markdown files', async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'mavebot-context-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+
+  await writeFile(path.join(dir, 'operating-memory.md'), 'do not include this copy');
+  await writeFile(path.join(dir, 'slack-session.md'), 'do not include this copy either');
+  await writeFile(path.join(dir, 'clash-ui-guidance.md'), '# Clash UI\nUse icon cards.');
+
+  const bundle = await readRepoContextBundle({ dir, maxChars: 500 });
+
+  assert.match(bundle, /## clash-ui-guidance\.md/);
+  assert.match(bundle, /Use icon cards/);
+  assert.doesNotMatch(bundle, /do not include this copy/);
 });
 
 test('checkUrl supports the Slack bridge health port', async (t) => {

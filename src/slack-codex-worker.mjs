@@ -80,6 +80,11 @@ const transcriptPath = path.join(contextDir, 'transcript.jsonl');
 const summaryPath = path.join(contextDir, 'summary.md');
 const recentPath = path.join(contextDir, 'recent.md');
 const sessionPath = path.join(contextDir, 'session.md');
+const repoContextDir = process.env.SLACK_WORKER_REPO_CONTEXT_DIR || path.join(repoDir, 'docs/context');
+const repoContextMaxChars = parsePositiveInt(
+  process.env.SLACK_WORKER_REPO_CONTEXT_MAX_CHARS,
+  16000
+);
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value || '', 10);
@@ -392,6 +397,7 @@ export function compactTranscriptRows(rows, options = {}) {
     '- Server app path: /opt/urba-apps/discord-bot/app.',
     '- Production deploy follows GitHub origin/main through the server poll deploy timer.',
     '- Slack #bot should behave like one channel session, with mavebot posting normal channel replies.',
+    '- Repo docs/context/*.md files are durable operating memory. Keep them concise, restructure them when stale, and remove duplicated obsolete notes.',
     '- Do not touch Chatwoot, Bookkeeper, nginx, Docker daemon settings, or unrelated apps unless Allen asks for that exact action.',
     '',
     '## Compacted Older Turns',
@@ -419,7 +425,7 @@ export function compactTranscriptRows(rows, options = {}) {
     '## Current Session Shape',
     '',
     '- Slack #bot is the user-facing control surface.',
-    '- Worker jobs should read repo docs/context/operating-memory.md and docs/context/slack-session.md before acting.',
+    '- Worker jobs should read repo docs/context/operating-memory.md, docs/context/slack-session.md, and relevant docs/context/*.md before acting.',
     '- Code changes should be tested, committed, pushed to main, then verified on the server.',
     '',
     '## Recent Turns Pointer',
@@ -473,6 +479,42 @@ async function readOptional(filePath) {
   }
 }
 
+export async function readRepoContextBundle({
+  dir = repoContextDir,
+  maxChars = repoContextMaxChars,
+  exclude = ['operating-memory.md', 'slack-session.md']
+} = {}) {
+  const excludeSet = new Set(exclude);
+  let names = [];
+  try {
+    names = (await readdir(dir))
+      .filter((name) => name.endsWith('.md') && !excludeSet.has(name))
+      .sort();
+  } catch {
+    return '';
+  }
+
+  const sections = [];
+  let remaining = maxChars;
+  for (const name of names) {
+    if (remaining <= 200) {
+      break;
+    }
+    const filePath = path.join(dir, name);
+    const content = await readOptional(filePath);
+    if (!content.trim()) {
+      continue;
+    }
+    const budget = Math.min(remaining, Math.max(2000, Math.floor(maxChars / Math.max(1, names.length))));
+    const clipped = truncate(content, budget);
+    const section = [`## ${name}`, '', clipped, ''].join('\n');
+    sections.push(section);
+    remaining -= section.length;
+  }
+
+  return sections.join('\n').trim();
+}
+
 async function readSlackMemoryTail(limit = 20) {
   try {
     const content = await readFile(slackMemoryPath, 'utf8');
@@ -500,7 +542,8 @@ function promptHeader(job) {
     '- Do not commit or push. The worker will run checks, commit, push main, and verify deploy after you finish.',
     '- If the request is conversational and needs no code, answer normally.',
     '- If the request changes durable behavior or project facts, update docs/context/slack-session.md.',
-    '- Before code changes, read docs/context/operating-memory.md and docs/context/slack-session.md.',
+    '- Before code changes, read docs/context/operating-memory.md, docs/context/slack-session.md, and relevant docs/context/*.md.',
+    '- Keep context docs useful: compact stale details, restructure bloated sections, and delete obsolete duplicated notes when the durable facts are captured elsewhere.',
     '- Discord command changes must update both src/commands.mjs and src/index.mjs.',
     '- Keep mavebot isolated from Chatwoot, Bookkeeper, nginx, and unrelated apps.',
     '- Final answer should be concise and suitable to post directly in Slack as mavebot.',
@@ -514,6 +557,7 @@ export function buildCodexWorkerPrompt({
   recent = '',
   operatingMemory = '',
   slackSession = '',
+  repoContextBundle = '',
   slackMemoryTail = ''
 }) {
   return [
@@ -529,6 +573,9 @@ export function buildCodexWorkerPrompt({
     '',
     '# Repo Slack Session Memory',
     slackSession || 'docs/context/slack-session.md was not readable.',
+    '',
+    '# Extra Repo Context Files',
+    repoContextBundle || 'No extra docs/context/*.md files were readable.',
     '',
     '# Raw Slack Memory Tail',
     slackMemoryTail || 'No raw Slack memory tail available.',
@@ -708,6 +755,7 @@ async function verifyRuntime() {
 async function runCodex(job, contextSnapshot) {
   const operatingMemory = await readOptional(path.join(repoDir, 'docs/context/operating-memory.md'));
   const slackSession = await readOptional(path.join(repoDir, 'docs/context/slack-session.md'));
+  const repoContextBundle = await readRepoContextBundle();
   const slackMemoryTail = await readSlackMemoryTail();
   const prompt = buildCodexWorkerPrompt({
     job,
@@ -715,6 +763,7 @@ async function runCodex(job, contextSnapshot) {
     recent: contextSnapshot.recent,
     operatingMemory,
     slackSession,
+    repoContextBundle,
     slackMemoryTail
   });
   const outputPath = path.join(contextDir, 'last-codex-message.md');

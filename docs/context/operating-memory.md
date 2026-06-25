@@ -12,7 +12,8 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   - `/lana`: draws a generated PNG heart image plus a randomized embed love
     note for Lana and Allen.
   - `/player`: looks up a Clash of Clans player by tag using the server-side
-    CoC API token.
+    CoC API token, then presents compact button pages plus a rendered army
+    image card with Clash Wiki/Fandom item icons when available.
 - Allen is Korean and Lana is Croatian; `/lana` copy can use that context.
 - The app is Clash of Clans focused. CoC API calls should use the official API
   base URL `https://api.clashofclans.com/v1` and the server-only
@@ -84,6 +85,9 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   `session.md` are regenerated after each turn to keep prompts bounded.
 - Worker prompts put the active Slack request before compacted memory. Older
   memory is background context only and must not override the current request.
+- Worker prompts also include bounded extra files from `docs/context/*.md`, such
+  as `docs/context/clash-ui-guidance.md`. Add focused context docs there when
+  the Slack agent needs durable domain guidance.
 - The bridge should use Slack Socket Mode with `SLACK_APP_TOKEN` so Slack events
   arrive over an outbound WebSocket and no public domain is required.
 - The older fallback bridge mode can forward normal #bot user messages to the official Codex Slack
@@ -134,9 +138,10 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Official Codex Slack user ID observed in #bot: `U0BCS1LE1B6`.
 - The intended default Codex cloud environment is `mavebot`, with
   `dolphalala/mavebot` as the target repo.
-- When Codex cloud works on this repo, it should read this file first, then
-  `docs/context/slack-session.md`, then inspect the current code before changing
-  behavior.
+- When Codex cloud or the server-side worker works on this repo, it should read
+  this file first, then `docs/context/slack-session.md`, then any relevant
+  focused context file such as `docs/context/clash-ui-guidance.md`, then inspect
+  the current code before changing behavior.
 - Do not ask Allen for generic setup context already captured here. Ask only for
   missing secrets or external UI actions that cannot be done from the repo or
   server.

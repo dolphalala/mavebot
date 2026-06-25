@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'node:crypto';
 import express from 'express';
 import {
   ActionRowBuilder,
@@ -10,8 +11,15 @@ import {
   Events,
   GatewayIntentBits
 } from 'discord.js';
-import { CocApiError, buildPlayerEmbedData, fetchPlayer, normalizePlayerTag } from './coc.mjs';
+import { fetchCocWikiImageMap } from './coc-assets.mjs';
+import {
+  CocApiError,
+  buildPlayerProfilePages,
+  fetchPlayer,
+  normalizePlayerTag
+} from './coc.mjs';
 import { createLanaHeartPng, randomLoveLetter } from './lana-art.mjs';
+import { playerArmyAssetNames, renderPlayerArmyCard } from './player-card.mjs';
 
 const token = process.env.DISCORD_TOKEN;
 const healthHost = process.env.HEALTH_HOST || '0.0.0.0';
@@ -38,6 +46,110 @@ const healthServer = app.listen(healthPort, healthHost, () => {
 });
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const playerViews = new Map();
+const playerViewTtlMs = 15 * 60 * 1000;
+
+function createViewId() {
+  return crypto.randomBytes(8).toString('hex');
+}
+
+function buildEmbed(page, footer) {
+  const embed = new EmbedBuilder()
+    .setColor(0x2f80ed)
+    .setTitle(page.title)
+    .setDescription(page.description)
+    .addFields(page.fields)
+    .setFooter({ text: footer || 'Clash of Clans player lookup' })
+    .setTimestamp();
+
+  if (page.thumbnailUrl) {
+    embed.setThumbnail(page.thumbnailUrl);
+  }
+  if (page.imageUrl) {
+    embed.setImage(page.imageUrl);
+  }
+  return embed;
+}
+
+function pageComponents(view, activePageId, { disabled = false } = {}) {
+  const pageRow = new ActionRowBuilder().addComponents(
+    view.pages.map((page) =>
+      new ButtonBuilder()
+        .setCustomId(`player:${view.id}:${page.id}`)
+        .setLabel(page.label)
+        .setStyle(page.id === activePageId ? ButtonStyle.Primary : ButtonStyle.Secondary)
+        .setDisabled(disabled || page.id === activePageId)
+    )
+  );
+
+  const rows = [pageRow];
+  if (view.profileUrl) {
+    rows.push(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel('Open in Clash')
+          .setStyle(ButtonStyle.Link)
+          .setURL(view.profileUrl)
+      )
+    );
+  }
+  return rows;
+}
+
+function renderPlayerView(view, pageId, { disabled = false } = {}) {
+  const page = view.pages.find((candidate) => candidate.id === pageId) || view.pages[0];
+  const files = [];
+  if (page.id === 'army' && view.armyImage) {
+    files.push(
+      new AttachmentBuilder(view.armyImage, {
+        name: view.armyImageName
+      })
+    );
+  }
+
+  return {
+    embeds: [buildEmbed(page, view.footer)],
+    components: pageComponents(view, page.id, { disabled }),
+    attachments: [],
+    files
+  };
+}
+
+function storePlayerView(view, message) {
+  view.message = message;
+  playerViews.set(view.id, view);
+
+  const timer = setTimeout(() => {
+    playerViews.delete(view.id);
+    view.message
+      ?.edit(renderPlayerView(view, view.activePageId, { disabled: true }))
+      .catch(() => {});
+  }, playerViewTtlMs);
+  timer.unref?.();
+}
+
+async function handlePlayerButton(interaction) {
+  const [, viewId, pageId] = interaction.customId.split(':');
+  const view = playerViews.get(viewId);
+  if (!view) {
+    await interaction.reply({
+      content: 'That player menu expired. Run /player again for a fresh one.',
+      ephemeral: true
+    });
+    return;
+  }
+
+  if (interaction.user.id !== view.ownerId) {
+    await interaction.reply({
+      content: 'This player menu belongs to the person who ran /player.',
+      ephemeral: true
+    });
+    return;
+  }
+
+  view.activePageId = pageId;
+  await interaction.update(renderPlayerView(view, pageId));
+}
 
 client.once(Events.ClientReady, (readyClient) => {
   ready = true;
@@ -46,6 +158,11 @@ client.once(Events.ClientReady, (readyClient) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
+  if (interaction.isButton() && interaction.customId.startsWith('player:')) {
+    await handlePlayerButton(interaction);
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) {
     return;
   }
@@ -86,30 +203,35 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     try {
       const player = await fetchPlayer(normalizePlayerTag(tag));
-      const embedData = buildPlayerEmbedData(player);
-      const embed = new EmbedBuilder()
-        .setColor(0x2f80ed)
-        .setTitle(embedData.title)
-        .setDescription(embedData.description)
-        .addFields(embedData.fields)
-        .setFooter({ text: embedData.footer || 'Clash of Clans player lookup' })
-        .setTimestamp();
-      if (embedData.thumbnailUrl) {
-        embed.setThumbnail(embedData.thumbnailUrl);
+      const assetUrls = await fetchCocWikiImageMap(playerArmyAssetNames(player), {
+        limit: 80
+      });
+      let armyImage = null;
+      const safeTag = normalizePlayerTag(player.tag || tag).replace(/^#/, '').toLowerCase();
+      const armyImageName = `mavebot-player-army-${safeTag}.png`;
+      try {
+        armyImage = await renderPlayerArmyCard(player, { assetUrls });
+      } catch (error) {
+        console.error('Clash player army card render failed:', error);
       }
 
-      const components = embedData.profileUrl
-        ? [
-            new ActionRowBuilder().addComponents(
-              new ButtonBuilder()
-                .setLabel('Open in Clash')
-                .setStyle(ButtonStyle.Link)
-                .setURL(embedData.profileUrl)
-            )
-          ]
-        : [];
+      const profile = buildPlayerProfilePages(player, {
+        assetUrls,
+        armyImageAttachment: armyImage ? armyImageName : null
+      });
+      const view = {
+        id: createViewId(),
+        ownerId: interaction.user.id,
+        pages: profile.pages,
+        profileUrl: profile.profileUrl,
+        footer: profile.footer,
+        armyImage,
+        armyImageName,
+        activePageId: 'overview'
+      };
 
-      await interaction.editReply({ embeds: [embed], components });
+      const message = await interaction.editReply(renderPlayerView(view, view.activePageId));
+      storePlayerView(view, message);
     } catch (error) {
       const message =
         error instanceof CocApiError

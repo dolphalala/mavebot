@@ -49,20 +49,26 @@ future tasks should know.
   lightly affectionate when appropriate.
 - The Discord bot is Clash of Clans focused and should use the official Clash
   of Clans API from server-side environment variables.
+- Clash UI and icon-source guidance lives in `docs/context/clash-ui-guidance.md`;
+  Slack worker tasks touching CoC features should read it and update it when
+  durable UI/source rules change.
 - `/ping` is no longer a public Discord slash command.
 - `/lana` replaced `/iloveyou` and sends a generated PNG heart image with a
   Lana/Allen embed. It should not regress to a text-only love letter.
 - `/player` is the first CoC lookup command and should stay token-backed from
   the server.
-- `/player` should stay compact: emphasize trophies, clan, attack profile, and
-  army composition; use official league/clan images plus emoji markers because
-  the public player payload does not provide troop/equipment sprite URLs.
+- `/player` should stay compact: use buttons for Overview, Army, Heroes, and
+  Progress; keep the first page short; render high-volume army/equipment data
+  as an attached PNG card with Clash Wiki/Fandom icons when available.
 
 ### Open Work
 
 - Keep the GitHub repository synchronized with live server changes so worker
   jobs and server auto-deploys use the same code.
 - Continue improving Discord commands for Clash of Clans workflows.
+- Keep context docs efficient as the Slack channel grows: summarize durable
+  facts, move domain guidance into focused files, and delete duplicated stale
+  notes once the fact is preserved in the right place.
 - server-worker-verification-20260625-0118
 - server-worker-verification-20260625-0132
 - server-worker-verification-20260625-0145
