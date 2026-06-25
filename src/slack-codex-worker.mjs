@@ -62,6 +62,10 @@ const deployTimeoutMs = parsePositiveInt(
   process.env.SLACK_WORKER_DEPLOY_TIMEOUT_MS,
   5 * 60 * 1000
 );
+const fetchTimeoutMs = parsePositiveInt(
+  process.env.SLACK_WORKER_FETCH_TIMEOUT_MS,
+  15000
+);
 const recentTurnLimit = parsePositiveInt(process.env.SLACK_WORKER_RECENT_TURNS, 40);
 const summaryTurnLimit = parsePositiveInt(process.env.SLACK_WORKER_SUMMARY_TURNS, 120);
 const maxOutputChars = parsePositiveInt(process.env.SLACK_WORKER_MAX_OUTPUT_CHARS, 20000);
@@ -218,6 +222,19 @@ function runProcess(command, args = [], options = {}) {
   });
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = fetchTimeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function postSlackMessage(text) {
   if (!slackBotToken || !slackChannelId) {
     console.log('Slack post skipped: missing bot token or channel id.');
@@ -225,7 +242,7 @@ async function postSlackMessage(text) {
     return null;
   }
 
-  const response = await fetch('https://slack.com/api/chat.postMessage', {
+  const response = await fetchWithTimeout('https://slack.com/api/chat.postMessage', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${slackBotToken}`,
@@ -619,7 +636,7 @@ async function checkUrl(url) {
     return false;
   }
   try {
-    const response = await fetch(url);
+    const response = await fetchWithTimeout(url, {}, 10000);
     return response.ok;
   } catch {
     return false;
@@ -738,12 +755,19 @@ async function handleJob(claimed) {
       jobId: job.id,
       text: slackText
     });
-    await postSlackMessage(slackText);
+    let slackPostError = '';
+    try {
+      await postSlackMessage(slackText);
+    } catch (postError) {
+      slackPostError = truncate(redact(postError.message || postError), 1000);
+      console.error(`Final Slack post failed: ${slackPostError}`);
+    }
     await moveJob(jobPath, doneDir, job, {
       completedAt: new Date().toISOString(),
       pushResult,
       deployResult,
-      runtime
+      runtime,
+      slackPostError
     });
   } catch (error) {
     const message = [
