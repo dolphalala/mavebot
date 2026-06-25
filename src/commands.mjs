@@ -9,7 +9,7 @@ export const commands = [
   },
   {
     name: 'player',
-    description: 'Shows a pretty Clash of Clans player stat card by tag.',
+    description: 'Shows a focused Clash of Clans player card by tag.',
     integration_types: [0],
     contexts: [0],
     options: [

@@ -54,6 +54,9 @@ future tasks should know.
   Lana/Allen embed. It should not regress to a text-only love letter.
 - `/player` is the first CoC lookup command and should stay token-backed from
   the server.
+- `/player` should stay compact: emphasize trophies, clan, attack profile, and
+  army composition; use official league/clan images plus emoji markers because
+  the public player payload does not provide troop/equipment sprite URLs.
 
 ### Open Work
 

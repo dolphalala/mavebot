@@ -1,7 +1,10 @@
 import 'dotenv/config';
 import express from 'express';
 import {
+  ActionRowBuilder,
   AttachmentBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   Client,
   EmbedBuilder,
   Events,
@@ -95,7 +98,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
         embed.setThumbnail(embedData.thumbnailUrl);
       }
 
-      await interaction.editReply({ embeds: [embed] });
+      const components = embedData.profileUrl
+        ? [
+            new ActionRowBuilder().addComponents(
+              new ButtonBuilder()
+                .setLabel('Open in Clash')
+                .setStyle(ButtonStyle.Link)
+                .setURL(embedData.profileUrl)
+            )
+          ]
+        : [];
+
+      await interaction.editReply({ embeds: [embed], components });
     } catch (error) {
       const message =
         error instanceof CocApiError

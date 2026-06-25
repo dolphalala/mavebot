@@ -110,11 +110,110 @@ function truncateText(value, limit = 1024) {
   return `${text.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
 }
 
+const UNIT_ICONS = new Map(
+  [
+    ['apprentice warden', '🔮'],
+    ['archer', '🏹'],
+    ['archer puppet', '🏹'],
+    ['archer queen', '🏹'],
+    ['baby dragon', '🐲'],
+    ['balloon', '🎈'],
+    ['barbarian', '⚔️'],
+    ['barbarian king', '👑'],
+    ['battle copter', '🚁'],
+    ['battle machine', '🔨'],
+    ['beta minion', '🦇'],
+    ['bomber', '💣'],
+    ['bowler', '🪨'],
+    ['boxer giant', '🥊'],
+    ['cannon cart', '🛞'],
+    ['dark orb', '🟣'],
+    ['dragon', '🐉'],
+    ['dragon rider', '🐉'],
+    ['druid', '🌿'],
+    ['earthquake boots', '🥾'],
+    ['electro boots', '⚡'],
+    ['electro dragon', '⚡'],
+    ['electro titan', '⚡'],
+    ['electrofire wizard', '🔥'],
+    ['eternal tome', '📖'],
+    ['fireball', '🔥'],
+    ['giant', '🪨'],
+    ['giant arrow', '🏹'],
+    ['giant gauntlet', '🧤'],
+    ['goblin', '💰'],
+    ['golem', '🪨'],
+    ['grand warden', '🔮'],
+    ['haste vial', '🧪'],
+    ['head hunter', '🎯'],
+    ['healer', '✨'],
+    ['healer puppet', '✨'],
+    ['healing tome', '📖'],
+    ['henchmen puppet', '🦇'],
+    ['hog glider', '🐗'],
+    ['hog rider', '🐗'],
+    ['hog rider puppet', '🐗'],
+    ['ice golem', '❄️'],
+    ['invisibility vial', '🧪'],
+    ['lava hound', '🌋'],
+    ['life gem', '💎'],
+    ['magic mirror', '🪞'],
+    ['miner', '⛏️'],
+    ['minion', '🦇'],
+    ['minion prince', '🦇'],
+    ['night witch', '💀'],
+    ['pekka', '🛡️'],
+    ['raged barbarian', '⚔️'],
+    ['rage gem', '💎'],
+    ['rage vial', '🧪'],
+    ['rocket spear', '🚀'],
+    ['root rider', '🌿'],
+    ['royal champion', '🛡️'],
+    ['royal gem', '💎'],
+    ['seeking shield', '🛡️'],
+    ['sneaky archer', '🏹'],
+    ['spiky ball', '🏐'],
+    ['super pekka', '⚡'],
+    ['thrower', '🪓'],
+    ['valkyrie', '🪓'],
+    ['vampstache', '🩸'],
+    ['wall breaker', '💣'],
+    ['witch', '💀'],
+    ['wizard', '🔥'],
+    ['yeti', '❄️']
+  ].map(([name, icon]) => [name, icon])
+);
+
+function unitIcon(item, fallback = '▫️') {
+  const name = String(item?.name || '').trim().toLowerCase();
+  if (UNIT_ICONS.has(name)) {
+    return UNIT_ICONS.get(name);
+  }
+
+  if (name.includes('dragon')) {
+    return '🐉';
+  }
+  if (name.includes('spell') || name.includes('vial')) {
+    return '🧪';
+  }
+  if (name.includes('tome')) {
+    return '📖';
+  }
+  if (name.includes('gem')) {
+    return '💎';
+  }
+  if (name.includes('machine') || name.includes('siege')) {
+    return '🛠️';
+  }
+
+  return fallback;
+}
+
 function formatLevelItem(item) {
   const level = Number.isFinite(item?.level) ? item.level : null;
   const maxLevel = Number.isFinite(item?.maxLevel) ? item.maxLevel : null;
   const levelText = level === null ? '' : maxLevel ? ` ${level}/${maxLevel}` : ` ${level}`;
-  return `${textValue(item?.name, 'Unknown')}${levelText}`;
+  return `${unitIcon(item)} ${textValue(item?.name, 'Unknown')}${levelText}`;
 }
 
 function formatLevelList(items, { village, limit = 8 } = {}) {
@@ -216,6 +315,22 @@ function clanDescription(clan) {
   return parts.join(' - ');
 }
 
+function clanSummary(player) {
+  const clan = player.clan;
+  if (!clan?.name) {
+    return 'No clan';
+  }
+
+  return [
+    `${clan.name}${clan.tag ? ` (${clan.tag})` : ''}`,
+    Number.isFinite(clan.clanLevel) ? `Level ${clan.clanLevel}` : null,
+    player.role ? labelText(player.role) : null,
+    `Donated ${numberText(player.donations)} / received ${numberText(player.donationsReceived)}`
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 function thumbnailUrl(player) {
   return (
     player.league?.iconUrls?.medium ||
@@ -226,98 +341,98 @@ function thumbnailUrl(player) {
   );
 }
 
+export function buildPlayerProfileUrl(tag) {
+  const cleanTag = normalizePlayerTag(tag).replace(/^#/, '');
+  return `https://link.clashofclans.com/en?action=OpenPlayerProfile&tag=${cleanTag}`;
+}
+
+function formatTrophySnapshot(player, { league, builderLeague } = {}) {
+  const rows = [
+    `Home: ${numberText(player.trophies)} (best ${numberText(player.bestTrophies)})`,
+    `League: ${league || 'Unranked'}`
+  ];
+
+  if (Number.isFinite(player.builderBaseTrophies) || player.builderBaseLeague?.name) {
+    rows.push(
+      `Builder: ${numberText(player.builderBaseTrophies)} (best ${numberText(player.bestBuilderBaseTrophies)})`,
+      `Builder league: ${builderLeague || 'Unranked'}`
+    );
+  }
+
+  if (Number.isFinite(player.legendStatistics?.legendTrophies)) {
+    rows.push(`Legend trophies: ${numberText(player.legendStatistics.legendTrophies)}`);
+  }
+
+  return rows.join('\n');
+}
+
+function formatAttackProfile(player) {
+  return [
+    `War stars: ${numberText(player.warStars)}`,
+    `Attack wins: ${numberText(player.attackWins)}`,
+    `Defense wins: ${numberText(player.defenseWins)}`,
+    `War preference: ${labelText(player.warPreference)}`
+  ].join('\n');
+}
+
+function formatArmyComposition(player) {
+  return [
+    `Main: ${formatLevelList(player.troops, { village: 'home', limit: 8 })}`,
+    `Spells: ${formatLevelList(player.spells, { limit: 8 })}`,
+    `Builder: ${formatLevelList(player.troops, { village: 'builderBase', limit: 5 })}`
+  ].join('\n');
+}
+
 export function buildPlayerEmbedData(player) {
   const league = player.league?.name || 'Unranked';
   const builderLeague = player.builderBaseLeague?.name || 'Unranked';
   const townHall = player.townHallWeaponLevel
     ? `${player.townHallLevel || 'Unknown'} weapon ${player.townHallWeaponLevel}`
     : String(player.townHallLevel || 'Unknown');
+  const profileUrl = player.tag ? buildPlayerProfileUrl(player.tag) : null;
   const description = [
+    `TH ${townHall} - XP ${numberText(player.expLevel)} - ${league}`,
     `${clanDescription(player.clan)}${player.role ? ` (${labelText(player.role)})` : ''}`,
-    `${league} - TH ${townHall} - XP ${numberText(player.expLevel)}`
-  ].join('\n');
+    profileUrl ? `[Open profile in Clash](${profileUrl})` : null
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   return {
     title: `${player.name || 'Unknown player'} ${player.tag || ''}`.trim(),
     description,
     thumbnailUrl: thumbnailUrl(player),
+    profileUrl,
     footer: 'Official Clash of Clans API',
     fields: [
       {
-        name: 'Home village',
-        value: [
-          `Town Hall: ${townHall}`,
-          `Trophies: ${numberText(player.trophies)} / best ${numberText(player.bestTrophies)}`,
-          `League: ${league}`,
-          `War preference: ${labelText(player.warPreference)}`
-        ].join('\n'),
+        name: '🏆 Trophies',
+        value: formatTrophySnapshot(player, { league, builderLeague }),
         inline: true
       },
       {
-        name: 'Builder base',
-        value: [
-          `Builder Hall: ${player.builderHallLevel || 'Unknown'}`,
-          `Trophies: ${numberText(player.builderBaseTrophies)} / best ${numberText(player.bestBuilderBaseTrophies)}`,
-          `League: ${builderLeague}`
-        ].join('\n'),
+        name: '🏰 Clan',
+        value: clanSummary(player),
         inline: true
       },
       {
-        name: 'War and attacks',
-        value: [
-          `War stars: ${numberText(player.warStars)}`,
-          `Attack wins: ${numberText(player.attackWins)}`,
-          `Defense wins: ${numberText(player.defenseWins)}`
-        ].join('\n'),
+        name: '⚔️ Attack Profile',
+        value: formatAttackProfile(player),
         inline: true
       },
       {
-        name: 'Clan and donations',
-        value: [
-          clanDescription(player.clan),
-          `Donated: ${numberText(player.donations)}`,
-          `Received: ${numberText(player.donationsReceived)}`
-        ].join('\n'),
-        inline: true
-      },
-      {
-        name: 'Labels',
-        value: formatLabels(player.labels),
-        inline: true
-      },
-      {
-        name: 'Legend League',
-        value: formatLegendStats(player.legendStatistics),
-        inline: true
-      },
-      {
-        name: 'Heroes',
-        value: formatHeroList(player.heroes),
+        name: '🛡️ Heroes',
+        value: formatHeroList(player.heroes, { limit: 6 }),
         inline: false
       },
       {
-        name: 'Hero equipment',
-        value: formatLevelList(player.heroEquipment, { limit: 10 }),
+        name: '🧰 Hero Equipment',
+        value: formatLevelList(player.heroEquipment, { limit: 8 }),
         inline: false
       },
       {
-        name: 'Top home troops',
-        value: formatLevelList(player.troops, { village: 'home', limit: 12 }),
-        inline: false
-      },
-      {
-        name: 'Top Builder Base troops',
-        value: formatLevelList(player.troops, { village: 'builderBase', limit: 8 }),
-        inline: false
-      },
-      {
-        name: 'Spells',
-        value: formatLevelList(player.spells, { limit: 10 }),
-        inline: false
-      },
-      {
-        name: 'Top achievements',
-        value: formatAchievements(player.achievements),
+        name: '🏹 Army Composition',
+        value: formatArmyComposition(player),
         inline: false
       }
     ]

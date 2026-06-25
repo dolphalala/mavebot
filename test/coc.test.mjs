@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   CocApiError,
   buildPlayerEmbedData,
+  buildPlayerProfileUrl,
   encodeCocTag,
   fetchPlayer,
   normalizePlayerTag
@@ -20,6 +21,13 @@ test('normalizePlayerTag rejects invalid tags', () => {
 
 test('encodeCocTag safely encodes the leading hash', () => {
   assert.equal(encodeCocTag('#ABC123'), '%23ABC123');
+});
+
+test('buildPlayerProfileUrl creates an in-game Clash profile link', () => {
+  assert.equal(
+    buildPlayerProfileUrl('#ABC123'),
+    'https://link.clashofclans.com/en?action=OpenPlayerProfile&tag=ABC123'
+  );
 });
 
 test('fetchPlayer sends an encoded tag and bearer token', async () => {
@@ -104,16 +112,17 @@ test('buildPlayerEmbedData formats a rich player stat card', () => {
   });
 
   assert.equal(embed.title, 'Allen #ABC123');
+  assert.match(embed.description, /TH 16 weapon 5 - XP 244 - Legend League/);
   assert.match(embed.description, /mave - #CLAN - Level 18 \(Leader\)/);
-  assert.match(embed.description, /Legend League - TH 16 weapon 5 - XP 244/);
+  assert.match(embed.description, /Open profile in Clash/);
   assert.equal(embed.thumbnailUrl, 'https://example.test/legend.png');
+  assert.equal(embed.profileUrl, 'https://link.clashofclans.com/en?action=OpenPlayerProfile&tag=ABC123');
   assert.equal(embed.footer, 'Official Clash of Clans API');
-  assert.ok(embed.fields.length >= 12);
-  assert.match(embed.fields.find((field) => field.name === 'Home village').value, /Trophies: 5,123 \/ best 6,000/);
-  assert.match(embed.fields.find((field) => field.name === 'Builder base').value, /Emerald League/);
-  assert.match(embed.fields.find((field) => field.name === 'War and attacks').value, /Defense wins: 12/);
-  assert.match(embed.fields.find((field) => field.name === 'Clan and donations').value, /Donated: 1,234/);
-  assert.match(embed.fields.find((field) => field.name === 'Heroes').value, /Archer Queen 96\/100/);
-  assert.match(embed.fields.find((field) => field.name === 'Top home troops').value, /Electro Dragon 7\/7/);
-  assert.match(embed.fields.find((field) => field.name === 'Top achievements').value, /War Hero \(3\/3\)/);
+  assert.equal(embed.fields.length, 6);
+  assert.match(embed.fields.find((field) => field.name === '🏆 Trophies').value, /Home: 5,123 \(best 6,000\)/);
+  assert.match(embed.fields.find((field) => field.name === '🏆 Trophies').value, /Emerald League/);
+  assert.match(embed.fields.find((field) => field.name === '🏰 Clan').value, /Donated 1,234 \/ received 987/);
+  assert.match(embed.fields.find((field) => field.name === '⚔️ Attack Profile').value, /Defense wins: 12/);
+  assert.match(embed.fields.find((field) => field.name === '🛡️ Heroes').value, /🏹 Archer Queen 96\/100/);
+  assert.match(embed.fields.find((field) => field.name === '🏹 Army Composition').value, /⚡ Electro Dragon 7\/7/);
 });
