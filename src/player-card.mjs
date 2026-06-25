@@ -7,7 +7,8 @@ const TILE_WIDTH = 92;
 const TILE_HEIGHT = 104;
 const TILE_GAP = 12;
 const ICON_SIZE = 58;
-const ICON_FETCH_TIMEOUT_MS = 4500;
+const ICON_FETCH_TIMEOUT_MS = 3000;
+const ICON_FETCH_CONCURRENCY = 12;
 
 const SIEGE_MACHINE_NAMES = new Set(
   [
@@ -158,6 +159,29 @@ async function iconComposite(item, { assetUrls, x, y, sectionColor, fetchImpl })
   }
 }
 
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    for (;;) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= items.length) {
+        return;
+      }
+      results[index] = await mapper(items[index], index);
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, Math.max(1, items.length)) },
+    () => worker()
+  );
+  await Promise.all(workers);
+  return results;
+}
+
 function sectionItems(player, sectionId) {
   if (sectionId === 'heroes') {
     return player.heroes || [];
@@ -213,6 +237,7 @@ export async function renderPlayerArmyCard(player, { assetUrls = new Map(), fetc
   const columns = 8;
   const contentWidth = CARD_WIDTH - CARD_PADDING * 2;
   const composites = [];
+  const iconJobs = [];
   let y = CARD_PADDING;
 
   composites.push({
@@ -256,11 +281,23 @@ export async function renderPlayerArmyCard(player, { assetUrls = new Map(), fetc
         left: 0,
         top: 0
       });
-      composites.push(await iconComposite(item, { assetUrls, x, y: tileY, sectionColor: section.color, fetchImpl }));
+      iconJobs.push({ item, x, y: tileY, sectionColor: section.color });
     }
 
     y += Math.ceil(section.items.length / columns) * (TILE_HEIGHT + TILE_GAP) + 22;
   }
+
+  composites.push(
+    ...(await mapWithConcurrency(iconJobs, ICON_FETCH_CONCURRENCY, (job) =>
+      iconComposite(job.item, {
+        assetUrls,
+        x: job.x,
+        y: job.y,
+        sectionColor: job.sectionColor,
+        fetchImpl
+      })
+    ))
+  );
 
   const height = Math.max(360, y + CARD_PADDING);
   composites.push({
