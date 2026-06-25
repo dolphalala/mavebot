@@ -60,5 +60,6 @@ future tasks should know.
 - Keep the GitHub repository synchronized with live server changes so worker
   jobs and server auto-deploys use the same code.
 - Continue improving Discord commands for Clash of Clans workflows.
+- server-worker-verification-20260625-0118
 - If a user asks to reset or start a new session, add a new dated section here
   instead of deleting older notes.
