@@ -614,10 +614,14 @@ async function waitForLiveCommit(fullCommit) {
   const deadline = Date.now() + deployTimeoutMs;
   let lastSeen = '';
   while (Date.now() < deadline) {
-    const result = await runProcess('git', ['-C', liveAppDir, 'rev-parse', 'HEAD'], {
-      allowFailure: true,
-      timeoutMs: 10000
-    });
+    const result = await runProcess(
+      'git',
+      ['-c', `safe.directory=${liveAppDir}`, '-C', liveAppDir, 'rev-parse', 'HEAD'],
+      {
+        allowFailure: true,
+        timeoutMs: 10000
+      }
+    );
     lastSeen = result.stdout.trim();
     if (lastSeen === fullCommit) {
       return { matched: true, commit: lastSeen.slice(0, 12) };
