@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { spawnSync } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -78,6 +79,17 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   assert.match(bundle, /## clash-ui-guidance\.md/);
   assert.match(bundle, /Use icon cards/);
   assert.doesNotMatch(bundle, /do not include this copy/);
+});
+
+test('slack-codex-worker can be imported from stdin module scripts', () => {
+  const result = spawnSync(process.execPath, ['--input-type=module'], {
+    cwd: process.cwd(),
+    input: "import './src/slack-codex-worker.mjs';\nconsole.log('import ok');\n",
+    encoding: 'utf8'
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /import ok/);
 });
 
 test('checkUrl supports the Slack bridge health port', async (t) => {

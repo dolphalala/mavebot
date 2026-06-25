@@ -919,7 +919,11 @@ async function loop() {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+function isMainModule() {
+  return process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+}
+
+if (isMainModule()) {
   loop().catch((error) => {
     console.error(redact(error.stack || error.message || error));
     process.exit(1);
