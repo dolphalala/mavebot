@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildCodexForwardPostArgs,
   buildCodexPromptText,
+  buildCodexWorkerJob,
   cleanCodexMirrorText,
   defaultCodexDeleteForwardDelayMs,
   markUndeployedCodexWork,
@@ -97,6 +98,25 @@ test('buildCodexForwardPostArgs sends the real prompt as visible message text', 
   assert.equal(args.channel, 'CTRIGGER');
   assert.equal(args.token, 'xoxp-test');
   assert.equal(Object.hasOwn(args, 'blocks'), false);
+});
+
+test('buildCodexWorkerJob creates a stable job id for Slack worker mode', () => {
+  const job = buildCodexWorkerJob({
+    payload: { team_id: 'T1' },
+    event: {
+      channel: 'C0BCG0T838B',
+      user: 'U1',
+      ts: '1782400000.123456',
+      text: 'make /lana prettier'
+    },
+    createdAt: '2026-06-24T00:00:00.000Z'
+  });
+
+  assert.equal(job.id, 'C0BCG0T838B-1782400000.123456');
+  assert.equal(job.teamId, 'T1');
+  assert.equal(job.channel, 'C0BCG0T838B');
+  assert.equal(job.user, 'U1');
+  assert.equal(job.text, 'make /lana prettier');
 });
 
 test('selectCodexForwardThreadTs only threads when the trigger is in the bot channel', () => {

@@ -11,8 +11,9 @@ future tasks should know.
 
 - Make Slack `#bot` feel like the main mavebot working session.
 - Users should be able to speak normally in `#bot` without tagging `@Codex`.
-- mavebot should post the visible channel replies. The official Codex Slack app
-  is only the backend worker for repo tasks.
+- mavebot should post the visible channel replies. The preferred backend for
+  repo tasks is now the server-side `codex-worker` container, not the official
+  Codex Slack app.
 
 ### Slack UX Decisions
 
@@ -20,16 +21,21 @@ future tasks should know.
 - Do not mirror task links unless the user asks for them.
 - Do not prefix mirrored answers with `Codex:`.
 - Do not post the Codex trigger as a reply under the user's original prompt.
-- Prefer a separate Codex trigger channel so the long hidden prompt, task cards,
-  wrong-environment text, and ChatGPT promo copy never appear in `#bot`.
-- If the bridge must fall back to `#bot`, hide the long prompt behind a short
-  mavebot working message and delete the trigger quickly.
+- Use `SLACK_CODEX_FORWARD_MODE=worker` so there is no official Codex trigger
+  channel, long hidden prompt, task card, wrong-environment text, or ChatGPT
+  promo copy in `#bot`.
 - Brief "working" status messages should sound like mavebot, not Codex.
 - Keep replies in the main channel whenever possible so users do not have to
   open Slack thread replies to follow the session.
 - Do not tell Allen a code change is live just because a Codex cloud task
   changed files in its workspace. The server deploy path follows GitHub
   `origin/main`; if a task only creates a PR or branch, say it is not deployed.
+- Worker jobs should make repo changes in the worker checkout, run checks,
+  commit, push `origin/main`, then wait for the server poll deploy to pull that
+  commit before reporting deployment success.
+- Worker memory lives in
+  `/opt/urba-apps/discord-bot/shared/codex-worker/context/`. `transcript.jsonl`
+  is append-only and `summary.md` plus `recent.md` keep future prompts bounded.
 - Discord slash command changes must include both command registration data and
   the runtime interaction handler, otherwise Discord shows "The application did
   not respond."
@@ -51,8 +57,8 @@ future tasks should know.
 
 ### Open Work
 
-- Keep the GitHub repository synchronized with live server changes so Codex
-  cloud tasks and server auto-deploys use the same code.
+- Keep the GitHub repository synchronized with live server changes so worker
+  jobs and server auto-deploys use the same code.
 - Continue improving Discord commands for Clash of Clans workflows.
 - If a user asks to reset or start a new session, add a new dated section here
   instead of deleting older notes.

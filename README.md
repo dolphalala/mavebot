@@ -11,6 +11,8 @@ Minimal Dockerized Discord bot foundation for the shared `urba-chatwoot` host.
 - local-only `/healthz` HTTP endpoint on port `4188`
 - Slack bridge for the `#bot` channel on local port `4190`, with Socket Mode
   support for no-domain Slack events
+- server-side Codex worker that turns normal `#bot` messages into Codex CLI
+  jobs, keeps compacted Markdown memory, pushes `main`, and waits for deploy
 - Docker Compose service named `urba-discord-bot`
 
 ## Local Checks
@@ -26,6 +28,14 @@ npm run check
 /opt/urba-apps/discord-bot/
   .env
   slack-bridge.env
+  codex-home/
+  shared/
+    codex-worker/
+      context/
+      jobs/
+      processing/
+      done/
+      failed/
   app/
     docker-compose.yml
     Dockerfile
@@ -106,6 +116,7 @@ SLACK_BOT_TOKEN=
 SLACK_CHANNEL_ID=C0BCG0T838B
 SLACK_SOCKET_MODE=1
 SLACK_CODEX_FORWARD=1
+SLACK_CODEX_FORWARD_MODE=worker
 SLACK_CODEX_USER_ID=
 SLACK_CODEX_TRIGGER_CHANNEL_ID=
 SLACK_CODEX_ENVIRONMENT=mavebot
@@ -118,10 +129,17 @@ SLACK_CODEX_STATE_PATH=/shared/codex-forward-state.json
 SLACK_CODEX_MEMORY_LIMIT=30
 SLACK_CODEX_MEMORY_TEXT_LIMIT=1500
 SLACK_CODEX_STATE_ENTRY_LIMIT=200
+SLACK_CODEX_WORKER_JOB_DIR=/shared/codex-worker/jobs
 SLACK_OAUTH_REDIRECT_URI=https://mavebot.lanawee.com/mavebot/slack/oauth/callback
 SLACK_USER_SCOPES=chat:write
 SLACK_USER_TOKEN_PATH=/shared/slack-user-tokens.json
 SLACK_BRIDGE_AUTOREPLY=0
+GITHUB_TOKEN=
+SLACK_WORKER_BRANCH=main
+SLACK_WORKER_REPOSITORY_URL=https://github.com/dolphalala/mavebot.git
+SLACK_WORKER_SHARED_DIR=/shared/codex-worker
+SLACK_WORKER_RECENT_TURNS=40
+SLACK_WORKER_SUMMARY_TURNS=120
 ```
 
 The bridge saves messages from `#bot` to
@@ -143,12 +161,38 @@ In Slack `Event Subscriptions`, enable events and subscribe the bot to:
 
 For Socket Mode, do not enter a Request URL.
 
-When `SLACK_CODEX_FORWARD=1`, normal human messages in `#bot` are reposted by
-the sender's own Slack user token as mentions to the official Codex Slack app.
-That path uses Codex cloud through each user's connected ChatGPT/Codex account
-and does not require an OpenAI API key. The forwarded prompt includes recent
-saved `#bot` messages, controlled by `SLACK_CODEX_MEMORY_LIMIT`, so the channel
-behaves more like a running session.
+When `SLACK_CODEX_FORWARD=1` and `SLACK_CODEX_FORWARD_MODE=worker`, normal
+human messages in `#bot` are saved as jobs under
+`/opt/urba-apps/discord-bot/shared/codex-worker/jobs`. The worker container
+uses Codex CLI auth from `/opt/urba-apps/discord-bot/codex-home`, not an
+OpenAI API key. It works in its own checkout, runs checks, commits, pushes
+`origin/main`, and then waits for the server poll deploy to pull the commit.
+
+The worker keeps durable context in:
+
+- `/opt/urba-apps/discord-bot/shared/codex-worker/context/transcript.jsonl`
+- `/opt/urba-apps/discord-bot/shared/codex-worker/context/summary.md`
+- `/opt/urba-apps/discord-bot/shared/codex-worker/context/recent.md`
+- `/opt/urba-apps/discord-bot/shared/codex-worker/context/session.md`
+
+`transcript.jsonl` is append-only. `summary.md` and `recent.md` are regenerated
+after each turn so prompts stay bounded while the channel still has memory.
+
+Start or update the profiled worker service manually after code changes to the
+worker itself:
+
+```bash
+cd /opt/urba-apps/discord-bot/app
+docker compose --profile codex-worker up -d --build codex-worker
+```
+
+The normal deploy script does not restart `codex-worker`, so a running worker
+is not killed by the bot deploy it just triggered.
+
+The older `SLACK_CODEX_FORWARD_MODE=official` path reposts messages by the
+sender's own Slack user token as mentions to the official Codex Slack app. Keep
+that only as a fallback; it can create task cards and does not reliably push
+deployable code to `origin/main`.
 
 Set `SLACK_CODEX_TRIGGER_CHANNEL_ID` to a separate public bridge channel when
 the official Codex app's task cards or ephemeral status text should stay out of

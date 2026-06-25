@@ -32,6 +32,11 @@ const codexStatePath =
   process.env.SLACK_CODEX_STATE_PATH || '/shared/codex-forward-state.json';
 const autoReply = process.env.SLACK_BRIDGE_AUTOREPLY === '1';
 const codexForward = process.env.SLACK_CODEX_FORWARD === '1';
+const codexForwardMode = process.env.SLACK_CODEX_FORWARD_MODE || 'official';
+const codexWorkerJobDir =
+  process.env.SLACK_CODEX_WORKER_JOB_DIR ||
+  process.env.SLACK_WORKER_JOB_DIR ||
+  '/shared/codex-worker/jobs';
 const codexMirrorReplies = process.env.SLACK_CODEX_MIRROR_REPLIES !== '0';
 const codexForwardInThread = process.env.SLACK_CODEX_FORWARD_IN_THREAD !== '0';
 const codexDeleteForward = process.env.SLACK_CODEX_DELETE_FORWARD === '1';
@@ -379,6 +384,56 @@ function normalizePromptText(text, limit = codexMemoryTextLimit) {
   }
 
   return `${normalized.slice(0, limit)}...`;
+}
+
+function safeIdPart(value) {
+  return String(value || 'missing')
+    .replace(/[^A-Za-z0-9._-]/g, '_')
+    .slice(0, 96);
+}
+
+export function buildCodexWorkerJob({
+  payload = {},
+  event,
+  createdAt = new Date().toISOString()
+}) {
+  const sourceTs = event?.ts || String(Date.now());
+  const id = [
+    safeIdPart(event?.channel || payload?.event?.channel || channelId || 'channel'),
+    safeIdPart(sourceTs)
+  ].join('-');
+
+  return {
+    id,
+    createdAt,
+    teamId: payload.team_id || event?.team || '',
+    channel: event?.channel || channelId,
+    user: event?.user || '',
+    ts: sourceTs,
+    threadTs: event?.thread_ts || '',
+    text: event?.text || ''
+  };
+}
+
+async function enqueueCodexWorkerJob(payload, event) {
+  await mkdir(codexWorkerJobDir, { recursive: true });
+  const job = buildCodexWorkerJob({ payload, event });
+  const jobPath = path.join(codexWorkerJobDir, `${job.id}.json`);
+
+  try {
+    await writeFile(jobPath, `${JSON.stringify(job, null, 2)}\n`, {
+      encoding: 'utf8',
+      mode: 0o600,
+      flag: 'wx'
+    });
+    await chmod(jobPath, 0o600).catch(() => {});
+    return { job, queued: true };
+  } catch (error) {
+    if (error?.code === 'EEXIST') {
+      return { job, queued: false };
+    }
+    throw error;
+  }
 }
 
 function formatMemoryLine(row, currentUserId) {
@@ -806,7 +861,15 @@ export function buildCodexForwardPostArgs({
   };
 }
 
-async function forwardToCodex(event) {
+async function forwardToCodex(payload, event) {
+  if (codexForwardMode === 'worker') {
+    const result = await enqueueCodexWorkerJob(payload, event);
+    if (result.queued) {
+      await postMessage({ text: randomWorkingMessage() });
+    }
+    return;
+  }
+
   if (!codexUserId) {
     await postMessage({
       text: 'Codex forwarding is enabled, but SLACK_CODEX_USER_ID is not configured.'
@@ -1145,7 +1208,7 @@ async function handleSlackEvent(payload) {
   await rememberMessage(payload, event);
 
   if (codexForward) {
-    await forwardToCodex(event);
+    await forwardToCodex(payload, event);
     return;
   }
 
@@ -1405,6 +1468,8 @@ app.get('/healthz', async (_req, res) => {
     contextPath,
     autoReply,
     codexForward,
+    codexForwardMode,
+    codexWorkerJobDir,
     codexMirrorReplies,
     codexForwardInThread,
     codexDeleteForward,

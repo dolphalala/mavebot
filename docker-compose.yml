@@ -46,6 +46,7 @@ services:
       SLACK_BRIDGE_PORT: 4190
       SLACK_BRIDGE_EVENT_PATH: /slack/events
       SLACK_MEMORY_PATH: /shared/slack-memory.jsonl
+      SLACK_CODEX_WORKER_JOB_DIR: /shared/codex-worker/jobs
       SLACK_CONTEXT_PATH: /app/docs/context/operating-memory.md
     ports:
       - "127.0.0.1:4190:4190"
@@ -68,3 +69,33 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  codex-worker:
+    profiles: ["codex-worker"]
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: urba-codex-worker
+    restart: unless-stopped
+    env_file:
+      - /opt/urba-apps/discord-bot/slack-bridge.env
+    environment:
+      NODE_ENV: production
+      CODEX_HOME: /codex-home
+      SLACK_WORKER_SHARED_DIR: /shared/codex-worker
+      SLACK_WORKER_JOB_DIR: /shared/codex-worker/jobs
+      SLACK_WORKER_CONTEXT_DIR: /shared/codex-worker/context
+      SLACK_WORKER_REPO_DIR: /shared/codex-worker/repo
+      SLACK_WORKER_LIVE_APP_DIR: /live-app
+      SLACK_WORKER_BOT_HEALTH_URL: http://discord-bot:4188/healthz
+      SLACK_WORKER_BRIDGE_HEALTH_URL: http://slack-bridge:4190/healthz
+    volumes:
+      - /opt/urba-apps/discord-bot/shared:/shared
+      - /opt/urba-apps/discord-bot/codex-home:/codex-home
+      - /opt/urba-apps/discord-bot/app:/live-app:ro
+    depends_on:
+      - discord-bot
+      - slack-bridge
+    security_opt:
+      - no-new-privileges:true
+    init: true

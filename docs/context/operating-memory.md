@@ -40,6 +40,14 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   runs.
 - Do not add mavebot endpoints to `chat.urba.group`; that domain belongs to
   Chatwoot.
+- The Slack-to-code path should use the server-side `codex-worker` compose
+  profile. Normal #bot messages become JSON jobs in
+  `/opt/urba-apps/discord-bot/shared/codex-worker/jobs`; the worker runs Codex
+  CLI in `/opt/urba-apps/discord-bot/shared/codex-worker/repo`, commits, pushes
+  `origin/main`, and waits for the 30-second poll deploy to pull that commit.
+- The normal deploy script intentionally updates only `discord-bot` and
+  `slack-bridge`. It does not restart `codex-worker`, because the worker could
+  otherwise kill itself after pushing the commit that triggers deploy.
 
 ## Discord Command Registration
 
@@ -66,9 +74,19 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   session by itself.
 - A custom Slack bridge stores channel memory in
   `/opt/urba-apps/discord-bot/shared/slack-memory.jsonl`.
+- The current preferred Slack bridge mode is `SLACK_CODEX_FORWARD_MODE=worker`.
+  In this mode there is no official `@Codex` forwarding, no per-user Slack
+  OAuth requirement, no task-card mirroring, and any human in #bot can trigger
+  the server runner.
+- Worker-side durable context is stored under
+  `/opt/urba-apps/discord-bot/shared/codex-worker/context/`:
+  `transcript.jsonl` is append-only, while `summary.md`, `recent.md`, and
+  `session.md` are regenerated after each turn to keep prompts bounded.
+- Worker prompts put the active Slack request before compacted memory. Older
+  memory is background context only and must not override the current request.
 - The bridge should use Slack Socket Mode with `SLACK_APP_TOKEN` so Slack events
   arrive over an outbound WebSocket and no public domain is required.
-- The bridge can forward normal #bot user messages to the official Codex Slack
+- The older fallback bridge mode can forward normal #bot user messages to the official Codex Slack
   app by posting a hidden `@Codex` mention as the Slack user who spoke. This
   uses Codex cloud through that user's connected ChatGPT/Codex account after
   they authorize mavebot once; it does not require an OpenAI API key.

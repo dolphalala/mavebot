@@ -7,6 +7,8 @@ SLACK_ENV="${SLACK_ENV:-/opt/urba-apps/discord-bot/slack-bridge.env}"
 SLACK_MEMORY_FILE="${SLACK_MEMORY_FILE:-/opt/urba-apps/discord-bot/shared/slack-memory.jsonl}"
 SLACK_CODEX_STATE_FILE="${SLACK_CODEX_STATE_FILE:-/opt/urba-apps/discord-bot/shared/codex-forward-state.json}"
 SLACK_USER_TOKEN_FILE="${SLACK_USER_TOKEN_FILE:-/opt/urba-apps/discord-bot/shared/slack-user-tokens.json}"
+CODEX_HOME_DIR="${CODEX_HOME_DIR:-/opt/urba-apps/discord-bot/codex-home}"
+CODEX_WORKER_DIR="${CODEX_WORKER_DIR:-/opt/urba-apps/discord-bot/shared/codex-worker}"
 LOG_DIR="${LOG_DIR:-/opt/urba-apps/discord-bot/shared/logs}"
 LOCK_FILE="${LOCK_FILE:-/opt/urba-apps/discord-bot/shared/deploy.lock}"
 BRANCH="${BRANCH:-main}"
@@ -51,13 +53,23 @@ if [ ! -s "$SLACK_USER_TOKEN_FILE" ]; then
 fi
 chmod 600 "$SLACK_USER_TOKEN_FILE"
 chown 1000:1000 "$SLACK_USER_TOKEN_FILE" 2>/dev/null || true
+mkdir -p \
+  "$CODEX_HOME_DIR" \
+  "$CODEX_WORKER_DIR/jobs" \
+  "$CODEX_WORKER_DIR/processing" \
+  "$CODEX_WORKER_DIR/done" \
+  "$CODEX_WORKER_DIR/failed" \
+  "$CODEX_WORKER_DIR/context" \
+  "$CODEX_WORKER_DIR/repo"
+chmod 700 "$CODEX_HOME_DIR" "$CODEX_WORKER_DIR" || true
+chown -R 1000:1000 "$CODEX_HOME_DIR" "$CODEX_WORKER_DIR" 2>/dev/null || true
 
 git -C "$APP_ROOT" fetch origin "$BRANCH"
 git -C "$APP_ROOT" checkout "$BRANCH"
 git -C "$APP_ROOT" merge --ff-only "origin/$BRANCH"
 
 docker compose -f "$APP_ROOT/docker-compose.yml" config --quiet
-docker compose -f "$APP_ROOT/docker-compose.yml" build
+docker compose -f "$APP_ROOT/docker-compose.yml" build discord-bot slack-bridge
 
 has_value() {
   local key="$1"
@@ -85,7 +97,7 @@ else
 fi
 
 docker compose -f "$APP_ROOT/docker-compose.yml" run --rm discord-bot npm run register
-docker compose -f "$APP_ROOT/docker-compose.yml" up -d
+docker compose -f "$APP_ROOT/docker-compose.yml" up -d discord-bot slack-bridge
 
 for _ in $(seq 1 20); do
   if curl --fail --silent --show-error http://127.0.0.1:4188/healthz >/dev/null; then
