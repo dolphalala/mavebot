@@ -1,6 +1,6 @@
 FROM node:24-alpine
 
-RUN apk add --no-cache bash ca-certificates git openssh-client python3 \
+RUN apk add --no-cache bash ca-certificates fontconfig git openssh-client python3 ttf-dejavu \
   && ln -sf python3 /usr/bin/python
 RUN npm install -g @openai/codex@0.142.1
 
