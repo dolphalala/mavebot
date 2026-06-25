@@ -2,6 +2,7 @@ FROM node:24-alpine
 
 WORKDIR /app
 ENV NODE_ENV=production
+ENV XDG_CACHE_HOME=/tmp/.cache
 
 RUN apk add --no-cache fontconfig ttf-dejavu
 

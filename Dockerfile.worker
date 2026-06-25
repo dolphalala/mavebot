@@ -6,6 +6,7 @@ RUN npm install -g @openai/codex@0.142.1
 
 WORKDIR /app
 ENV NODE_ENV=production
+ENV XDG_CACHE_HOME=/tmp/.cache
 
 COPY --chown=node:node package*.json ./
 RUN npm install --omit=dev --no-package-lock
