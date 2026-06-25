@@ -66,6 +66,10 @@ const fetchTimeoutMs = parsePositiveInt(
   process.env.SLACK_WORKER_FETCH_TIMEOUT_MS,
   15000
 );
+const runtimeHealthTimeoutMs = parsePositiveInt(
+  process.env.SLACK_WORKER_RUNTIME_HEALTH_TIMEOUT_MS,
+  60000
+);
 const recentTurnLimit = parsePositiveInt(process.env.SLACK_WORKER_RECENT_TURNS, 40);
 const summaryTurnLimit = parsePositiveInt(process.env.SLACK_WORKER_SUMMARY_TURNS, 120);
 const maxOutputChars = parsePositiveInt(process.env.SLACK_WORKER_MAX_OUTPUT_CHARS, 20000);
@@ -647,10 +651,21 @@ async function checkUrl(url) {
   }
 }
 
+async function waitForUrl(url, timeoutMs = runtimeHealthTimeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await checkUrl(url)) {
+      return true;
+    }
+    await sleep(2000);
+  }
+  return false;
+}
+
 async function verifyRuntime() {
   const [botOk, bridgeOk] = await Promise.all([
-    checkUrl(botHealthUrl),
-    checkUrl(bridgeHealthUrl)
+    waitForUrl(botHealthUrl),
+    waitForUrl(bridgeHealthUrl)
   ]);
   return { botOk, bridgeOk };
 }
