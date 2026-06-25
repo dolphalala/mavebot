@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import {
   buildCodexWorkerPrompt,
+  checkUrl,
   compactTranscriptRows
 } from '../src/slack-codex-worker.mjs';
 
@@ -54,4 +56,33 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   );
   assert.match(prompt, /Do not commit or push/);
   assert.match(prompt, /Discord command changes must update both src\/commands\.mjs and src\/index\.mjs/);
+});
+
+test('checkUrl supports the Slack bridge health port', async (t) => {
+  const server = http.createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end('{"ok":true}');
+  });
+
+  try {
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(4190, '127.0.0.1', resolve);
+    });
+  } catch (error) {
+    if (error?.code === 'EADDRINUSE') {
+      t.skip('port 4190 is already in use on this machine');
+      return;
+    }
+    throw error;
+  }
+
+  t.after(
+    () =>
+      new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      })
+  );
+
+  assert.equal(await checkUrl('http://127.0.0.1:4190/healthz'), true);
 });

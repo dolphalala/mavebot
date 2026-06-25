@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import http from 'node:http';
+import https from 'node:https';
 import { spawn } from 'node:child_process';
 import {
   access,
@@ -639,16 +641,49 @@ async function waitForLiveCommit(fullCommit) {
   };
 }
 
-async function checkUrl(url) {
+export async function checkUrl(url, timeoutMs = 10000) {
   if (!url) {
     return false;
   }
-  try {
-    const response = await fetchWithTimeout(url, {}, 10000);
-    return response.ok;
-  } catch {
-    return false;
-  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(value);
+    };
+
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      finish(false);
+      return;
+    }
+
+    const client = parsed.protocol === 'https:' ? https : parsed.protocol === 'http:' ? http : null;
+    if (!client) {
+      finish(false);
+      return;
+    }
+
+    const request = client.request(parsed, { method: 'GET' }, (response) => {
+      response.resume();
+      response.on('end', () => {
+        finish(response.statusCode >= 200 && response.statusCode < 300);
+      });
+    });
+
+    request.setTimeout(timeoutMs, () => {
+      request.destroy();
+      finish(false);
+    });
+    request.on('error', () => finish(false));
+    request.end();
+  });
 }
 
 async function waitForUrl(url, timeoutMs = runtimeHealthTimeoutMs) {
