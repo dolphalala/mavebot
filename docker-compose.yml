@@ -12,6 +12,10 @@ services:
       NODE_ENV: production
       HEALTH_HOST: 0.0.0.0
       HEALTH_PORT: 4188
+      LEGENDS_STORE_PATH: /shared/legends-tracking.json
+      LEGENDS_TRACK_INTERVAL_MS: 120000
+    volumes:
+      - /opt/urba-apps/discord-bot/shared:/shared
     ports:
       - "127.0.0.1:4188:4188"
     security_opt:

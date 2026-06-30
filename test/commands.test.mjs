@@ -35,3 +35,22 @@ test('player command is guild-install only and requires a tag option', () => {
     }
   ]);
 });
+
+test('legends command is guild-install only and requires a player tag option', () => {
+  const legends = commands.find((command) => command.name === 'legends');
+
+  assert.ok(legends);
+  assert.match(legends.description, /Legend League trophy changes/i);
+  assert.deepEqual(legends.integration_types, [0]);
+  assert.deepEqual(legends.contexts, [0]);
+  assert.deepEqual(legends.options, [
+    {
+      name: 'player',
+      description: 'Player tag to track, with or without #.',
+      type: ApplicationCommandOptionType.String,
+      required: true,
+      min_length: 3,
+      max_length: 20
+    }
+  ]);
+});

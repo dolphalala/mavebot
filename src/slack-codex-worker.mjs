@@ -112,6 +112,34 @@ function stripSlackLinks(text) {
     .trim();
 }
 
+export function isCodexAuthError(value) {
+  const text = String(value?.message || value || '');
+  return /access token could not be refreshed/i.test(text) ||
+    /refresh token was already used/i.test(text) ||
+    /HTTP(?: error)?: 401/i.test(text) ||
+    /token_expired/i.test(text) ||
+    /Please log out and sign in again/i.test(text);
+}
+
+function workerFailureMessage(error) {
+  if (isCodexAuthError(error)) {
+    return [
+      "I hit a server setup blocker: mavebot's Codex login on the server is expired.",
+      '',
+      'Slack is receiving jobs, but the server-side Codex CLI cannot start work until CODEX_HOME is re-authenticated.',
+      'I saved the failed job and context so it can be retried after login is fixed.'
+    ].join('\n');
+  }
+
+  return [
+    'I hit a real blocker while running this on the server.',
+    '',
+    truncate(redact(error.message || error), 2200),
+    '',
+    'I saved the job and context so the next run can continue from it.'
+  ].join('\n');
+}
+
 function redact(value) {
   let text = String(value || '');
   const secrets = [
@@ -873,13 +901,7 @@ async function handleJob(claimed) {
       slackPostError
     });
   } catch (error) {
-    const message = [
-      'I hit a real blocker while running this on the server.',
-      '',
-      truncate(redact(error.message || error), 2200),
-      '',
-      'I saved the job and context so the next run can continue from it.'
-    ].join('\n');
+    const message = workerFailureMessage(error);
     console.error(redact(error.stack || error.message || error));
     contextSnapshot = await appendTurn({
       at: new Date().toISOString(),

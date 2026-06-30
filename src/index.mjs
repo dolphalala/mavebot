@@ -19,11 +19,26 @@ import {
   normalizePlayerTag
 } from './coc.mjs';
 import { createLanaHeartPng, randomLoveLetter } from './lana-art.mjs';
+import {
+  DEFAULT_LEGENDS_INTERVAL_MS,
+  buildLegendsPages,
+  ensureLegendsTracked,
+  legendsStorePath,
+  startLegendsTracker
+} from './legends-store.mjs';
 import { playerArmyAssetNames, renderPlayerArmyCard } from './player-card.mjs';
 
 const token = process.env.DISCORD_TOKEN;
 const healthHost = process.env.HEALTH_HOST || '0.0.0.0';
 const healthPort = Number.parseInt(process.env.HEALTH_PORT || '4188', 10);
+const configuredLegendsIntervalMs = Number.parseInt(
+  process.env.LEGENDS_TRACK_INTERVAL_MS || '',
+  10
+);
+const legendsIntervalMs =
+  Number.isFinite(configuredLegendsIntervalMs) && configuredLegendsIntervalMs > 0
+    ? configuredLegendsIntervalMs
+    : DEFAULT_LEGENDS_INTERVAL_MS;
 
 if (!token) {
   throw new Error('DISCORD_TOKEN is required.');
@@ -47,7 +62,9 @@ const healthServer = app.listen(healthPort, healthHost, () => {
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const playerViews = new Map();
+const legendsViews = new Map();
 const playerViewTtlMs = 15 * 60 * 1000;
+let stopLegendsTracker = null;
 
 function createViewId() {
   return crypto.randomBytes(8).toString('hex');
@@ -71,11 +88,11 @@ function buildEmbed(page, footer) {
   return embed;
 }
 
-function pageComponents(view, activePageId, { disabled = false } = {}) {
+function pageComponents(view, activePageId, { disabled = false, customIdPrefix = 'player' } = {}) {
   const pageRow = new ActionRowBuilder().addComponents(
     view.pages.map((page) =>
       new ButtonBuilder()
-        .setCustomId(`player:${view.id}:${page.id}`)
+        .setCustomId(`${customIdPrefix}:${view.id}:${page.id}`)
         .setLabel(page.label)
         .setStyle(page.id === activePageId ? ButtonStyle.Primary : ButtonStyle.Secondary)
         .setDisabled(disabled || page.id === activePageId)
@@ -109,9 +126,17 @@ function renderPlayerView(view, pageId, { disabled = false } = {}) {
 
   return {
     embeds: [buildEmbed(page, view.footer)],
-    components: pageComponents(view, page.id, { disabled }),
+    components: pageComponents(view, page.id, { disabled, customIdPrefix: 'player' }),
     attachments: [],
     files
+  };
+}
+
+function renderLegendsView(view, pageId, { disabled = false } = {}) {
+  const page = view.pages.find((candidate) => candidate.id === pageId) || view.pages[0];
+  return {
+    embeds: [buildEmbed(page, view.footer)],
+    components: pageComponents(view, page.id, { disabled, customIdPrefix: 'legends' })
   };
 }
 
@@ -151,15 +176,60 @@ async function handlePlayerButton(interaction) {
   await interaction.update(renderPlayerView(view, pageId));
 }
 
+function storeLegendsView(view, message) {
+  view.message = message;
+  legendsViews.set(view.id, view);
+
+  const timer = setTimeout(() => {
+    legendsViews.delete(view.id);
+    view.message
+      ?.edit(renderLegendsView(view, view.activePageId, { disabled: true }))
+      .catch(() => {});
+  }, playerViewTtlMs);
+  timer.unref?.();
+}
+
+async function handleLegendsButton(interaction) {
+  const [, viewId, pageId] = interaction.customId.split(':');
+  const view = legendsViews.get(viewId);
+  if (!view) {
+    await interaction.reply({
+      content: 'That legends menu expired. Run /legends again for a fresh one.',
+      ephemeral: true
+    });
+    return;
+  }
+
+  if (interaction.user.id !== view.ownerId) {
+    await interaction.reply({
+      content: 'This legends menu belongs to the person who ran /legends.',
+      ephemeral: true
+    });
+    return;
+  }
+
+  view.activePageId = pageId;
+  await interaction.update(renderLegendsView(view, pageId));
+}
+
 client.once(Events.ClientReady, (readyClient) => {
   ready = true;
   readyUser = readyClient.user.tag;
   console.log(`Logged in as ${readyUser}.`);
+  stopLegendsTracker = startLegendsTracker({
+    storePath: legendsStorePath(),
+    intervalMs: legendsIntervalMs
+  });
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isButton() && interaction.customId.startsWith('player:')) {
     await handlePlayerButton(interaction);
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith('legends:')) {
+    await handleLegendsButton(interaction);
     return;
   }
 
@@ -240,12 +310,49 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.editReply(message);
       console.error('Clash player lookup failed:', error);
     }
+    return;
+  }
+
+  if (interaction.commandName === 'legends') {
+    const tag = interaction.options.getString('player', true);
+    await interaction.deferReply();
+
+    try {
+      const result = await ensureLegendsTracked(tag, {
+        storePath: legendsStorePath(),
+        intervalMs: legendsIntervalMs
+      });
+      const trackedCount = Object.keys(result.store.players || {}).length;
+      const profile = buildLegendsPages(result.record, {
+        trackedCount,
+        intervalMs: legendsIntervalMs
+      });
+      const view = {
+        id: createViewId(),
+        ownerId: interaction.user.id,
+        pages: profile.pages,
+        profileUrl: profile.profileUrl,
+        footer: profile.footer,
+        activePageId: 'timeline'
+      };
+
+      const message = await interaction.editReply(renderLegendsView(view, view.activePageId));
+      storeLegendsView(view, message);
+    } catch (error) {
+      const message =
+        error instanceof CocApiError
+          ? error.message
+          : 'I could not start legends tracking for that player right now.';
+      await interaction.editReply(message);
+      console.error('Legend tracker command failed:', error);
+    }
   }
 });
 
 async function shutdown(signal) {
   console.log(`Received ${signal}; shutting down.`);
   ready = false;
+  stopLegendsTracker?.();
   client.destroy();
   healthServer.close(() => process.exit(0));
 }

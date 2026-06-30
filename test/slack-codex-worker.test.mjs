@@ -9,6 +9,7 @@ import {
   buildCodexWorkerPrompt,
   checkUrl,
   compactTranscriptRows,
+  isCodexAuthError,
   readRepoContextBundle
 } from '../src/slack-codex-worker.mjs';
 
@@ -64,6 +65,17 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /Discord command changes must update both src\/commands\.mjs and src\/index\.mjs/);
   assert.match(prompt, /# Extra Repo Context Files/);
   assert.match(prompt, /clash ui guidance/);
+});
+
+test('isCodexAuthError detects expired server-side Codex login failures', () => {
+  assert.equal(
+    isCodexAuthError(
+      'Failed to refresh token: Your access token could not be refreshed because your refresh token was already used.'
+    ),
+    true
+  );
+  assert.equal(isCodexAuthError('failed to connect to websocket: HTTP error: 401 Unauthorized'), true);
+  assert.equal(isCodexAuthError('npm test failed'), false);
 });
 
 test('readRepoContextBundle loads bounded extra docs/context markdown files', async (t) => {

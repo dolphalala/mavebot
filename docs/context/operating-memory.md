@@ -14,6 +14,9 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   - `/player`: looks up a Clash of Clans player by tag using the server-side
     CoC API token, then presents compact button pages plus a rendered army
     image card with Clash Wiki/Fandom item icons when available.
+  - `/legends`: starts or views Legend League trophy tracking for a player tag.
+    The command stores snapshots in the server shared volume and shows timeline
+    plus current Legend-day pages.
 - Allen is Korean and Lana is Croatian; `/lana` copy can use that context.
 - The app is Clash of Clans focused. CoC API calls should use the official API
   base URL `https://api.clashofclans.com/v1` and the server-only
@@ -29,6 +32,10 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   `COC_API_BASE_URL` and `COC_API_TOKEN`.
 - Docker Compose service/container: `urba-discord-bot`.
 - Health endpoint: `http://127.0.0.1:4188/healthz`.
+- Legend tracking store:
+  `/opt/urba-apps/discord-bot/shared/legends-tracking.json`.
+- `/legends` uses fixed MST for day boundaries: the Legend day starts at
+  23:00 MST, which is 06:00 UTC.
 - GitHub deploys should use the server-local
   `urba-discord-poll-deploy.timer`, not a public webhook.
 - The server poll deploy only follows `origin/main`. A Codex cloud task that
@@ -49,6 +56,9 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - The normal deploy script intentionally updates only `discord-bot` and
   `slack-bridge`. It does not restart `codex-worker`, because the worker could
   otherwise kill itself after pushing the commit that triggers deploy.
+- If Slack says the server-side Codex login is expired, Slack is still
+  receiving jobs but `codex-worker` cannot run `codex exec` until its mounted
+  `CODEX_HOME` is re-authenticated.
 
 ## Discord Command Registration
 

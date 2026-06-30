@@ -9,6 +9,7 @@ SLACK_CODEX_STATE_FILE="${SLACK_CODEX_STATE_FILE:-/opt/urba-apps/discord-bot/sha
 SLACK_USER_TOKEN_FILE="${SLACK_USER_TOKEN_FILE:-/opt/urba-apps/discord-bot/shared/slack-user-tokens.json}"
 CODEX_HOME_DIR="${CODEX_HOME_DIR:-/opt/urba-apps/discord-bot/codex-home}"
 CODEX_WORKER_DIR="${CODEX_WORKER_DIR:-/opt/urba-apps/discord-bot/shared/codex-worker}"
+LEGENDS_STORE_FILE="${LEGENDS_STORE_FILE:-/opt/urba-apps/discord-bot/shared/legends-tracking.json}"
 LOG_DIR="${LOG_DIR:-/opt/urba-apps/discord-bot/shared/logs}"
 LOCK_FILE="${LOCK_FILE:-/opt/urba-apps/discord-bot/shared/deploy.lock}"
 BRANCH="${BRANCH:-main}"
@@ -53,6 +54,11 @@ if [ ! -s "$SLACK_USER_TOKEN_FILE" ]; then
 fi
 chmod 600 "$SLACK_USER_TOKEN_FILE"
 chown 1000:1000 "$SLACK_USER_TOKEN_FILE" 2>/dev/null || true
+if [ ! -s "$LEGENDS_STORE_FILE" ]; then
+  printf '{"version":1,"players":{},"scheduler":{"cursor":0}}\n' >"$LEGENDS_STORE_FILE"
+fi
+chmod 600 "$LEGENDS_STORE_FILE"
+chown 1000:1000 "$LEGENDS_STORE_FILE" 2>/dev/null || true
 mkdir -p \
   "$CODEX_HOME_DIR" \
   "$CODEX_WORKER_DIR/jobs" \

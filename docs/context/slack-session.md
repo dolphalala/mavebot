@@ -60,11 +60,20 @@ future tasks should know.
 - `/player` should stay compact: use buttons for Overview, Army, Heroes, and
   Progress; keep the first page short; render high-volume army/equipment data
   as an attached PNG card with Clash Wiki/Fandom icons when available.
+- `/legends player:<tag>` tracks Legend League trophies for a Clash player.
+  It stores snapshots in `/shared/legends-tracking.json`, checks one due
+  tracked player per 2-minute cycle, and shows Timeline plus Today button
+  pages. The Legend day starts at 23:00 fixed MST.
 
 ### Open Work
 
 - Keep the GitHub repository synchronized with live server changes so worker
   jobs and server auto-deploys use the same code.
+- On 2026-06-30, Allen asked Slack to create `/legends`; the Slack bridge
+  created a job, but `codex-worker` failed before code generation because the
+  server-side Codex CLI login was expired (`HTTP 401` / refresh token already
+  used). Future workers should surface that as an auth blocker, not as a vague
+  idle state.
 - Continue improving Discord commands for Clash of Clans workflows.
 - Keep context docs efficient as the Slack channel grows: summarize durable
   facts, move domain guidance into focused files, and delete duplicated stale
