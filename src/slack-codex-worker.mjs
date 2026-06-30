@@ -345,7 +345,7 @@ async function ensureDirectories() {
 }
 
 async function readJsonFile(filePath) {
-  return JSON.parse(await readFile(filePath, 'utf8'));
+  return JSON.parse((await readFile(filePath, 'utf8')).replace(/^\uFEFF/, ''));
 }
 
 async function listJsonFiles(dir) {
@@ -403,7 +403,14 @@ async function claimNextJob() {
       await rename(source, target);
       const job = await readJsonFile(target);
       return { job: await markJobStarted(target, job), path: target };
-    } catch {
+    } catch (error) {
+      if (await pathExists(target)) {
+        const fallbackJob = { id: path.basename(name, '.json') };
+        await moveJob(target, failedDir, fallbackJob, {
+          failedAt: new Date().toISOString(),
+          error: truncate(redact(error.message || error), 4000)
+        }).catch(() => {});
+      }
       continue;
     }
   }
