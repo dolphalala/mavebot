@@ -69,19 +69,17 @@ future tasks should know.
 
 - Keep the GitHub repository synchronized with live server changes so worker
   jobs and server auto-deploys use the same code.
-- On 2026-06-30, Allen asked Slack to create `/legends`; the Slack bridge
-  created a job, but `codex-worker` failed before code generation because the
-  server-side Codex CLI login was expired (`HTTP 401` / refresh token already
-  used). Future workers should surface that as an auth blocker, not as a vague
-  idle state.
+- On 2026-06-30, Allen asked Slack to create `/legends`; the bridge did create
+  the job. Root cause of the stall was expired server-side Codex CLI auth
+  (`HTTP 401` / refresh token already used), not Slack event delivery.
+  `CODEX_HOME` was re-authenticated and the worker now surfaces auth expiry as
+  a clear setup blocker.
+- Also on 2026-06-30, the deploy path was fixed so `codex-worker` is built and
+  safely recreated after active jobs clear. The final worker queue smoke test
+  completed with no Slack post error and no stuck jobs.
 - Continue improving Discord commands for Clash of Clans workflows.
 - Keep context docs efficient as the Slack channel grows: summarize durable
   facts, move domain guidance into focused files, and delete duplicated stale
   notes once the fact is preserved in the right place.
-- server-worker-verification-20260625-0118
-- server-worker-verification-20260625-0132
-- server-worker-verification-20260625-0145
-- server-worker-verification-20260625-014511
-- server-worker-verification-final-20260625-020018
 - If a user asks to reset or start a new session, add a new dated section here
   instead of deleting older notes.

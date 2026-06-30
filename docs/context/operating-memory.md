@@ -53,9 +53,15 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   `/opt/urba-apps/discord-bot/shared/codex-worker/jobs`; the worker runs Codex
   CLI in `/opt/urba-apps/discord-bot/shared/codex-worker/repo`, commits, pushes
   `origin/main`, and waits for the 30-second poll deploy to pull that commit.
-- The normal deploy script intentionally updates only `discord-bot` and
-  `slack-bridge`. It does not restart `codex-worker`, because the worker could
-  otherwise kill itself after pushing the commit that triggers deploy.
+- The deploy script builds `discord-bot`, `slack-bridge`, and `codex-worker`.
+  It recreates `codex-worker` only when no worker job is active; if a job is in
+  `processing`, it writes `shared/codex-worker/restart-needed` and the poll
+  deploy completes the worker recreate after the queue is clear. This avoids
+  killing the worker mid-Slack request while still keeping worker code current.
+- Worker jobs are marked with `attempts`, `startedAt`, and `worker` metadata
+  after being claimed. If a processing job is stale, the worker and deploy
+  script can requeue it; malformed claimed JSON is moved to `failed` instead of
+  being left invisible in `processing`.
 - If Slack says the server-side Codex login is expired, Slack is still
   receiving jobs but `codex-worker` cannot run `codex exec` until its mounted
   `CODEX_HOME` is re-authenticated.
