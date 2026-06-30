@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import http from 'node:http';
 import https from 'node:https';
+import os from 'node:os';
 import { spawn } from 'node:child_process';
 import {
   access,
@@ -366,8 +367,30 @@ async function recycleStaleProcessingJobs() {
       continue;
     }
     const target = path.join(jobDir, name);
-    await rename(source, target).catch(() => {});
+    await rename(source, target).then(() => {
+      console.log(`Requeued stale processing job ${name}.`);
+    }).catch(() => {});
   }
+}
+
+async function markJobStarted(jobPath, job) {
+  const startedAt = new Date().toISOString();
+  const attempts = Number.isFinite(Number.parseInt(job.attempts, 10))
+    ? Number.parseInt(job.attempts, 10) + 1
+    : 1;
+  const next = {
+    ...job,
+    attempts,
+    startedAt,
+    worker: {
+      name: workerName,
+      pid: process.pid,
+      host: os.hostname(),
+      startedAt
+    }
+  };
+  await writePrivateText(jobPath, `${JSON.stringify(next, null, 2)}\n`);
+  return next;
 }
 
 async function claimNextJob() {
@@ -379,7 +402,7 @@ async function claimNextJob() {
     try {
       await rename(source, target);
       const job = await readJsonFile(target);
-      return { job, path: target };
+      return { job: await markJobStarted(target, job), path: target };
     } catch {
       continue;
     }
