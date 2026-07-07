@@ -906,7 +906,9 @@ function finalSlackMessage({ codexMessage, checkOk, pushResult, deployResult, ru
   const runtimeOk = runtime.botOk && runtime.bridgeOk;
 
   if (checkOk && deployOk && runtimeOk) {
-    lines.push(pushResult.pushed ? 'Done and live.' : 'Done.');
+    if (pushResult.pushed) {
+      lines.push('Done and live.');
+    }
     return truncate(lines.filter(Boolean).join('\n\n'), 1900);
   }
 
