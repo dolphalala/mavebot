@@ -137,9 +137,9 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   verify live state, and answer plainly when the request needs real work.
 - Worker prompts also include bounded extra files from `docs/context/*.md`, such
   as `docs/context/remote-codex-session.md` and
-  `docs/context/code-map.md`, and `docs/context/clash-ui-guidance.md`. Add
-  focused context docs there when the Slack/Discord agent needs durable domain
-  guidance.
+  `docs/context/local-codex-parity.md`, `docs/context/code-map.md`, and
+  `docs/context/clash-ui-guidance.md`. Add focused context docs there when the
+  Slack/Discord agent needs durable domain guidance.
 - The bridge should use Slack Socket Mode with `SLACK_APP_TOKEN` so Slack events
   arrive over an outbound WebSocket and no public domain is required.
 - The older fallback bridge mode can forward normal #bot user messages to the official Codex Slack

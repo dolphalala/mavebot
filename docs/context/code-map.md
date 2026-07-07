@@ -69,4 +69,6 @@ Registering a command without a matching runtime handler causes Discord's
    cleaning.
 3. Update `remote-codex-session.md` and this file when behavior or context
    loading changes.
-4. Verify the worker queue, generated memory files, and live channel response.
+4. Update `local-codex-parity.md` if the standard for matching local Codex
+   Desktop behavior changes.
+5. Verify the worker queue, generated memory files, and live channel response.

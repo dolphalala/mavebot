@@ -184,6 +184,7 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /Do not commit or push/);
   assert.match(prompt, /persistent Codex session/);
   assert.match(prompt, /Be as capable as a local Codex Desktop session/);
+  assert.match(prompt, /local-codex-parity\.md/);
   assert.match(prompt, /docs\/context\/remote-codex-session\.md/);
   assert.match(prompt, /Discord command changes must update both src\/commands\.mjs and src\/index\.mjs/);
   assert.match(prompt, /# Extra Repo Context Files/);
@@ -199,6 +200,8 @@ test('buildWorkerRuntimeSnapshot explains deploy and safety boundaries without s
   assert.match(snapshot, /origin\/main/);
   assert.match(snapshot, /scripts\/deploy-server\.sh/);
   assert.match(snapshot, /npm run check/);
+  assert.match(snapshot, /transcript is normalized/);
+  assert.match(snapshot, /localSessionParity/);
   assert.match(snapshot, /do not touch Chatwoot/);
   assert.doesNotMatch(snapshot, /TOKEN|SECRET|xox|github_pat/i);
 });
@@ -223,20 +226,26 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   await writeFile(path.join(dir, 'README.md'), 'do not include context map copy');
   await writeFile(path.join(dir, 'clash-ui-guidance.md'), '# Clash UI\nUse icon cards.');
   await writeFile(path.join(dir, 'remote-codex-session.md'), '# Remote Contract\nAct like a session.');
+  await writeFile(path.join(dir, 'local-codex-parity.md'), '# Local Parity\nMatch local Codex.');
   await writeFile(path.join(dir, 'code-map.md'), '# Code Map\nUpdate index and commands.');
   await writeFile(path.join(dir, 'z-extra.md'), '# Extra\nLess important.');
 
   const bundle = await readRepoContextBundle({ dir, maxChars: 1000 });
 
   assert.ok(
-    bundle.indexOf('## remote-codex-session.md') < bundle.indexOf('## code-map.md'),
-    'remote session contract should be loaded before source map'
+    bundle.indexOf('## remote-codex-session.md') < bundle.indexOf('## local-codex-parity.md'),
+    'remote session contract should be loaded before local parity contract'
+  );
+  assert.ok(
+    bundle.indexOf('## local-codex-parity.md') < bundle.indexOf('## code-map.md'),
+    'local parity contract should be loaded before source map'
   );
   assert.ok(
     bundle.indexOf('## code-map.md') < bundle.indexOf('## clash-ui-guidance.md'),
     'source map should be loaded before domain guidance'
   );
   assert.match(bundle, /Act like a session/);
+  assert.match(bundle, /Match local Codex/);
   assert.match(bundle, /Update index and commands/);
   assert.match(bundle, /## clash-ui-guidance\.md/);
   assert.match(bundle, /Use icon cards/);

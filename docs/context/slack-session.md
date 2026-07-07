@@ -53,6 +53,9 @@ future tasks should know.
   making Slack `#bot` and Discord `#codex` feel like this local Codex Desktop
   session. Remote jobs should read it, follow it, and update focused context
   docs instead of depending on hidden desktop-thread context.
+- `docs/context/local-codex-parity.md` defines the checklist for matching this
+  local Codex Desktop session: inspect, implement, test, push, verify deploy,
+  maintain context, and answer plainly.
 - `docs/context/README.md` is the context map and `docs/context/code-map.md`
   is the source orientation map for remote jobs.
 - Discord slash command changes must include both command registration data and

@@ -1,0 +1,80 @@
+# Local Codex Parity Contract
+
+This file defines what "as capable as the local Codex Desktop session" means
+for mavebot's Slack and Discord control channels.
+
+## Standard For Every Job
+
+Remote jobs should follow the same loop a local Codex session would use:
+
+1. Understand the active request and decide whether it is code work,
+   operational verification, explanation, or memory maintenance.
+2. Load project instructions and durable context before acting.
+3. Inspect the current source files that own the behavior.
+4. Make focused edits that match existing project patterns.
+5. Update tests and context docs when behavior, user preferences, deployment
+   rules, or durable product facts change.
+6. Run the relevant checks, with `npm run check` as the default full gate.
+7. Push to `origin/main` through the worker when code changes are ready.
+8. Wait for server deploy and verify the live runtime before saying it is live.
+9. Reply in normal channel language with the result or exact remaining blocker.
+
+If a step cannot be completed from the worker environment, say so plainly and
+include the smallest external action needed. Do not pretend a change is live.
+
+## Context Budget
+
+Use context in layers instead of dumping the full channel history:
+
+- Active user request is the only command for the run.
+- `AGENTS.md` and `docs/context/README.md` decide how to load the repo.
+- Worker `summary.md` and `recent.md` provide bounded channel memory.
+- `operating-memory.md` owns server, deploy, command registration, and safety
+  facts.
+- `slack-session.md` owns user preferences, current goals, and open work.
+- `remote-codex-session.md` owns remote-channel behavior.
+- This file owns local-session parity expectations.
+- `code-map.md` points to source ownership.
+- Focused docs such as `clash-ui-guidance.md` own domain rules.
+- Source files and tests are the final authority.
+
+Do not let old memory override the active user request. Treat old memory as
+background context that must be verified against source.
+
+## Memory Write Rules
+
+After each meaningful job, decide whether a durable context update is needed:
+
+- Update `operating-memory.md` for deployment, env, server path, command
+  registration, state-store, or safety-boundary changes.
+- Update `slack-session.md` for user preferences, active goals, open work, and
+  cross-job decisions.
+- Update `remote-codex-session.md` for Slack/Discord session behavior changes.
+- Update `code-map.md` when source ownership or feature recipes change.
+- Update a focused domain file for reusable product/domain guidance.
+
+Do not add a note for every transient status, smoke test, or temporary error.
+Rewrite noisy sections instead of appending duplicate bullets.
+
+## Discord Bot Feature Standard
+
+For Discord bot feature work, remote jobs should be able to do what this
+desktop session does:
+
+- Change slash command registration and runtime handling together.
+- Add or update helper modules instead of bloating `src/index.mjs`.
+- Add tests for command shape and core behavior.
+- Verify commands are deployed through the GitHub-to-server path.
+- Keep outputs readable on Discord mobile.
+- Use official Clash API data and repeatable documented icon sources.
+- Preserve durable JSON state safely, including corrupt-file backups.
+
+## Answer Standard
+
+The channel answer should be short and human:
+
+- Say what changed and whether it is live.
+- Mention tests or deploy checks only when useful.
+- If blocked, say exactly what blocked it and what needs to happen next.
+- Do not include prompt dumps, task cards, ChatGPT promo text, long logs, or
+  irrelevant implementation detail.

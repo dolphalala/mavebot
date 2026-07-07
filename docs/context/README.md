@@ -16,7 +16,8 @@ Remote worker prompts include context in this order:
 6. `operating-memory.md`.
 7. `slack-session.md`.
 8. Extra focused context files, currently prioritized as:
-   `remote-codex-session.md`, `code-map.md`, `clash-ui-guidance.md`.
+   `remote-codex-session.md`, `local-codex-parity.md`, `code-map.md`,
+   `clash-ui-guidance.md`.
 9. Current source code and tests.
 
 The active request wins over older memory. Source code and tests are the final
@@ -30,6 +31,8 @@ authority when docs are stale.
   work from the long-running channel session.
 - `remote-codex-session.md`: behavior contract for making Slack `#bot` and
   Discord `#codex` act like persistent Codex sessions.
+- `local-codex-parity.md`: checklist for making remote jobs match the quality
+  of this local Codex Desktop session.
 - `code-map.md`: source-file map and feature change recipes.
 - `clash-ui-guidance.md`: Clash of Clans data, icon, and Discord UI guidance.
 

@@ -90,6 +90,7 @@ const repoContextMaxChars = parsePositiveInt(
 );
 const repoContextPriority = [
   'remote-codex-session.md',
+  'local-codex-parity.md',
   'code-map.md',
   'clash-ui-guidance.md'
 ];
@@ -706,11 +707,24 @@ export function buildWorkerRuntimeSnapshot(job = {}) {
       botHealthUrl,
       bridgeHealthUrl
     },
+    sessionMemory: {
+      transcriptPath,
+      summaryPath,
+      recentPath,
+      sessionPath,
+      policy: 'active request wins; transcript is normalized; durable facts go in docs/context/*.md'
+    },
     verification: [
       'npm run check',
       'Discord command registration/runtime handler match',
       'server live commit check after push',
       'health endpoints after deploy'
+    ],
+    localSessionParity: [
+      'inspect relevant source before editing',
+      'update context docs for durable behavior or user-preference changes',
+      'answer in plain channel language',
+      'say not live when push/deploy/runtime verification did not complete'
     ],
     boundaries: [
       'mavebot repo and /opt/urba-apps/discord-bot only',
@@ -749,6 +763,8 @@ function promptHeader(job) {
     '- Treat the Slack or Discord control channel as a persistent Codex session, not a one-off support bot.',
     '- Use the provided compacted memory and repo docs to recover context, then verify against source files before changing behavior.',
     '- Be as capable as a local Codex Desktop session for this repo: inspect code, inspect tests, run commands, change files, update docs, and verify live deploys when the request requires it.',
+    '- Follow docs/context/local-codex-parity.md as the standard for intake, implementation, verification, memory updates, and final answers.',
+    '- If any local-session-equivalent step cannot be done from the worker, state the blocker and the smallest needed external action.',
     '- Do not use @Codex, official Codex Slack, Slack OAuth forwarding, or ChatGPT task links.',
     '- Do not commit or push. The worker will run checks, commit, push main, and verify deploy after you finish.',
     '- If the request is conversational and needs no code, answer normally.',

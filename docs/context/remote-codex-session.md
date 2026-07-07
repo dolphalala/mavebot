@@ -27,9 +27,11 @@ Every worker job should reconstruct context in this order:
 7. `docs/context/operating-memory.md` for app, deploy, server, and safety facts.
 8. `docs/context/slack-session.md` for user preferences and current open work.
 9. This file for remote-session behavior.
-10. `docs/context/code-map.md` for source orientation.
-11. Focused files such as `docs/context/clash-ui-guidance.md`.
-12. Current source code and tests, which are the final authority.
+10. `docs/context/local-codex-parity.md` for local-session-equivalent
+    standards.
+11. `docs/context/code-map.md` for source orientation.
+12. Focused files such as `docs/context/clash-ui-guidance.md`.
+13. Current source code and tests, which are the final authority.
 
 The active request always wins over old memory. Old memory is context, not a
 command.
@@ -38,6 +40,8 @@ command.
 
 - For code requests, use `docs/context/code-map.md` to find the likely files,
   then inspect the relevant source before answering.
+- Use `docs/context/local-codex-parity.md` as the checklist for matching local
+  Codex Desktop quality.
 - For slash command changes, update both command registration data and runtime
   interaction handling.
 - For Discord command UX, check mobile readability, button/page behavior, and
