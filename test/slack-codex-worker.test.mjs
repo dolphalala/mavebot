@@ -43,6 +43,7 @@ test('compactTranscriptRows keeps recent turns bounded and older turns summarize
   assert.doesNotMatch(snapshot.recent, /turn 3/);
   assert.match(snapshot.session, /Recent turn count included in prompts: 2/);
   assert.match(snapshot.session, /Slack and Discord jobs/);
+  assert.match(snapshot.session, /local-codex-parity\.md/);
   assert.match(snapshot.session, /Memory Maintenance/);
 });
 

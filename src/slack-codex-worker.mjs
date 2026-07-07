@@ -555,7 +555,7 @@ export function compactTranscriptRows(rows, options = {}) {
     '## Current Session Shape',
     '',
     '- Slack #bot and Discord #codex are user-facing control surfaces for the same mavebot coding session.',
-    '- Worker jobs should read repo docs/context/operating-memory.md, docs/context/slack-session.md, docs/context/remote-codex-session.md, and relevant docs/context/*.md before acting.',
+    '- Worker jobs should read repo docs/context/operating-memory.md, docs/context/slack-session.md, docs/context/remote-codex-session.md, docs/context/local-codex-parity.md, and relevant docs/context/*.md before acting.',
     '- Code changes should be tested, committed, pushed to main, then verified on the server.',
     '- Final answers should read like normal mavebot chat, not CI logs.',
     '',
