@@ -64,6 +64,10 @@ future tasks should know.
   It stores snapshots in `/shared/legends-tracking.json`, checks one due
   tracked player per 2-minute cycle, and shows Timeline plus Today button
   pages. The Legend day starts at 23:00 fixed MST.
+- `/elder user:<discord user>` grants elder command access. Server admins or
+  existing elders can grant it. `/mute` and `/bench` require elder access,
+  collect 3 unique elder votes, and store permanent target records in
+  `/shared/elder-votes.json`.
 
 ### Open Work
 

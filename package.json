@@ -12,7 +12,7 @@
     "codex-worker": "node src/slack-codex-worker.mjs",
     "register": "node scripts/register-commands.mjs",
     "test": "node --test",
-    "check": "node --check src/index.mjs && node --check src/slack-bridge.mjs && node --check src/slack-codex-worker.mjs && node --check src/commands.mjs && node --check src/coc.mjs && node --check src/coc-assets.mjs && node --check src/player-card.mjs && node --check src/legends-store.mjs && node --check src/lana-art.mjs && node --check scripts/register-commands.mjs && python -m py_compile scripts/deploy-webhook.py && npm test"
+    "check": "node --check src/index.mjs && node --check src/slack-bridge.mjs && node --check src/slack-codex-worker.mjs && node --check src/commands.mjs && node --check src/coc.mjs && node --check src/coc-assets.mjs && node --check src/player-card.mjs && node --check src/legends-store.mjs && node --check src/moderation-store.mjs && node --check src/lana-art.mjs && node --check scripts/register-commands.mjs && python -m py_compile scripts/deploy-webhook.py && npm test"
   },
   "dependencies": {
     "discord.js": "14.26.4",

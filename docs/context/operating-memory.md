@@ -17,6 +17,13 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   - `/legends`: starts or views Legend League trophy tracking for a player tag.
     The command stores snapshots in the server shared volume and shows timeline
     plus current Legend-day pages.
+  - `/elder`: lets a server admin or existing elder grant elder status to a
+    Discord user.
+  - `/mute`: elder vote command. Three unique elder votes mute the target for
+    5 minutes and append the result to the permanent moderation record.
+  - `/bench`: elder vote command. Three unique elder votes assign the target a
+    `benched` role with an ugly yellow role color and append the result to the
+    permanent moderation record.
 - Allen is Korean and Lana is Croatian; `/lana` copy can use that context.
 - The app is Clash of Clans focused. CoC API calls should use the official API
   base URL `https://api.clashofclans.com/v1` and the server-only
@@ -34,6 +41,8 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Health endpoint: `http://127.0.0.1:4188/healthz`.
 - Legend tracking store:
   `/opt/urba-apps/discord-bot/shared/legends-tracking.json`.
+- Elder/vote moderation store:
+  `/opt/urba-apps/discord-bot/shared/elder-votes.json`.
 - `/legends` uses fixed MST for day boundaries: the Legend day starts at
   23:00 MST, which is 06:00 UTC.
 - GitHub deploys should use the server-local

@@ -38,5 +38,47 @@ export const commands = [
         max_length: 20
       }
     ]
+  },
+  {
+    name: 'elder',
+    description: 'Allows a server member to use elder vote commands.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'user',
+        description: 'Discord user to make an elder.',
+        type: ApplicationCommandOptionType.User,
+        required: true
+      }
+    ]
+  },
+  {
+    name: 'mute',
+    description: 'Elder vote to mute a server member for 5 minutes.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'user',
+        description: 'Discord user to vote against.',
+        type: ApplicationCommandOptionType.User,
+        required: true
+      }
+    ]
+  },
+  {
+    name: 'bench',
+    description: 'Elder vote to give a server member the ugly yellow benched role.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'user',
+        description: 'Discord user to vote against.',
+        type: ApplicationCommandOptionType.User,
+        required: true
+      }
+    ]
   }
 ];

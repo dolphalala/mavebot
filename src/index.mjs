@@ -9,7 +9,8 @@ import {
   Client,
   EmbedBuilder,
   Events,
-  GatewayIntentBits
+  GatewayIntentBits,
+  PermissionFlagsBits
 } from 'discord.js';
 import { fetchCocWikiImageMap } from './coc-assets.mjs';
 import {
@@ -26,6 +27,18 @@ import {
   legendsStorePath,
   startLegendsTracker
 } from './legends-store.mjs';
+import {
+  BENCHED_ROLE_COLOR,
+  BENCHED_ROLE_NAME,
+  MUTE_DURATION_MS,
+  VOTE_THRESHOLD,
+  buildModerationRecordText,
+  grantElder,
+  isElder,
+  moderationStorePath,
+  recordModerationOutcome,
+  submitModerationVote
+} from './moderation-store.mjs';
 import { playerArmyAssetNames, renderPlayerArmyCard } from './player-card.mjs';
 
 const token = process.env.DISCORD_TOKEN;
@@ -86,6 +99,326 @@ function buildEmbed(page, footer) {
     embed.setImage(page.imageUrl);
   }
   return embed;
+}
+
+function userMention(userId) {
+  return `<@${userId}>`;
+}
+
+function moderationReason(action, targetUser, voterUser) {
+  return `mavebot /${action} vote passed for ${targetUser.tag || targetUser.id}; final vote by ${voterUser.tag || voterUser.id}`;
+}
+
+function buildModerationEmbed({ title, description, targetUser, record, activeVote = null, color = 0xc9b30a }) {
+  return new EmbedBuilder()
+    .setColor(color)
+    .setTitle(title)
+    .setDescription(description)
+    .addFields({
+      name: `${targetUser.username || targetUser.tag || targetUser.id}'s record`,
+      value: buildModerationRecordText(record, activeVote)
+    })
+    .setFooter({ text: `${VOTE_THRESHOLD} unique elder votes are needed to pass.` })
+    .setTimestamp();
+}
+
+async function fetchGuildMember(interaction, user) {
+  if (!interaction.guild) {
+    throw new Error('This command only works in a Discord server.');
+  }
+  return interaction.guild.members.fetch(user.id);
+}
+
+async function fetchBotMember(guild) {
+  return guild.members.me || guild.members.fetch(client.user.id);
+}
+
+function memberHasAnyPermission(interaction, permissions) {
+  return permissions.some((permission) => interaction.memberPermissions?.has(permission));
+}
+
+async function canManageElders(interaction) {
+  if (!interaction.guildId) {
+    return false;
+  }
+  if (
+    memberHasAnyPermission(interaction, [
+      PermissionFlagsBits.Administrator,
+      PermissionFlagsBits.ManageGuild
+    ])
+  ) {
+    return true;
+  }
+  return isElder(interaction.guildId, interaction.user.id, {
+    storePath: moderationStorePath()
+  });
+}
+
+async function canUseElderVote(interaction) {
+  if (!interaction.guildId) {
+    return false;
+  }
+  if (
+    memberHasAnyPermission(interaction, [
+      PermissionFlagsBits.Administrator,
+      PermissionFlagsBits.ManageGuild
+    ])
+  ) {
+    return true;
+  }
+  return isElder(interaction.guildId, interaction.user.id, {
+    storePath: moderationStorePath()
+  });
+}
+
+async function ensureCanTimeout(interaction, targetMember) {
+  const botMember = await fetchBotMember(interaction.guild);
+  if (!botMember.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+    throw new Error('mavebot needs the Moderate Members permission before /mute votes can apply.');
+  }
+  if (targetMember.id === botMember.id) {
+    throw new Error('mavebot cannot vote against itself.');
+  }
+  if (!targetMember.moderatable) {
+    throw new Error('mavebot cannot mute that member because their role is too high or protected.');
+  }
+}
+
+async function ensureBenchedRole(guild) {
+  const botMember = await fetchBotMember(guild);
+  if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles)) {
+    throw new Error('mavebot needs the Manage Roles permission before /bench votes can apply.');
+  }
+
+  let role = guild.roles.cache.find(
+    (candidate) => candidate.name.toLowerCase() === BENCHED_ROLE_NAME
+  );
+  if (!role) {
+    role = await guild.roles.create({
+      name: BENCHED_ROLE_NAME,
+      color: BENCHED_ROLE_COLOR,
+      reason: 'mavebot /bench vote role'
+    });
+  }
+
+  if (!role.editable) {
+    throw new Error('mavebot cannot edit the benched role because it is above mavebot in the role list.');
+  }
+
+  if (role.color !== BENCHED_ROLE_COLOR || role.name !== BENCHED_ROLE_NAME) {
+    role = await role.edit({
+      name: BENCHED_ROLE_NAME,
+      color: BENCHED_ROLE_COLOR,
+      reason: 'mavebot /bench role color'
+    });
+  }
+
+  const desiredPosition = Math.max(1, botMember.roles.highest.position - 1);
+  if (role.position < desiredPosition) {
+    try {
+      role = await role.setPosition(desiredPosition, 'mavebot /bench role color priority');
+    } catch (error) {
+      console.warn('Could not raise benched role position:', error);
+    }
+  }
+
+  if (role.position >= botMember.roles.highest.position) {
+    throw new Error('The benched role is above mavebot, so mavebot cannot assign it.');
+  }
+
+  return role;
+}
+
+async function ensureCanBench(interaction, targetMember) {
+  const botMember = await fetchBotMember(interaction.guild);
+  if (targetMember.id === botMember.id) {
+    throw new Error('mavebot cannot vote against itself.');
+  }
+  if (!targetMember.manageable) {
+    throw new Error('mavebot cannot bench that member because their role is too high or protected.');
+  }
+  return ensureBenchedRole(interaction.guild);
+}
+
+async function handleElderCommand(interaction) {
+  if (!interaction.guildId || !interaction.guild) {
+    await interaction.reply({
+      content: '/elder only works inside a Discord server.',
+      ephemeral: true
+    });
+    return;
+  }
+
+  if (!(await canManageElders(interaction))) {
+    await interaction.reply({
+      content: 'Only server admins or existing elders can grant elder commands.',
+      ephemeral: true
+    });
+    return;
+  }
+
+  const targetUser = interaction.options.getUser('user', true);
+  if (targetUser.bot) {
+    await interaction.reply({
+      content: 'Bots do not need elder commands.',
+      ephemeral: true
+    });
+    return;
+  }
+
+  const result = await grantElder(interaction.guildId, targetUser, interaction.user, {
+    storePath: moderationStorePath()
+  });
+  const description = result.alreadyElder
+    ? `${userMention(targetUser.id)} is already an elder. They can use /mute and /bench.`
+    : `${userMention(targetUser.id)} is now an elder. They can use /mute and /bench.`;
+  const embed = new EmbedBuilder()
+    .setColor(0xd4af37)
+    .setTitle('Elder granted')
+    .setDescription(description)
+    .setFooter({ text: 'Elder commands use 3 unique votes before applying.' })
+    .setTimestamp();
+
+  await interaction.reply({ embeds: [embed] });
+}
+
+async function handleModerationVoteCommand(interaction, action) {
+  if (!interaction.guildId || !interaction.guild) {
+    await interaction.reply({
+      content: `/${action} only works inside a Discord server.`,
+      ephemeral: true
+    });
+    return;
+  }
+
+  if (!(await canUseElderVote(interaction))) {
+    await interaction.reply({
+      content: `Only elders can use /${action}. Ask a server admin or elder to run /elder for you.`,
+      ephemeral: true
+    });
+    return;
+  }
+
+  const targetUser = interaction.options.getUser('user', true);
+  if (targetUser.id === interaction.user.id) {
+    await interaction.reply({
+      content: `You cannot /${action} yourself.`,
+      ephemeral: true
+    });
+    return;
+  }
+  if (targetUser.bot) {
+    await interaction.reply({
+      content: `/${action} votes are only for server members, not bots.`,
+      ephemeral: true
+    });
+    return;
+  }
+
+  await interaction.deferReply();
+
+  try {
+    const targetMember = await fetchGuildMember(interaction, targetUser);
+    let benchedRole = null;
+    if (action === 'mute') {
+      await ensureCanTimeout(interaction, targetMember);
+    } else {
+      benchedRole = await ensureCanBench(interaction, targetMember);
+    }
+
+    const vote = await submitModerationVote(action, interaction.guildId, targetUser, interaction.user, {
+      storePath: moderationStorePath()
+    });
+    const activeVote = vote.completed ? null : vote.activeVote;
+
+    if (!vote.completed) {
+      const description = vote.duplicate
+        ? `${userMention(interaction.user.id)} already voted to ${action} ${userMention(targetUser.id)}.`
+        : `${userMention(interaction.user.id)} voted to ${action} ${userMention(targetUser.id)}.`;
+      await interaction.editReply({
+        embeds: [
+          buildModerationEmbed({
+            title: `/${action} vote: ${vote.voteCount}/${vote.threshold}`,
+            description,
+            targetUser,
+            record: vote.record,
+            activeVote
+          })
+        ]
+      });
+      return;
+    }
+
+    const reason = moderationReason(action, targetUser, interaction.user);
+    if (action === 'mute') {
+      let result;
+      try {
+        await targetMember.timeout(MUTE_DURATION_MS, reason);
+        result = await recordModerationOutcome('mute', interaction.guildId, targetUser, 'success', {
+          storePath: moderationStorePath(),
+          reason,
+          actorUser: interaction.user
+        });
+      } catch (applyError) {
+        await recordModerationOutcome('mute', interaction.guildId, targetUser, 'failed', {
+          storePath: moderationStorePath(),
+          reason: applyError?.message || reason,
+          actorUser: interaction.user
+        });
+        throw applyError;
+      }
+      await interaction.editReply({
+        embeds: [
+          buildModerationEmbed({
+            title: '/mute vote passed',
+            description: `${userMention(targetUser.id)} is muted for 5 minutes after ${vote.threshold}/${vote.threshold} elder votes.`,
+            targetUser,
+            record: result.record,
+            color: 0xe06c75
+          })
+        ]
+      });
+      return;
+    }
+
+    let result;
+    try {
+      await targetMember.roles.add(benchedRole, reason);
+      result = await recordModerationOutcome('bench', interaction.guildId, targetUser, 'success', {
+        storePath: moderationStorePath(),
+        reason,
+        actorUser: interaction.user
+      });
+    } catch (applyError) {
+      await recordModerationOutcome('bench', interaction.guildId, targetUser, 'failed', {
+        storePath: moderationStorePath(),
+        reason: applyError?.message || reason,
+        actorUser: interaction.user
+      });
+      throw applyError;
+    }
+    await interaction.editReply({
+      embeds: [
+        buildModerationEmbed({
+          title: '/bench vote passed',
+          description: `${userMention(targetUser.id)} now has the ${BENCHED_ROLE_NAME} role after ${vote.threshold}/${vote.threshold} elder votes.`,
+          targetUser,
+          record: result.record,
+          color: BENCHED_ROLE_COLOR
+        })
+      ]
+    });
+  } catch (error) {
+    console.error(`/${action} command failed:`, error);
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply(String(error?.message || `I could not run /${action} right now.`));
+    } else {
+      await interaction.reply({
+        content: String(error?.message || `I could not run /${action} right now.`),
+        ephemeral: true
+      });
+    }
+  }
 }
 
 function pageComponents(view, activePageId, { disabled = false, customIdPrefix = 'player' } = {}) {
@@ -346,6 +679,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.editReply(message);
       console.error('Legend tracker command failed:', error);
     }
+    return;
+  }
+
+  if (interaction.commandName === 'elder') {
+    await handleElderCommand(interaction);
+    return;
+  }
+
+  if (interaction.commandName === 'mute') {
+    await handleModerationVoteCommand(interaction, 'mute');
+    return;
+  }
+
+  if (interaction.commandName === 'bench') {
+    await handleModerationVoteCommand(interaction, 'bench');
   }
 });
 

@@ -54,3 +54,38 @@ test('legends command is guild-install only and requires a player tag option', (
     }
   ]);
 });
+
+test('elder command is guild-install only and selects a Discord user', () => {
+  const elder = commands.find((command) => command.name === 'elder');
+
+  assert.ok(elder);
+  assert.match(elder.description, /elder vote commands/i);
+  assert.deepEqual(elder.integration_types, [0]);
+  assert.deepEqual(elder.contexts, [0]);
+  assert.deepEqual(elder.options, [
+    {
+      name: 'user',
+      description: 'Discord user to make an elder.',
+      type: ApplicationCommandOptionType.User,
+      required: true
+    }
+  ]);
+});
+
+test('elder vote commands are guild-install only and select Discord users', () => {
+  for (const name of ['mute', 'bench']) {
+    const command = commands.find((candidate) => candidate.name === name);
+
+    assert.ok(command);
+    assert.deepEqual(command.integration_types, [0]);
+    assert.deepEqual(command.contexts, [0]);
+    assert.deepEqual(command.options, [
+      {
+        name: 'user',
+        description: 'Discord user to vote against.',
+        type: ApplicationCommandOptionType.User,
+        required: true
+      }
+    ]);
+  }
+});
