@@ -85,14 +85,11 @@ const userScopes =
   process.env.SLACK_USER_SCOPES || 'chat:write';
 
 const workingMessages = [
-  'On it. I will bring it back here.',
-  'I am on it. Tiny heart engine running.',
-  'Got it. I am checking the repo now.',
-  'Working on it for you now.',
-  'I will check this and come right back.',
-  'On it. Keeping everything right here in #bot.',
-  'I am looking now. Soft little focus mode.',
-  'Got you. I will make this feel like a real session.'
+  'On it.',
+  'Got it, checking now.',
+  'I am looking.',
+  'Working on it.',
+  'I will handle it.'
 ];
 
 let messageCount = 0;

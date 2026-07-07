@@ -37,6 +37,8 @@ const slackMemoryPath =
   process.env.SLACK_MEMORY_PATH || '/shared/slack-memory.jsonl';
 const slackBotToken = process.env.SLACK_BOT_TOKEN || '';
 const slackChannelId = process.env.SLACK_CHANNEL_ID || '';
+const discordBotToken = process.env.DISCORD_TOKEN || '';
+const discordCodexChannelId = process.env.DISCORD_CODEX_CHANNEL_ID || '';
 const workerName = process.env.SLACK_WORKER_NAME || 'mavebot';
 const codexBin = process.env.CODEX_BIN || 'codex';
 const codexModel = process.env.CODEX_MODEL || process.env.SLACK_WORKER_CODEX_MODEL || '';
@@ -127,7 +129,7 @@ function workerFailureMessage(error) {
     return [
       "I hit a server setup blocker: mavebot's Codex login on the server is expired.",
       '',
-      'Slack is receiving jobs, but the server-side Codex CLI cannot start work until CODEX_HOME is re-authenticated.',
+      'Messages are reaching the server, but Codex cannot start work until CODEX_HOME is re-authenticated.',
       'I saved the failed job and context so it can be retried after login is fixed.'
     ].join('\n');
   }
@@ -300,6 +302,42 @@ async function postSlackMessage(text) {
     throw new Error(`chat.postMessage failed: ${result.error || 'unknown error'}`);
   }
   return result;
+}
+
+async function postDiscordMessage({ channel, text }) {
+  const targetChannel = channel || discordCodexChannelId;
+  if (!discordBotToken || !targetChannel) {
+    console.log('Discord post skipped: missing bot token or channel id.');
+    console.log(redact(text));
+    return null;
+  }
+
+  const response = await fetchWithTimeout(
+    `https://discord.com/api/v10/channels/${encodeURIComponent(targetChannel)}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bot ${discordBotToken}`,
+        'Content-Type': 'application/json; charset=utf-8'
+      },
+      body: JSON.stringify({
+        content: truncate(text, 1900),
+        allowed_mentions: { parse: [] }
+      })
+    }
+  );
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(`Discord message failed: ${result?.message || response.statusText}`);
+  }
+  return result;
+}
+
+async function postJobMessage(job, text) {
+  if (job?.source === 'discord') {
+    return postDiscordMessage({ channel: job.channel, text });
+  }
+  return postSlackMessage(text);
 }
 
 function githubToken() {
@@ -583,12 +621,16 @@ async function readSlackMemoryTail(limit = 20) {
 }
 
 function promptHeader(job) {
+  const source = job.source === 'discord' ? 'Discord' : 'Slack';
   return [
     'You are the server-side mavebot Codex runner.',
     '',
-    'Active Slack request. This is the only task for this run:',
+    `Active ${source} request. This is the only task for this run:`,
     JSON.stringify({
+      source: job.source || 'slack',
       user: job.user || 'unknown',
+      username: job.username || '',
+      guildId: job.guildId || '',
       channel: job.channel || slackChannelId,
       ts: job.ts || '',
       text: job.text || ''
@@ -607,7 +649,8 @@ function promptHeader(job) {
     '- Discord moderation, role, timeout, or permission features must call out remaining live Discord limits, especially role hierarchy, in the final answer.',
     '- Durable JSON state under /shared must have an explicit env path and deploy initialization/chown rule.',
     '- Keep mavebot isolated from Chatwoot, Bookkeeper, nginx, and unrelated apps.',
-    '- Final answer should be concise and suitable to post directly in Slack as mavebot.',
+    '- Final answer should be plain, short, and suitable to post directly as mavebot. Talk like a helpful person, not a deployment log.',
+    '- Do not include commit hashes, test counts, or health-check details in the final answer unless something failed or needs user action.',
     ''
   ].join('\n');
 }
@@ -857,38 +900,41 @@ function finalSlackMessage({ codexMessage, checkOk, pushResult, deployResult, ru
   const cleaned = stripSlackLinks(codexMessage);
   if (cleaned) {
     lines.push(cleaned);
-    lines.push('');
   }
 
+  const deployOk = !pushResult.pushed || deployResult.matched;
+  const runtimeOk = runtime.botOk && runtime.bridgeOk;
+
+  if (checkOk && deployOk && runtimeOk) {
+    lines.push(pushResult.pushed ? 'Done and live.' : 'Done.');
+    return truncate(lines.filter(Boolean).join('\n\n'), 1900);
+  }
+
+  if (!checkOk) {
+    lines.push('I made progress, but the checks did not finish cleanly.');
+  }
   if (pushResult.pushed) {
-    lines.push(`Pushed to main: ${pushResult.commit}.`);
+    if (!deployResult.matched) {
+      lines.push(`I pushed the change, but I could not confirm it is live yet: ${deployResult.reason}.`);
+    }
   } else {
-    lines.push('No repo changes were needed.');
+    lines.push('No code changes were needed.');
+  }
+  if (!runtimeOk) {
+    lines.push(`Health check needs attention: Discord ${runtime.botOk ? 'ok' : 'not ok'}, Slack bridge ${runtime.bridgeOk ? 'ok' : 'not ok'}.`);
   }
 
-  lines.push(checkOk ? 'Checks passed.' : 'Checks did not complete.');
-  if (pushResult.pushed) {
-    lines.push(
-      deployResult.matched
-        ? `Server deploy picked it up: ${deployResult.commit}.`
-        : `Server deploy not confirmed yet: ${deployResult.reason}.`
-    );
-  }
-  lines.push(
-    `Runtime health: Discord ${runtime.botOk ? 'ok' : 'not ok'}, Slack bridge ${runtime.bridgeOk ? 'ok' : 'not ok'}.`
-  );
-
-  return truncate(lines.join('\n'), 3500);
+  return truncate(lines.filter(Boolean).join('\n\n'), 1900);
 }
 
 async function handleJob(claimed) {
   const { job, path: jobPath } = claimed;
-  console.log(`Processing Slack job ${job.id}: ${truncate(job.text, 120)}`);
+  console.log(`Processing ${job.source || 'slack'} job ${job.id}: ${truncate(job.text, 120)}`);
 
   let contextSnapshot = await appendTurn({
     at: new Date().toISOString(),
     role: 'user',
-    user: job.user || 'unknown',
+    user: job.username || job.user || 'unknown',
     jobId: job.id,
     text: job.text || ''
   });
@@ -921,10 +967,10 @@ async function handleJob(claimed) {
     });
     let slackPostError = '';
     try {
-      await postSlackMessage(slackText);
+      await postJobMessage(job, slackText);
     } catch (postError) {
       slackPostError = truncate(redact(postError.message || postError), 1000);
-      console.error(`Final Slack post failed: ${slackPostError}`);
+      console.error(`Final message post failed: ${slackPostError}`);
     }
     await moveJob(jobPath, doneDir, job, {
       completedAt: new Date().toISOString(),
@@ -943,8 +989,8 @@ async function handleJob(claimed) {
       jobId: job.id,
       text: message
     });
-    await postSlackMessage(message).catch((postError) => {
-      console.error(`Failed to post Slack error: ${redact(postError.message)}`);
+    await postJobMessage(job, message).catch((postError) => {
+      console.error(`Failed to post job error: ${redact(postError.message)}`);
     });
     await moveJob(jobPath, failedDir, job, {
       failedAt: new Date().toISOString(),

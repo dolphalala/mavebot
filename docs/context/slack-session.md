@@ -9,8 +9,11 @@ future tasks should know.
 
 ### Current Goal
 
-- Make Slack `#bot` feel like the main mavebot working session.
+- Make Slack `#bot` and Discord `#codex` feel like normal mavebot working
+  sessions.
 - Users should be able to speak normally in `#bot` without tagging `@Codex`.
+- Discord users should be able to speak normally in `#codex` without tagging
+  mavebot.
 - mavebot should post the visible channel replies. The preferred backend for
   repo tasks is now the server-side `codex-worker` container, not the official
   Codex Slack app.
@@ -24,15 +27,24 @@ future tasks should know.
 - Use `SLACK_CODEX_FORWARD_MODE=worker` so there is no official Codex trigger
   channel, long hidden prompt, task card, wrong-environment text, or ChatGPT
   promo copy in `#bot`.
-- Brief "working" status messages should sound like mavebot, not Codex.
+- Discord channel `1523893930993778698` is the Discord `#codex` control
+  channel. Any non-bot user message there should create a server-side worker
+  job and receive the final answer in the same Discord channel. This requires
+  Discord Developer Portal Message Content Intent; runtime auto-detects the
+  flag and stays online with a setup note if it is still off.
+- Brief "working" status messages should be short and human, not technical.
 - Keep replies in the main channel whenever possible so users do not have to
   open Slack thread replies to follow the session.
+- Keep Discord replies in `#codex` as normal channel messages.
 - Do not tell Allen a code change is live just because a Codex cloud task
   changed files in its workspace. The server deploy path follows GitHub
   `origin/main`; if a task only creates a PR or branch, say it is not deployed.
 - Worker jobs should make repo changes in the worker checkout, run checks,
   commit, push `origin/main`, then wait for the server poll deploy to pull that
   commit before reporting deployment success.
+- Final worker answers should be plain language. Avoid commit hashes, test
+  counts, and health-check details unless something failed or needs user
+  action.
 - Worker memory lives in
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/`. `transcript.jsonl`
   is append-only and `summary.md` plus `recent.md` keep future prompts bounded.

@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 import {
   ActionRowBuilder,
+  ApplicationFlagsBitField,
   AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -40,10 +41,25 @@ import {
   submitModerationVote
 } from './moderation-store.mjs';
 import { playerArmyAssetNames, renderPlayerArmyCard } from './player-card.mjs';
+import {
+  DEFAULT_DISCORD_CODEX_JOB_DIR,
+  buildDiscordCodexWorkerJob,
+  enqueueDiscordCodexWorkerJob,
+  randomWorkingMessage,
+  shouldHandleDiscordCodexMessage
+} from './discord-codex-control.mjs';
 
 const token = process.env.DISCORD_TOKEN;
 const healthHost = process.env.HEALTH_HOST || '0.0.0.0';
 const healthPort = Number.parseInt(process.env.HEALTH_PORT || '4188', 10);
+const discordCodexChannelId = process.env.DISCORD_CODEX_CHANNEL_ID || '';
+const discordCodexWorkerJobDir =
+  process.env.DISCORD_CODEX_WORKER_JOB_DIR ||
+  process.env.SLACK_CODEX_WORKER_JOB_DIR ||
+  process.env.SLACK_WORKER_JOB_DIR ||
+  DEFAULT_DISCORD_CODEX_JOB_DIR;
+const discordMessageContentIntentPreference =
+  process.env.DISCORD_MESSAGE_CONTENT_INTENT || 'auto';
 const configuredLegendsIntervalMs = Number.parseInt(
   process.env.LEGENDS_TRACK_INTERVAL_MS || '',
   10
@@ -59,12 +75,47 @@ if (!token) {
 
 let ready = false;
 let readyUser = null;
+let discordCodexMessageCount = 0;
+let discordCodexLastMessageAt = null;
+let discordCodexIntentWarningSent = false;
+
+async function detectMessageContentIntentAvailable() {
+  if (!discordCodexChannelId || discordMessageContentIntentPreference === '0') {
+    return false;
+  }
+  if (discordMessageContentIntentPreference === '1') {
+    return true;
+  }
+
+  try {
+    const response = await fetch('https://discord.com/api/v10/applications/@me', {
+      headers: { Authorization: `Bot ${token}` }
+    });
+    const application = await response.json();
+    const flags = Number(application.flags || 0);
+    return Boolean(flags & ApplicationFlagsBitField.Flags.GatewayMessageContent);
+  } catch (error) {
+    console.warn('Could not detect Discord Message Content Intent:', error);
+    return false;
+  }
+}
+
+const discordMessageContentIntentAvailable =
+  await detectMessageContentIntentAvailable();
+const discordMessageContentIntentRequested =
+  Boolean(discordCodexChannelId && discordMessageContentIntentAvailable);
 
 const app = express();
 app.get('/healthz', (_req, res) => {
   res.status(ready ? 200 : 503).json({
     ok: ready,
     botUser: readyUser,
+    discordCodexChannelIdConfigured: Boolean(discordCodexChannelId),
+    discordMessageContentIntentAvailable,
+    discordMessageContentIntentRequested,
+    discordCodexWorkerJobDir,
+    discordCodexMessageCount,
+    discordCodexLastMessageAt,
     uptimeSec: Math.floor(process.uptime())
   });
 });
@@ -73,7 +124,13 @@ const healthServer = app.listen(healthPort, healthHost, () => {
   console.log(`Health endpoint listening on ${healthHost}:${healthPort}.`);
 });
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    ...(discordMessageContentIntentRequested ? [GatewayIntentBits.MessageContent] : [])
+  ]
+});
 const playerViews = new Map();
 const legendsViews = new Map();
 const playerViewTtlMs = 15 * 60 * 1000;
@@ -553,6 +610,48 @@ client.once(Events.ClientReady, (readyClient) => {
     storePath: legendsStorePath(),
     intervalMs: legendsIntervalMs
   });
+});
+
+client.on(Events.MessageCreate, async (message) => {
+  const isConfiguredCodexChannel =
+    Boolean(discordCodexChannelId) &&
+    message?.channelId === discordCodexChannelId &&
+    !message?.author?.bot &&
+    !message?.system &&
+    !message?.webhookId;
+  if (isConfiguredCodexChannel && !discordMessageContentIntentRequested) {
+    if (!discordCodexIntentWarningSent) {
+      discordCodexIntentWarningSent = true;
+      await message.channel.send({
+        content: 'I can see this channel, but I need Message Content Intent turned on before I can read messages here.',
+        allowedMentions: { parse: [] }
+      }).catch(() => {});
+    }
+    return;
+  }
+
+  if (!shouldHandleDiscordCodexMessage(message, discordCodexChannelId)) {
+    return;
+  }
+
+  try {
+    const job = buildDiscordCodexWorkerJob(message);
+    const result = await enqueueDiscordCodexWorkerJob(discordCodexWorkerJobDir, job);
+    if (result.queued) {
+      discordCodexMessageCount += 1;
+      discordCodexLastMessageAt = new Date().toISOString();
+      await message.channel.send({
+        content: randomWorkingMessage(),
+        allowedMentions: { parse: [] }
+      });
+    }
+  } catch (error) {
+    console.error('Discord Codex channel enqueue failed:', error);
+    await message.channel.send({
+      content: 'I could not start that yet. I saved the error in the server logs.',
+      allowedMentions: { parse: [] }
+    }).catch(() => {});
+  }
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

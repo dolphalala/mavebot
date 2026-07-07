@@ -15,6 +15,8 @@ services:
       LEGENDS_STORE_PATH: /shared/legends-tracking.json
       LEGENDS_TRACK_INTERVAL_MS: 120000
       ELDER_STORE_PATH: /shared/elder-votes.json
+      DISCORD_CODEX_CHANNEL_ID: "1523893930993778698"
+      DISCORD_CODEX_WORKER_JOB_DIR: /shared/codex-worker/jobs
     volumes:
       - /opt/urba-apps/discord-bot/shared:/shared
     ports:
@@ -83,10 +85,12 @@ services:
     container_name: urba-codex-worker
     restart: unless-stopped
     env_file:
+      - /opt/urba-apps/discord-bot/.env
       - /opt/urba-apps/discord-bot/slack-bridge.env
     environment:
       NODE_ENV: production
       CODEX_HOME: /codex-home
+      DISCORD_CODEX_CHANNEL_ID: "1523893930993778698"
       SLACK_WORKER_SHARED_DIR: /shared/codex-worker
       SLACK_WORKER_JOB_DIR: /shared/codex-worker/jobs
       SLACK_WORKER_CONTEXT_DIR: /shared/codex-worker/context

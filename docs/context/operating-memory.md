@@ -69,6 +69,14 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   `/opt/urba-apps/discord-bot/shared/codex-worker/jobs`; the worker runs Codex
   CLI in `/opt/urba-apps/discord-bot/shared/codex-worker/repo`, commits, pushes
   `origin/main`, and waits for the 30-second poll deploy to pull that commit.
+- Discord channel-to-code uses the same worker queue. Normal messages from
+  non-bot users in Discord channel `1523893930993778698` (`#codex`) become
+  JSON jobs in `/opt/urba-apps/discord-bot/shared/codex-worker/jobs`, and the
+  worker posts the final answer back into that Discord channel. This requires
+  the Discord Developer Portal Message Content Intent because users are not
+  tagging mavebot. The bot auto-detects whether that intent is enabled; if it
+  is disabled, the bot remains online and posts a one-time setup note in
+  `#codex` instead of crashing.
 - The deploy script builds `discord-bot`, `slack-bridge`, and `codex-worker`.
   It recreates `codex-worker` only when no worker job is active; if a job is in
   `processing`, it writes `shared/codex-worker/restart-needed` and the poll
@@ -107,15 +115,16 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   session by itself.
 - A custom Slack bridge stores channel memory in
   `/opt/urba-apps/discord-bot/shared/slack-memory.jsonl`.
-- The current preferred Slack bridge mode is `SLACK_CODEX_FORWARD_MODE=worker`.
-  In this mode there is no official `@Codex` forwarding, no per-user Slack
-  OAuth requirement, no task-card mirroring, and any human in #bot can trigger
-  the server runner.
+- The current preferred control mode is the server-side worker queue. Slack
+  uses `SLACK_CODEX_FORWARD_MODE=worker`; Discord uses
+  `DISCORD_CODEX_CHANNEL_ID`. In this mode there is no official `@Codex`
+  forwarding, no per-user Slack OAuth requirement, no task-card mirroring, and
+  any human in the configured control channel can trigger the server runner.
 - Worker-side durable context is stored under
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/`:
   `transcript.jsonl` is append-only, while `summary.md`, `recent.md`, and
   `session.md` are regenerated after each turn to keep prompts bounded.
-- Worker prompts put the active Slack request before compacted memory. Older
+- Worker prompts put the active Slack/Discord request before compacted memory. Older
   memory is background context only and must not override the current request.
 - Worker prompts also include bounded extra files from `docs/context/*.md`, such
   as `docs/context/clash-ui-guidance.md`. Add focused context docs there when
