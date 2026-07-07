@@ -106,6 +106,7 @@ const workingMessages = [
   'Working on it.',
   'I will handle it.'
 ];
+const supportedHumanSlackEventTypes = new Set(['message', 'app_mention', 'file_shared']);
 
 let messageCount = 0;
 let lastEventAt = null;
@@ -319,10 +320,69 @@ async function saveUserToken({ userId, teamId, accessToken, scopes }) {
   await writeUserTokens(tokens);
 }
 
-function slackEventFiles(event) {
+function firstString(...values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+    if (Array.isArray(value)) {
+      const nested = firstString(...value);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+  return '';
+}
+
+export function normalizeSlackEvent(event = {}, payload = {}) {
+  const normalized = { ...event };
+  normalized.team ||= payload.team_id || '';
+  normalized.channel = firstString(
+    normalized.channel,
+    normalized.channel_id,
+    normalized.channel?.id,
+    normalized.item?.channel,
+    normalized.file?.channels,
+    normalized.file?.groups,
+    normalized.file?.ims
+  );
+  normalized.user = firstString(
+    normalized.user,
+    normalized.user_id,
+    normalized.file?.user
+  );
+  normalized.ts = firstString(
+    normalized.ts,
+    normalized.event_ts,
+    normalized.message?.ts,
+    normalized.file?.timestamp ? String(normalized.file.timestamp) : ''
+  );
+  normalized.text ||= normalized.message?.text || '';
+  return normalized;
+}
+
+export function isSupportedHumanSlackEvent(event = {}) {
+  if (!supportedHumanSlackEventTypes.has(event.type)) {
+    return false;
+  }
+  if (event.bot_id) {
+    return false;
+  }
+  if (event.type === 'file_shared') {
+    return Boolean(event.file_id || event.file?.id);
+  }
+  return !event.subtype || event.subtype === 'file_share';
+}
+
+export function slackEventFiles(event) {
   const files = Array.isArray(event?.files) ? [...event.files] : [];
   if (event?.file && !files.some((file) => file?.id === event.file.id)) {
     files.push(event.file);
+  }
+  const fileId = firstString(event?.file_id, event?.file?.id);
+  if (fileId && !files.some((file) => file?.id === fileId)) {
+    files.push({ id: fileId });
   }
   return files.filter(Boolean);
 }
@@ -358,7 +418,10 @@ async function downloadSlackFile(file, { channel, ts, index }) {
   const reference = baseSlackFileReference(file);
   const url = slackFileDownloadUrl(file);
   if (!url) {
-    return { ...reference, downloadError: 'Slack did not provide a downloadable file URL.' };
+    return {
+      ...reference,
+      downloadError: file?.downloadError || 'Slack did not provide a downloadable file URL.'
+    };
   }
   if (!botToken) {
     return { ...reference, downloadError: 'SLACK_BOT_TOKEN is not configured.' };
@@ -411,8 +474,69 @@ async function downloadSlackFile(file, { channel, ts, index }) {
   }
 }
 
-async function materializeSlackFiles(event) {
+function needsSlackFileInfo(file) {
+  return Boolean(
+    file?.id &&
+      !slackFileDownloadUrl(file) &&
+      !file?.downloadError &&
+      !file?.permalink &&
+      !file?.mimetype &&
+      !file?.filetype
+  );
+}
+
+async function fetchSlackFileInfo(fileId) {
+  if (!botToken) {
+    return {
+      id: fileId,
+      downloadError: 'SLACK_BOT_TOKEN is not configured, so Slack file metadata could not be fetched.'
+    };
+  }
+
+  try {
+    const response = await fetch('https://slack.com/api/files.info', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${botToken}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({ file: fileId })
+    });
+    const result = await response.json();
+    if (!result.ok || !result.file) {
+      return {
+        id: fileId,
+        downloadError: `Slack files.info failed: ${result.error || `HTTP ${response.status}`}.`
+      };
+    }
+    return result.file;
+  } catch (error) {
+    return {
+      id: fileId,
+      downloadError: `Slack files.info failed: ${error?.message || error}.`
+    };
+  }
+}
+
+async function resolveSlackEventFiles(event) {
   const files = slackEventFiles(event);
+  if (!files.length) {
+    return [];
+  }
+
+  return Promise.all(
+    files.map(async (file) => {
+      if (!needsSlackFileInfo(file)) {
+        return file;
+      }
+      const detailed = await fetchSlackFileInfo(file.id);
+      return { ...file, ...detailed };
+    })
+  );
+}
+
+async function materializeSlackFiles(event) {
+  const files = await resolveSlackEventFiles(event);
   if (!files.length) {
     return [];
   }
@@ -1441,11 +1565,10 @@ function isBridgeForward(event) {
 }
 
 async function handleSlackEvent(payload) {
-  const event = payload.event;
-  if (!event || !['message', 'app_mention'].includes(event.type)) {
+  const event = normalizeSlackEvent(payload.event, payload);
+  if (!event || !isSupportedHumanSlackEvent(event)) {
     return;
   }
-  event.team ||= payload.team_id;
 
   const isBotChannel = event.channel === channelId;
   const isCodexTriggerChannel = event.channel === codexTriggerChannelId;
@@ -1462,11 +1585,6 @@ async function handleSlackEvent(payload) {
   }
 
   if (isBridgeForward(event)) {
-    return;
-  }
-
-  const isHumanMessageSubtype = !event.subtype || event.subtype === 'file_share';
-  if (event.bot_id || !isHumanMessageSubtype) {
     return;
   }
 
@@ -1740,6 +1858,11 @@ app.get('/healthz', async (_req, res) => {
     codexDeleteForward,
     codexDeleteForwardDelayMs,
     codexMemoryLimit,
+    slackFileContextDir,
+    slackFileDownloadMaxBytes,
+    slackFileEventsSupported: ['message.file_share', 'file_shared'],
+    slackFileInfoLookup: true,
+    slackFileReadScopeRequired: true,
     codexUserIdConfigured: Boolean(codexUserId),
     codexEnvironment,
     codexRepository,

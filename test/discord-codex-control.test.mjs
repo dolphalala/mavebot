@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   buildDiscordCodexWorkerJob,
+  DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE,
+  discordCodexSetupBlocker,
   discordMessageToWorkerText,
   enqueueDiscordCodexWorkerJob,
   randomWorkingMessage,
@@ -93,4 +95,28 @@ test('enqueueDiscordCodexWorkerJob writes one private worker job', async (t) => 
 
 test('randomWorkingMessage can be deterministic for tests', () => {
   assert.equal(randomWorkingMessage(() => 0), 'On it.');
+});
+
+test('discordCodexSetupBlocker explains the required portal setting only when needed', () => {
+  assert.equal(
+    discordCodexSetupBlocker({
+      channelIdConfigured: true,
+      messageContentIntentRequested: false
+    }),
+    DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE
+  );
+  assert.equal(
+    discordCodexSetupBlocker({
+      channelIdConfigured: true,
+      messageContentIntentRequested: true
+    }),
+    ''
+  );
+  assert.equal(
+    discordCodexSetupBlocker({
+      channelIdConfigured: false,
+      messageContentIntentRequested: false
+    }),
+    ''
+  );
 });

@@ -128,9 +128,11 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   and old verification chatter.
 - Slack uploads from `#bot` are downloaded by the bridge into
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/slack-files/` and
-  referenced by local path in worker jobs. This requires the Slack bot token to
-  have `files:read`; if the scope is missing, jobs still include the Slack file
-  metadata plus a download error.
+  referenced by local path in worker jobs. The bridge handles both
+  `message.file_share` and standalone `file_shared` Slack events; file-id-only
+  events are resolved with Slack `files.info`. This requires the Slack bot token
+  to have `files:read`; if the scope is missing, jobs still include the Slack
+  file metadata plus a download error.
 - Worker prompts put the active Slack/Discord request before compacted memory.
   Older memory is background context only and must not override the current
   request.

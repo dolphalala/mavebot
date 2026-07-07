@@ -12,7 +12,10 @@ import {
   selectForwardMessageTsFromHistory,
   selectForwardForCodexEvent,
   isCodexStatusNoise,
+  isSupportedHumanSlackEvent,
+  normalizeSlackEvent,
   slackFilesToWorkerLines,
+  slackEventFiles,
   slackRowsToWorkerText
 } from '../src/slack-bridge.mjs';
 
@@ -146,6 +149,53 @@ test('Slack worker context formats uploaded files as local Codex-readable paths'
 
   assert.match(text, /read this screenshot/);
   assert.match(text, /local: \/shared\/codex-worker\/context\/slack-files\/C1\/123\/01-screen\.png/);
+});
+
+test('Slack standalone file_shared events are normalized into Codex-readable file context', () => {
+  const event = normalizeSlackEvent(
+    {
+      type: 'file_shared',
+      channel_id: 'C0BCG0T838B',
+      user_id: 'U1',
+      file_id: 'F123',
+      event_ts: '1783407000.123456'
+    },
+    { team_id: 'T1' }
+  );
+
+  assert.equal(event.team, 'T1');
+  assert.equal(event.channel, 'C0BCG0T838B');
+  assert.equal(event.user, 'U1');
+  assert.equal(event.ts, '1783407000.123456');
+  assert.equal(isSupportedHumanSlackEvent(event), true);
+  assert.deepEqual(slackEventFiles(event), [{ id: 'F123' }]);
+});
+
+test('Slack bot and unsupported message events are ignored before worker enqueue', () => {
+  assert.equal(
+    isSupportedHumanSlackEvent({
+      type: 'message',
+      bot_id: 'B1',
+      text: 'bot chatter'
+    }),
+    false
+  );
+  assert.equal(
+    isSupportedHumanSlackEvent({
+      type: 'message',
+      subtype: 'message_changed',
+      text: 'edited'
+    }),
+    false
+  );
+  assert.equal(
+    isSupportedHumanSlackEvent({
+      type: 'message',
+      subtype: 'file_share',
+      files: [{ id: 'F1' }]
+    }),
+    true
+  );
 });
 
 test('buildCodexWorkerJob bundles a Slack message burst with files and recent context', () => {

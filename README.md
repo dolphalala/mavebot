@@ -170,12 +170,14 @@ In Slack `Event Subscriptions`, enable events and subscribe the bot to:
 
 - `message.channels`
 - `app_mention`
+- `file_shared`
 
 For screenshots and uploads to become Codex context, add the bot token scope
 `files:read`, reinstall the Slack app, and keep the bot subscribed to channel
-messages. The bridge accepts `file_share` message events, downloads Slack files
-to `/shared/codex-worker/context/slack-files`, and includes those local paths in
-the worker job.
+messages. The bridge accepts both `file_share` message events and standalone
+`file_shared` file events, looks up file-id-only events with `files.info`,
+downloads Slack files to `/shared/codex-worker/context/slack-files`, and
+includes those local paths in the worker job.
 
 For Socket Mode, do not enter a Request URL.
 

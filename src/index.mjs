@@ -44,6 +44,7 @@ import { playerArmyAssetNames, renderPlayerArmyCard } from './player-card.mjs';
 import {
   DEFAULT_DISCORD_CODEX_JOB_DIR,
   buildDiscordCodexWorkerJob,
+  discordCodexSetupBlocker,
   enqueueDiscordCodexWorkerJob,
   randomWorkingMessage,
   shouldHandleDiscordCodexMessage
@@ -104,6 +105,10 @@ const discordMessageContentIntentAvailable =
   await detectMessageContentIntentAvailable();
 const discordMessageContentIntentRequested =
   Boolean(discordCodexChannelId && discordMessageContentIntentAvailable);
+const discordCodexSetupMessage = discordCodexSetupBlocker({
+  channelIdConfigured: Boolean(discordCodexChannelId),
+  messageContentIntentRequested: discordMessageContentIntentRequested
+});
 
 const app = express();
 app.get('/healthz', (_req, res) => {
@@ -113,6 +118,8 @@ app.get('/healthz', (_req, res) => {
     discordCodexChannelIdConfigured: Boolean(discordCodexChannelId),
     discordMessageContentIntentAvailable,
     discordMessageContentIntentRequested,
+    discordCodexSetupReady: Boolean(discordCodexChannelId && discordMessageContentIntentRequested),
+    discordCodexSetupMessage,
     discordCodexWorkerJobDir,
     discordCodexMessageCount,
     discordCodexLastMessageAt,
@@ -623,7 +630,7 @@ client.on(Events.MessageCreate, async (message) => {
     if (!discordCodexIntentWarningSent) {
       discordCodexIntentWarningSent = true;
       await message.channel.send({
-        content: 'I can see this channel, but I need Message Content Intent turned on before I can read messages here.',
+        content: discordCodexSetupMessage || 'I need Message Content Intent turned on before I can read messages here.',
         allowedMentions: { parse: [] }
       }).catch(() => {});
     }

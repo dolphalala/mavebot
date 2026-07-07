@@ -11,6 +11,8 @@ const workingMessages = [
   'Working on it.',
   'I will handle it.'
 ];
+export const DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE =
+  'Enable Message Content Intent in the Discord Developer Portal for mavebot, save it, then restart the bot so I can read normal messages in #codex.';
 
 function safeIdPart(value) {
   return String(value || 'missing')
@@ -20,6 +22,19 @@ function safeIdPart(value) {
 
 export function randomWorkingMessage(randomInt = crypto.randomInt) {
   return workingMessages[randomInt(workingMessages.length)];
+}
+
+export function discordCodexSetupBlocker({
+  channelIdConfigured,
+  messageContentIntentRequested
+} = {}) {
+  if (!channelIdConfigured) {
+    return '';
+  }
+  if (messageContentIntentRequested) {
+    return '';
+  }
+  return DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE;
 }
 
 export function discordMessageToWorkerText(message) {
