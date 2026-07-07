@@ -12,6 +12,7 @@ import {
   selectForwardMessageTsFromHistory,
   selectForwardForCodexEvent,
   isCodexStatusNoise,
+  hasSlackFilesReadScopeError,
   isSupportedHumanSlackEvent,
   normalizeSlackEvent,
   slackFilesToWorkerLines,
@@ -195,6 +196,27 @@ test('Slack bot and unsupported message events are ignored before worker enqueue
       files: [{ id: 'F1' }]
     }),
     true
+  );
+});
+
+test('hasSlackFilesReadScopeError detects Slack file permission failures', () => {
+  assert.equal(
+    hasSlackFilesReadScopeError([
+      {
+        name: 'screen.png',
+        downloadError: 'Slack files.info failed: missing_scope.'
+      }
+    ]),
+    true
+  );
+  assert.equal(
+    hasSlackFilesReadScopeError([
+      {
+        name: 'screen.png',
+        localPath: '/shared/codex-worker/context/slack-files/C/ts/01-screen.png'
+      }
+    ]),
+    false
   );
 });
 

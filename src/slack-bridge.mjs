@@ -117,6 +117,7 @@ let contextReadable = false;
 let bridgeStateQueue = Promise.resolve();
 const inFlightMirrors = new Set();
 const pendingWorkerJobs = new Map();
+let slackFilesReadScopeWarningSent = false;
 
 function hasSlackConfig() {
   if (socketMode) {
@@ -571,6 +572,12 @@ export function slackFilesToWorkerLines(files = []) {
       return `[${parts.join(' | ')}]`;
     })
     .filter(Boolean);
+}
+
+export function hasSlackFilesReadScopeError(files = []) {
+  return (files || []).some((file) =>
+    /(?:missing_scope|files:read)/i.test(String(file?.downloadError || ''))
+  );
 }
 
 export function slackRowsToWorkerText(rows = [], { currentUserId = '' } = {}) {
@@ -1589,6 +1596,17 @@ async function handleSlackEvent(payload) {
   }
 
   const rememberedRow = await rememberMessage(payload, event);
+  if (
+    Array.isArray(rememberedRow.files) &&
+    rememberedRow.files.length &&
+    hasSlackFilesReadScopeError(rememberedRow.files) &&
+    !slackFilesReadScopeWarningSent
+  ) {
+    slackFilesReadScopeWarningSent = true;
+    await postMessage({
+      text: 'I can see a file was uploaded, but Slack has not granted me `files:read` yet. Add `files:read` under OAuth & Permissions and reinstall mavebot so I can read screenshots.'
+    });
+  }
 
   if (codexForward) {
     await forwardToCodex(payload, event, rememberedRow);
