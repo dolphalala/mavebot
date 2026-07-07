@@ -69,12 +69,30 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
       source: 'discord',
       channel: '1523893930993778698',
       text: 'The Discord worker path is live.'
+    },
+    {
+      at: '2026-07-07T00:03:00.000Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'I hit a real blocker while running this on the server.'
+    },
+    {
+      at: '2026-07-07T00:04:00.000Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'Memory compaction is clean.'
     }
   ];
 
   assert.equal(isLowSignalTranscriptRow(rows[0]), false);
   assert.equal(isLowSignalTranscriptRow(rows[1]), true);
   assert.equal(isLowSignalTranscriptRow(rows[2]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[3]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[4]), true);
 
   const snapshot = compactTranscriptRows(rows, {
     recentLimit: 5,
@@ -85,7 +103,8 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.match(snapshot.recent, /make \/player show better army cards/);
   assert.doesNotMatch(snapshot.recent, /Smoke test from the local Codex app/);
   assert.doesNotMatch(snapshot.recent, /Discord worker path is live/);
-  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 2/);
+  assert.doesNotMatch(snapshot.recent, /Memory compaction is clean/);
+  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 4/);
 });
 
 test('buildCodexWorkerPrompt puts active Slack request before memory', () => {

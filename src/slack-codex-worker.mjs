@@ -487,7 +487,9 @@ export function isLowSignalTranscriptRow(row) {
     /worker autonomous auth fixed/,
     /worker autonomous final ok/,
     /discord worker path is live/,
-    /remote codex memory contract is live/
+    /remote codex memory contract is live/,
+    /memory compaction is clean/,
+    /i hit a real blocker while running this on the server/
   ].some((pattern) => pattern.test(text));
 }
 
