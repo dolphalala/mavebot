@@ -185,9 +185,10 @@ The worker keeps durable context in:
 
 `transcript.jsonl` is append-only. `summary.md` and `recent.md` are regenerated
 after each turn so prompts stay bounded while the channel still has memory.
-Repo-side durable guidance lives in `docs/context/operating-memory.md`,
-`docs/context/slack-session.md`, `docs/context/remote-codex-session.md`, and
-focused domain files such as `docs/context/clash-ui-guidance.md`.
+Repo-side durable guidance starts at `docs/context/README.md`, then
+`docs/context/operating-memory.md`, `docs/context/slack-session.md`,
+`docs/context/remote-codex-session.md`, `docs/context/code-map.md`, and focused
+domain files such as `docs/context/clash-ui-guidance.md`.
 
 Start or update the profiled worker service manually after code changes to the
 worker itself:

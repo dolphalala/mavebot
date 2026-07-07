@@ -3,9 +3,10 @@
 This project is the Vibe mirror for the Discord bot intended to run on the
 `urba-chatwoot` shared host at `/opt/urba-apps/discord-bot`.
 
-Before making changes, read `docs/context/operating-memory.md` for the current
-Discord app, server deploy, command registration, and Slack/Codex workflow
-context.
+Before making changes, read `docs/context/README.md` first, then
+`docs/context/operating-memory.md`, `docs/context/slack-session.md`, and any
+focused context file relevant to the task. Remote Slack/Discord Codex jobs use
+the same context surface, so keep it concise and current.
 
 ## Rules
 
@@ -15,6 +16,10 @@ context.
 - Keep this bot isolated from Chatwoot and Bookkeeper.
 - Do not edit nginx, Docker daemon settings, Chatwoot files, or existing app
   containers unless the user asks for that exact production action.
+- New slash commands must update both `src/commands.mjs` and the runtime
+  handler in `src/index.mjs`, with tests.
+- Durable server state belongs under `/shared/...` through explicit env-backed
+  paths and must be documented in `docs/context/operating-memory.md`.
 
 ## Checks
 

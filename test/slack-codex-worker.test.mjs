@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   buildCodexWorkerPrompt,
+  buildWorkerRuntimeSnapshot,
   checkUrl,
   compactTranscriptRows,
   isCodexAuthError,
@@ -117,6 +118,9 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
     },
     summary: 'old request: change /player',
     recent: 'recent request: check /ping',
+    repoInstructions: 'AGENTS instructions',
+    contextIndex: 'context map',
+    runtimeSnapshot: 'runtime snapshot',
     operatingMemory: 'operating memory',
     slackSession: 'slack session',
     repoContextBundle: 'clash ui guidance',
@@ -128,9 +132,20 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
     'active Slack request should be before compacted memory'
   );
   assert.ok(
+    prompt.indexOf('# Project AGENTS.md') < prompt.indexOf('# Worker Compacted Memory'),
+    'project instructions should be loaded before compacted memory'
+  );
+  assert.ok(
+    prompt.indexOf('# Context Map') < prompt.indexOf('# Worker Compacted Memory'),
+    'context map should be loaded before compacted memory'
+  );
+  assert.ok(
     prompt.indexOf('change /lana now') < prompt.indexOf('old request: change /player'),
     'active request text should come before older memory'
   );
+  assert.match(prompt, /AGENTS instructions/);
+  assert.match(prompt, /context map/);
+  assert.match(prompt, /runtime snapshot/);
   assert.match(prompt, /Do not commit or push/);
   assert.match(prompt, /persistent Codex session/);
   assert.match(prompt, /Be as capable as a local Codex Desktop session/);
@@ -138,6 +153,19 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /Discord command changes must update both src\/commands\.mjs and src\/index\.mjs/);
   assert.match(prompt, /# Extra Repo Context Files/);
   assert.match(prompt, /clash ui guidance/);
+});
+
+test('buildWorkerRuntimeSnapshot explains deploy and safety boundaries without secrets', () => {
+  const snapshot = buildWorkerRuntimeSnapshot({
+    source: 'discord',
+    channel: '1523893930993778698'
+  });
+
+  assert.match(snapshot, /origin\/main/);
+  assert.match(snapshot, /scripts\/deploy-server\.sh/);
+  assert.match(snapshot, /npm run check/);
+  assert.match(snapshot, /do not touch Chatwoot/);
+  assert.doesNotMatch(snapshot, /TOKEN|SECRET|xox|github_pat/i);
 });
 
 test('isCodexAuthError detects expired server-side Codex login failures', () => {
@@ -157,20 +185,28 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
 
   await writeFile(path.join(dir, 'operating-memory.md'), 'do not include this copy');
   await writeFile(path.join(dir, 'slack-session.md'), 'do not include this copy either');
+  await writeFile(path.join(dir, 'README.md'), 'do not include context map copy');
   await writeFile(path.join(dir, 'clash-ui-guidance.md'), '# Clash UI\nUse icon cards.');
   await writeFile(path.join(dir, 'remote-codex-session.md'), '# Remote Contract\nAct like a session.');
+  await writeFile(path.join(dir, 'code-map.md'), '# Code Map\nUpdate index and commands.');
   await writeFile(path.join(dir, 'z-extra.md'), '# Extra\nLess important.');
 
   const bundle = await readRepoContextBundle({ dir, maxChars: 1000 });
 
   assert.ok(
-    bundle.indexOf('## remote-codex-session.md') < bundle.indexOf('## clash-ui-guidance.md'),
-    'remote session contract should be loaded before domain guidance'
+    bundle.indexOf('## remote-codex-session.md') < bundle.indexOf('## code-map.md'),
+    'remote session contract should be loaded before source map'
+  );
+  assert.ok(
+    bundle.indexOf('## code-map.md') < bundle.indexOf('## clash-ui-guidance.md'),
+    'source map should be loaded before domain guidance'
   );
   assert.match(bundle, /Act like a session/);
+  assert.match(bundle, /Update index and commands/);
   assert.match(bundle, /## clash-ui-guidance\.md/);
   assert.match(bundle, /Use icon cards/);
   assert.doesNotMatch(bundle, /do not include this copy/);
+  assert.doesNotMatch(bundle, /do not include context map copy/);
 });
 
 test('slack-codex-worker can be imported from stdin module scripts', () => {

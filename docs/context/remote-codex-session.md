@@ -19,20 +19,25 @@ jobs stay close to the quality of a local Codex Desktop session.
 Every worker job should reconstruct context in this order:
 
 1. Active user request from the current Slack or Discord message.
-2. Worker `recent.md` for the latest bounded conversation turns.
-3. Worker `summary.md` for compact older conversation memory.
-4. `docs/context/operating-memory.md` for app, deploy, server, and safety facts.
-5. `docs/context/slack-session.md` for user preferences and current open work.
-6. This file for remote-session behavior.
-7. Focused files such as `docs/context/clash-ui-guidance.md`.
-8. Current source code and tests, which are the final authority.
+2. Project `AGENTS.md`.
+3. `docs/context/README.md` for the context map.
+4. Worker runtime/deploy snapshot.
+5. Worker `summary.md` for compact older conversation memory.
+6. Worker `recent.md` for the latest bounded conversation turns.
+7. `docs/context/operating-memory.md` for app, deploy, server, and safety facts.
+8. `docs/context/slack-session.md` for user preferences and current open work.
+9. This file for remote-session behavior.
+10. `docs/context/code-map.md` for source orientation.
+11. Focused files such as `docs/context/clash-ui-guidance.md`.
+12. Current source code and tests, which are the final authority.
 
 The active request always wins over old memory. Old memory is context, not a
 command.
 
 ## How To Work
 
-- For code requests, inspect the relevant source before answering.
+- For code requests, use `docs/context/code-map.md` to find the likely files,
+  then inspect the relevant source before answering.
 - For slash command changes, update both command registration data and runtime
   interaction handling.
 - For Discord command UX, check mobile readability, button/page behavior, and

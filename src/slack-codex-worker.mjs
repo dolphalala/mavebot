@@ -86,10 +86,11 @@ const sessionPath = path.join(contextDir, 'session.md');
 const repoContextDir = process.env.SLACK_WORKER_REPO_CONTEXT_DIR || path.join(repoDir, 'docs/context');
 const repoContextMaxChars = parsePositiveInt(
   process.env.SLACK_WORKER_REPO_CONTEXT_MAX_CHARS,
-  16000
+  24000
 );
 const repoContextPriority = [
   'remote-codex-session.md',
+  'code-map.md',
   'clash-ui-guidance.md'
 ];
 
@@ -619,7 +620,7 @@ async function readOptional(filePath) {
 export async function readRepoContextBundle({
   dir = repoContextDir,
   maxChars = repoContextMaxChars,
-  exclude = ['operating-memory.md', 'slack-session.md'],
+  exclude = ['README.md', 'operating-memory.md', 'slack-session.md'],
   priority = repoContextPriority
 } = {}) {
   const excludeSet = new Set(exclude);
@@ -659,6 +660,41 @@ export async function readRepoContextBundle({
   }
 
   return sections.join('\n').trim();
+}
+
+export function buildWorkerRuntimeSnapshot(job = {}) {
+  return JSON.stringify({
+    repository: repoUrl,
+    branch,
+    source: job.source || 'slack',
+    channel: job.channel || slackChannelId,
+    worker: {
+      sharedDir,
+      jobDir,
+      processingDir,
+      doneDir,
+      failedDir,
+      contextDir,
+      repoDir,
+      liveAppDir
+    },
+    deploy: {
+      target: `origin/${branch}`,
+      mechanism: 'server poll deploy pulls GitHub main and runs scripts/deploy-server.sh',
+      botHealthUrl,
+      bridgeHealthUrl
+    },
+    verification: [
+      'npm run check',
+      'Discord command registration/runtime handler match',
+      'server live commit check after push',
+      'health endpoints after deploy'
+    ],
+    boundaries: [
+      'mavebot repo and /opt/urba-apps/discord-bot only',
+      'do not touch Chatwoot, Bookkeeper, nginx, Docker daemon settings, or unrelated apps without exact user request'
+    ]
+  }, null, 2);
 }
 
 async function readSlackMemoryTail(limit = 20) {
@@ -713,6 +749,9 @@ export function buildCodexWorkerPrompt({
   job,
   summary = '',
   recent = '',
+  repoInstructions = '',
+  contextIndex = '',
+  runtimeSnapshot = '',
   operatingMemory = '',
   slackSession = '',
   repoContextBundle = '',
@@ -720,6 +759,15 @@ export function buildCodexWorkerPrompt({
 }) {
   return [
     promptHeader(job),
+    '# Project AGENTS.md',
+    repoInstructions || 'AGENTS.md was not readable.',
+    '',
+    '# Context Map',
+    contextIndex || 'docs/context/README.md was not readable.',
+    '',
+    '# Runtime And Deploy Snapshot',
+    runtimeSnapshot || buildWorkerRuntimeSnapshot(job),
+    '',
     '# Worker Compacted Memory',
     summary || 'No compacted memory yet.',
     '',
@@ -911,6 +959,8 @@ async function verifyRuntime() {
 }
 
 async function runCodex(job, contextSnapshot) {
+  const repoInstructions = await readOptional(path.join(repoDir, 'AGENTS.md'));
+  const contextIndex = await readOptional(path.join(repoDir, 'docs/context/README.md'));
   const operatingMemory = await readOptional(path.join(repoDir, 'docs/context/operating-memory.md'));
   const slackSession = await readOptional(path.join(repoDir, 'docs/context/slack-session.md'));
   const repoContextBundle = await readRepoContextBundle();
@@ -919,6 +969,9 @@ async function runCodex(job, contextSnapshot) {
     job,
     summary: contextSnapshot.summary,
     recent: contextSnapshot.recent,
+    repoInstructions,
+    contextIndex,
+    runtimeSnapshot: buildWorkerRuntimeSnapshot(job),
     operatingMemory,
     slackSession,
     repoContextBundle,
