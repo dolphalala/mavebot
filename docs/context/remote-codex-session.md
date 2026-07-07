@@ -59,6 +59,9 @@ The channel history will grow forever, so remote jobs must keep memory useful:
 - Worker `recent.md` and `summary.md` intentionally suppress setup smoke tests
   and verification chatter so future jobs do not waste prompt space on old
   infrastructure checks.
+- Worker `transcript.jsonl` is normalized history, not permanent raw chat
+  storage. Low-signal smoke/status rows should be pruned from the worker's
+  private memory after they have served their verification purpose.
 - Put domain rules in focused files under `docs/context/`, not in one giant
   catch-all file.
 - If a file gets noisy, restructure it and remove duplicated stale notes after

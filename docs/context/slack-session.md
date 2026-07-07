@@ -47,7 +47,8 @@ future tasks should know.
   action.
 - Worker memory lives in
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/`. `transcript.jsonl`
-  is append-only and `summary.md` plus `recent.md` keep future prompts bounded.
+  is normalized history, and `summary.md` plus `recent.md` keep future prompts
+  bounded.
 - `docs/context/remote-codex-session.md` is the durable behavior contract for
   making Slack `#bot` and Discord `#codex` feel like this local Codex Desktop
   session. Remote jobs should read it, follow it, and update focused context

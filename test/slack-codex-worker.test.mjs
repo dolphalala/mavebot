@@ -12,6 +12,7 @@ import {
   compactTranscriptRows,
   isCodexAuthError,
   isLowSignalTranscriptRow,
+  pruneTranscriptRowsForStorage,
   readRepoContextBundle
 } from '../src/slack-codex-worker.mjs';
 
@@ -106,6 +107,40 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.doesNotMatch(snapshot.recent, /Discord worker path is live/);
   assert.doesNotMatch(snapshot.recent, /Memory compaction is clean/);
   assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 4/);
+});
+
+test('pruneTranscriptRowsForStorage removes low-signal rows from durable storage', () => {
+  const rows = [
+    {
+      at: '2026-07-07T00:00:00.000Z',
+      role: 'user',
+      user: 'Allen',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'make /player show better army cards'
+    },
+    {
+      at: '2026-07-07T00:01:00.000Z',
+      role: 'user',
+      user: 'Codex smoke',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'Smoke test from the local Codex app. Do not change files.'
+    },
+    {
+      at: '2026-07-07T00:02:00.000Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'Memory compaction is clean.'
+    }
+  ];
+
+  assert.deepEqual(
+    pruneTranscriptRowsForStorage(rows).map((row) => row.text),
+    ['make /player show better army cards']
+  );
 });
 
 test('buildCodexWorkerPrompt puts active Slack request before memory', () => {

@@ -549,7 +549,7 @@ export function compactTranscriptRows(rows, options = {}) {
     '',
     `Generated: ${generatedAt}`,
     '',
-    'Use this file as the worker-side running memory for Slack and Discord jobs. The append-only source is transcript.jsonl, while summary.md and recent.md keep prompts bounded.',
+    'Use this file as the worker-side running memory for Slack and Discord jobs. The normalized source is transcript.jsonl, while summary.md and recent.md keep prompts bounded.',
     '',
     '## Current Session Shape',
     '',
@@ -576,6 +576,21 @@ export function compactTranscriptRows(rows, options = {}) {
   return { summary, recent, session };
 }
 
+export function pruneTranscriptRowsForStorage(rows) {
+  return rows.filter((row) => !isLowSignalTranscriptRow(row));
+}
+
+function serializeTranscriptRows(rows) {
+  if (!rows.length) {
+    return '';
+  }
+  return `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`;
+}
+
+async function writeTranscriptRows(rows) {
+  await writePrivateText(transcriptPath, serializeTranscriptRows(rows));
+}
+
 async function readTranscriptRows() {
   try {
     const content = await readFile(transcriptPath, 'utf8');
@@ -595,8 +610,15 @@ async function readTranscriptRows() {
   }
 }
 
-async function rebuildContextFiles() {
-  const rows = await readTranscriptRows();
+async function rebuildContextFiles({ pruneTranscript = false } = {}) {
+  let rows = await readTranscriptRows();
+  if (pruneTranscript) {
+    const prunedRows = pruneTranscriptRowsForStorage(rows);
+    if (prunedRows.length !== rows.length) {
+      await writeTranscriptRows(prunedRows);
+      rows = prunedRows;
+    }
+  }
   const snapshot = compactTranscriptRows(rows);
   await writePrivateText(summaryPath, snapshot.summary);
   await writePrivateText(recentPath, snapshot.recent);
@@ -606,7 +628,7 @@ async function rebuildContextFiles() {
 
 async function appendTurn(row) {
   await appendPrivateJsonl(transcriptPath, row);
-  return rebuildContextFiles();
+  return rebuildContextFiles({ pruneTranscript: true });
 }
 
 async function readOptional(filePath) {
@@ -1122,7 +1144,7 @@ async function handleJob(claimed) {
 
 async function loop() {
   await ensureDirectories();
-  await rebuildContextFiles();
+  await rebuildContextFiles({ pruneTranscript: true });
   console.log(`${workerName} Codex worker started. Watching ${jobDir}.`);
 
   for (;;) {
