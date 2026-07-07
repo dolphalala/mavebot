@@ -13,6 +13,8 @@ Minimal Dockerized Discord bot foundation for the shared `urba-chatwoot` host.
   support for no-domain Slack events
 - server-side Codex worker that turns normal `#bot` messages into Codex CLI
   jobs, keeps compacted Markdown memory, pushes `main`, and waits for deploy
+- Discord `#codex` control channel support that uses the same worker queue and
+  memory system as Slack
 - Docker Compose service named `urba-discord-bot`
 
 ## Local Checks
@@ -71,6 +73,7 @@ DISCORD_TOKEN=
 DISCORD_CLIENT_ID=1519063290058117170
 DISCORD_GUILD_ID=
 DISCORD_CLEAR_GUILD_COMMANDS_ID=
+DISCORD_CODEX_CHANNEL_ID=1523893930993778698
 COC_API_BASE_URL=https://api.clashofclans.com/v1
 COC_API_TOKEN=
 ```
@@ -97,6 +100,11 @@ Global command registration can take longer to appear in Discord.
 The Clash of Clans developer API token must be created for the server public IP
 `5.78.127.221` and stored only in the server `.env` file. The `/player` command
 uses that token to call the official Clash of Clans API.
+
+The Discord `#codex` channel control path requires Discord Developer Portal
+Message Content Intent because users type normal messages without tagging
+mavebot. The bot auto-detects whether that intent is enabled and stays online
+with a setup note if it is off.
 
 ## Slack Bridge
 
@@ -177,6 +185,9 @@ The worker keeps durable context in:
 
 `transcript.jsonl` is append-only. `summary.md` and `recent.md` are regenerated
 after each turn so prompts stay bounded while the channel still has memory.
+Repo-side durable guidance lives in `docs/context/operating-memory.md`,
+`docs/context/slack-session.md`, `docs/context/remote-codex-session.md`, and
+focused domain files such as `docs/context/clash-ui-guidance.md`.
 
 Start or update the profiled worker service manually after code changes to the
 worker itself:

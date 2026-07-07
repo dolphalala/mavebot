@@ -18,6 +18,8 @@ test('compactTranscriptRows keeps recent turns bounded and older turns summarize
     at: `2026-06-24T00:00:0${index}.000Z`,
     role: index % 2 === 0 ? 'user' : 'assistant',
     user: index % 2 === 0 ? `U${index}` : 'mavebot',
+    source: index % 2 === 0 ? 'discord' : 'slack',
+    channel: index % 2 === 0 ? '1523893930993778698' : 'C0BCG0T838B',
     text: `turn ${index}`
   }));
 
@@ -33,8 +35,12 @@ test('compactTranscriptRows keeps recent turns bounded and older turns summarize
   assert.doesNotMatch(snapshot.summary, /turn 0/);
   assert.match(snapshot.recent, /turn 4/);
   assert.match(snapshot.recent, /turn 5/);
+  assert.match(snapshot.recent, /\[discord\/1523893930993778698\]/);
+  assert.match(snapshot.recent, /\[slack\/C0BCG0T838B\]/);
   assert.doesNotMatch(snapshot.recent, /turn 3/);
   assert.match(snapshot.session, /Recent turn count included in prompts: 2/);
+  assert.match(snapshot.session, /Slack and Discord jobs/);
+  assert.match(snapshot.session, /Memory Maintenance/);
 });
 
 test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
@@ -62,6 +68,9 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
     'active request text should come before older memory'
   );
   assert.match(prompt, /Do not commit or push/);
+  assert.match(prompt, /persistent Codex session/);
+  assert.match(prompt, /Be as capable as a local Codex Desktop session/);
+  assert.match(prompt, /docs\/context\/remote-codex-session\.md/);
   assert.match(prompt, /Discord command changes must update both src\/commands\.mjs and src\/index\.mjs/);
   assert.match(prompt, /# Extra Repo Context Files/);
   assert.match(prompt, /clash ui guidance/);
@@ -85,9 +94,16 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   await writeFile(path.join(dir, 'operating-memory.md'), 'do not include this copy');
   await writeFile(path.join(dir, 'slack-session.md'), 'do not include this copy either');
   await writeFile(path.join(dir, 'clash-ui-guidance.md'), '# Clash UI\nUse icon cards.');
+  await writeFile(path.join(dir, 'remote-codex-session.md'), '# Remote Contract\nAct like a session.');
+  await writeFile(path.join(dir, 'z-extra.md'), '# Extra\nLess important.');
 
-  const bundle = await readRepoContextBundle({ dir, maxChars: 500 });
+  const bundle = await readRepoContextBundle({ dir, maxChars: 1000 });
 
+  assert.ok(
+    bundle.indexOf('## remote-codex-session.md') < bundle.indexOf('## clash-ui-guidance.md'),
+    'remote session contract should be loaded before domain guidance'
+  );
+  assert.match(bundle, /Act like a session/);
   assert.match(bundle, /## clash-ui-guidance\.md/);
   assert.match(bundle, /Use icon cards/);
   assert.doesNotMatch(bundle, /do not include this copy/);

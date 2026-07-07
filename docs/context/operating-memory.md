@@ -124,11 +124,16 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/`:
   `transcript.jsonl` is append-only, while `summary.md`, `recent.md`, and
   `session.md` are regenerated after each turn to keep prompts bounded.
-- Worker prompts put the active Slack/Discord request before compacted memory. Older
-  memory is background context only and must not override the current request.
+- Worker prompts put the active Slack/Discord request before compacted memory.
+  Older memory is background context only and must not override the current
+  request.
+- Remote channel jobs should behave like local Codex sessions for this repo:
+  inspect source, update files, run checks, push `origin/main`, wait for deploy,
+  verify live state, and answer plainly when the request needs real work.
 - Worker prompts also include bounded extra files from `docs/context/*.md`, such
-  as `docs/context/clash-ui-guidance.md`. Add focused context docs there when
-  the Slack agent needs durable domain guidance.
+  as `docs/context/remote-codex-session.md` and
+  `docs/context/clash-ui-guidance.md`. Add focused context docs there when the
+  Slack/Discord agent needs durable domain guidance.
 - The bridge should use Slack Socket Mode with `SLACK_APP_TOKEN` so Slack events
   arrive over an outbound WebSocket and no public domain is required.
 - The older fallback bridge mode can forward normal #bot user messages to the official Codex Slack
@@ -159,10 +164,12 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Forwarded Codex prompts should include recent saved `#bot` messages from
   bridge memory so Slack feels like a running session. The default prompt memory
   window is controlled by `SLACK_CODEX_MEMORY_LIMIT`.
-- Codex cloud tasks should treat `docs/context/slack-session.md` as durable
-  `#bot` session memory. Each task should read it after this file and update it
-  when a turn adds facts, decisions, open work, deployment changes, or user
-  preferences future tasks should know.
+- Remote worker tasks should treat `docs/context/slack-session.md` as durable
+  user preference and open-work memory, and
+  `docs/context/remote-codex-session.md` as the behavior contract for making
+  Slack/Discord feel like this local Codex session. Each task should update the
+  right context doc when a turn adds facts, decisions, open work, deployment
+  changes, or user preferences future tasks should know.
 - If Allen or Lana asks to reset/start a new session, create a new dated section
   in `docs/context/slack-session.md` instead of deleting older memory.
 - Per-user Slack user tokens are stored server-side at
@@ -180,9 +187,10 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - The intended default Codex cloud environment is `mavebot`, with
   `dolphalala/mavebot` as the target repo.
 - When Codex cloud or the server-side worker works on this repo, it should read
-  this file first, then `docs/context/slack-session.md`, then any relevant
-  focused context file such as `docs/context/clash-ui-guidance.md`, then inspect
-  the current code before changing behavior.
+  this file first, then `docs/context/slack-session.md`, then
+  `docs/context/remote-codex-session.md`, then any relevant focused context
+  file such as `docs/context/clash-ui-guidance.md`, then inspect the current
+  code before changing behavior.
 - Do not ask Allen for generic setup context already captured here. Ask only for
   missing secrets or external UI actions that cannot be done from the repo or
   server.

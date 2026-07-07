@@ -48,6 +48,10 @@ future tasks should know.
 - Worker memory lives in
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/`. `transcript.jsonl`
   is append-only and `summary.md` plus `recent.md` keep future prompts bounded.
+- `docs/context/remote-codex-session.md` is the durable behavior contract for
+  making Slack `#bot` and Discord `#codex` feel like this local Codex Desktop
+  session. Remote jobs should read it, follow it, and update focused context
+  docs instead of depending on hidden desktop-thread context.
 - Discord slash command changes must include both command registration data and
   the runtime interaction handler, otherwise Discord shows "The application did
   not respond."
@@ -100,7 +104,7 @@ future tasks should know.
   safely recreated after active jobs clear. The final worker queue smoke test
   completed with no Slack post error and no stuck jobs.
 - Continue improving Discord commands for Clash of Clans workflows.
-- Keep context docs efficient as the Slack channel grows: summarize durable
+- Keep context docs efficient as Slack/Discord channels grow: summarize durable
   facts, move domain guidance into focused files, and delete duplicated stale
   notes once the fact is preserved in the right place.
 - If a user asks to reset or start a new session, add a new dated section here
