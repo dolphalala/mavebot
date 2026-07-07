@@ -43,6 +43,13 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   `/opt/urba-apps/discord-bot/shared/legends-tracking.json`.
 - Elder/vote moderation store:
   `/opt/urba-apps/discord-bot/shared/elder-votes.json`.
+  Deploy initializes and chowns it as `/shared/elder-votes.json`; if malformed
+  JSON is detected, runtime preserves the bad file as a `.corrupt-*` backup
+  before starting a clean store.
+- Current live Discord permissions include Administrator, Manage Roles, and
+  Moderate Members, but Discord role hierarchy still applies. If mute/bench
+  must affect high-role users, move the mavebot role above those users/roles in
+  Discord server role settings.
 - `/legends` uses fixed MST for day boundaries: the Legend day starts at
   23:00 MST, which is 06:00 UTC.
 - GitHub deploys should use the server-local

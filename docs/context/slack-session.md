@@ -68,6 +68,12 @@ future tasks should know.
   existing elders can grant it. `/mute` and `/bench` require elder access,
   collect 3 unique elder votes, and store permanent target records in
   `/shared/elder-votes.json`.
+- Deploy creates/chowns `/shared/elder-votes.json`; malformed JSON is preserved
+  as `.corrupt-*` before a clean store is started so the permanent moderation
+  record is not silently overwritten.
+- Discord role hierarchy still applies even with Administrator/Manage
+  Roles/Moderate Members. Move mavebot's role higher if `/mute` or `/bench`
+  must affect high-role members.
 
 ### Open Work
 

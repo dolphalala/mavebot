@@ -126,14 +126,25 @@ export function moderationStorePath() {
 }
 
 export async function readModerationStore(filePath = moderationStorePath()) {
+  let content = '';
   try {
-    const parsed = JSON.parse(await readFile(filePath, 'utf8'));
+    content = await readFile(filePath, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return emptyStore();
+    }
+    throw error;
+  }
+
+  try {
+    const parsed = JSON.parse(content);
     return {
       ...emptyStore(),
       ...parsed,
       guilds: parsed?.guilds && typeof parsed.guilds === 'object' ? parsed.guilds : {}
     };
   } catch {
+    await rename(filePath, `${filePath}.corrupt-${Date.now()}`).catch(() => {});
     return emptyStore();
   }
 }

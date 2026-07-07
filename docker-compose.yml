@@ -14,6 +14,7 @@ services:
       HEALTH_PORT: 4188
       LEGENDS_STORE_PATH: /shared/legends-tracking.json
       LEGENDS_TRACK_INTERVAL_MS: 120000
+      ELDER_STORE_PATH: /shared/elder-votes.json
     volumes:
       - /opt/urba-apps/discord-bot/shared:/shared
     ports:

@@ -603,6 +603,9 @@ function promptHeader(job) {
     '- Before code changes, read docs/context/operating-memory.md, docs/context/slack-session.md, and relevant docs/context/*.md.',
     '- Keep context docs useful: compact stale details, restructure bloated sections, and delete obsolete duplicated notes when the durable facts are captured elsewhere.',
     '- Discord command changes must update both src/commands.mjs and src/index.mjs.',
+    '- Discord command changes must be verified with tests and command registration/runtime checks whenever the request touches slash commands.',
+    '- Discord moderation, role, timeout, or permission features must call out remaining live Discord limits, especially role hierarchy, in the final answer.',
+    '- Durable JSON state under /shared must have an explicit env path and deploy initialization/chown rule.',
     '- Keep mavebot isolated from Chatwoot, Bookkeeper, nginx, and unrelated apps.',
     '- Final answer should be concise and suitable to post directly in Slack as mavebot.',
     ''

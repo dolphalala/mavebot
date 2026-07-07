@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -36,6 +36,20 @@ test('grantElder stores guild elder membership', async (t) => {
   assert.equal(result.alreadyElder, false);
   assert.equal(await isElder('guild-1', 'elder-1', { storePath }), true);
   assert.equal(await isElder('guild-1', 'outsider', { storePath }), false);
+});
+
+test('readModerationStore preserves malformed permanent record before resetting', async (t) => {
+  const storePath = await tempStore(t);
+  await writeFile(storePath, '{not valid json', 'utf8');
+
+  const store = await readModerationStore(storePath);
+  const files = await readdir(path.dirname(storePath));
+
+  assert.deepEqual(store, { version: 1, guilds: {} });
+  assert.ok(
+    files.some((name) => name.startsWith('elder-votes.json.corrupt-')),
+    'malformed elder vote store should be kept as a corrupt backup'
+  );
 });
 
 test('submitModerationVote counts unique voters and completes at three votes', async (t) => {
