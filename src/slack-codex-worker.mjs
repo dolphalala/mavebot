@@ -472,11 +472,34 @@ async function moveJob(jobPath, targetDir, job, extra = {}) {
   });
 }
 
+export function isLowSignalTranscriptRow(row) {
+  const text = String(row?.text || '').toLowerCase();
+  if (!text.trim()) {
+    return true;
+  }
+
+  return [
+    /worker verification task/,
+    /server-worker-verification/,
+    /worker smoke test/,
+    /smoke test from the local codex app/,
+    /smoke test the remote-session memory contract/,
+    /worker autonomous auth fixed/,
+    /worker autonomous final ok/,
+    /discord worker path is live/,
+    /remote codex memory contract is live/
+  ].some((pattern) => pattern.test(text));
+}
+
 export function compactTranscriptRows(rows, options = {}) {
   const recentLimit = options.recentLimit ?? recentTurnLimit;
   const summaryLimit = options.summaryLimit ?? summaryTurnLimit;
-  const recentRows = rows.slice(-recentLimit);
-  const olderRows = rows.slice(0, Math.max(0, rows.length - recentLimit)).slice(-summaryLimit);
+  const signalRows = rows.filter((row) => !isLowSignalTranscriptRow(row));
+  const suppressedCount = rows.length - signalRows.length;
+  const recentRows = signalRows.slice(-recentLimit);
+  const olderRows = signalRows
+    .slice(0, Math.max(0, signalRows.length - recentLimit))
+    .slice(-summaryLimit);
   const generatedAt = options.generatedAt || new Date().toISOString();
 
   const formatRow = (row, limit = 320) => {
@@ -501,6 +524,7 @@ export function compactTranscriptRows(rows, options = {}) {
     '- Slack #bot and Discord #codex should behave like persistent channel sessions, with mavebot posting normal channel replies.',
     '- Repo docs/context/*.md files are durable operating memory. Keep them concise, restructure them when stale, and remove duplicated obsolete notes.',
     '- Do not touch Chatwoot, Bookkeeper, nginx, Docker daemon settings, or unrelated apps unless Allen asks for that exact action.',
+    `- Low-signal smoke/verification turns suppressed from prompt memory: ${suppressedCount}.`,
     '',
     '## Compacted Older Turns',
     '',
@@ -542,6 +566,7 @@ export function compactTranscriptRows(rows, options = {}) {
     '',
     `- Recent turn count included in prompts: ${recentRows.length}.`,
     `- Older compacted turn count included in prompts: ${olderRows.length}.`,
+    `- Low-signal smoke/verification turns suppressed from prompt memory: ${suppressedCount}.`,
     ''
   ].join('\n');
 

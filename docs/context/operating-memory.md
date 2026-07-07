@@ -123,7 +123,9 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Worker-side durable context is stored under
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/`:
   `transcript.jsonl` is append-only, while `summary.md`, `recent.md`, and
-  `session.md` are regenerated after each turn to keep prompts bounded.
+  `session.md` are regenerated after each turn to keep prompts bounded. The
+  regenerated prompt memory suppresses low-signal smoke tests and old
+  verification chatter; the raw transcript remains append-only.
 - Worker prompts put the active Slack/Discord request before compacted memory.
   Older memory is background context only and must not override the current
   request.

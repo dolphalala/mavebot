@@ -10,6 +10,7 @@ import {
   checkUrl,
   compactTranscriptRows,
   isCodexAuthError,
+  isLowSignalTranscriptRow,
   readRepoContextBundle
 } from '../src/slack-codex-worker.mjs';
 
@@ -41,6 +42,50 @@ test('compactTranscriptRows keeps recent turns bounded and older turns summarize
   assert.match(snapshot.session, /Recent turn count included in prompts: 2/);
   assert.match(snapshot.session, /Slack and Discord jobs/);
   assert.match(snapshot.session, /Memory Maintenance/);
+});
+
+test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory', () => {
+  const rows = [
+    {
+      at: '2026-07-07T00:00:00.000Z',
+      role: 'user',
+      user: 'Allen',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'make /player show better army cards'
+    },
+    {
+      at: '2026-07-07T00:01:00.000Z',
+      role: 'user',
+      user: 'Codex smoke',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'Smoke test from the local Codex app. Do not change files.'
+    },
+    {
+      at: '2026-07-07T00:02:00.000Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'The Discord worker path is live.'
+    }
+  ];
+
+  assert.equal(isLowSignalTranscriptRow(rows[0]), false);
+  assert.equal(isLowSignalTranscriptRow(rows[1]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[2]), true);
+
+  const snapshot = compactTranscriptRows(rows, {
+    recentLimit: 5,
+    summaryLimit: 5,
+    generatedAt: '2026-07-07T00:03:00.000Z'
+  });
+
+  assert.match(snapshot.recent, /make \/player show better army cards/);
+  assert.doesNotMatch(snapshot.recent, /Smoke test from the local Codex app/);
+  assert.doesNotMatch(snapshot.recent, /Discord worker path is live/);
+  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 2/);
 });
 
 test('buildCodexWorkerPrompt puts active Slack request before memory', () => {

@@ -51,6 +51,9 @@ The channel history will grow forever, so remote jobs must keep memory useful:
 
 - Keep `docs/context/slack-session.md` focused on user preferences, durable
   decisions, current goals, and open work.
+- Worker `recent.md` and `summary.md` intentionally suppress setup smoke tests
+  and verification chatter so future jobs do not waste prompt space on old
+  infrastructure checks.
 - Put domain rules in focused files under `docs/context/`, not in one giant
   catch-all file.
 - If a file gets noisy, restructure it and remove duplicated stale notes after
