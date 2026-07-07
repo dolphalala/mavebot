@@ -65,10 +65,13 @@ Registering a command without a matching runtime handler causes Discord's
 
 1. Update `src/slack-codex-worker.mjs`, `src/slack-bridge.mjs`, or
    `src/discord-codex-control.mjs` as appropriate.
-2. Add tests around prompt shape, memory compaction, queue behavior, or message
-   cleaning.
-3. Update `remote-codex-session.md` and this file when behavior or context
+2. For Slack files/screenshots, preserve file metadata and local shared-volume
+   paths so the worker can inspect uploads from
+   `/shared/codex-worker/context/slack-files/`.
+3. Add tests around prompt shape, memory compaction, queue behavior, file
+   context, or message cleaning.
+4. Update `remote-codex-session.md` and this file when behavior or context
    loading changes.
-4. Update `local-codex-parity.md` if the standard for matching local Codex
+5. Update `local-codex-parity.md` if the standard for matching local Codex
    Desktop behavior changes.
-5. Verify the worker queue, generated memory files, and live channel response.
+6. Verify the worker queue, generated memory files, and live channel response.

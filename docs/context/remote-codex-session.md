@@ -8,6 +8,8 @@ jobs stay close to the quality of a local Codex Desktop session.
 
 - Treat Slack `#bot` and Discord `#codex` as persistent coding sessions.
 - Accept normal human messages from any user in the configured channel.
+- Treat Slack uploads and nearby consecutive Slack messages as part of the
+  same working context whenever the bridge includes them in the worker job.
 - Infer the relevant repo/server context from durable memory before acting.
 - Work end to end when possible: inspect, implement, test, push, wait for
   deploy, verify live behavior, then answer plainly in the channel.
@@ -40,6 +42,9 @@ command.
 
 - For code requests, use `docs/context/code-map.md` to find the likely files,
   then inspect the relevant source before answering.
+- If the active Slack request includes file metadata or local paths under
+  `/shared/codex-worker/context/slack-files/`, inspect those files when they
+  are relevant to the task instead of saying the image was not visible.
 - Use `docs/context/local-codex-parity.md` as the checklist for matching local
   Codex Desktop quality.
 - For slash command changes, update both command registration data and runtime

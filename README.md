@@ -136,8 +136,12 @@ SLACK_CODEX_DELETE_FORWARD_DELAY_MS=60000
 SLACK_CODEX_STATE_PATH=/shared/codex-forward-state.json
 SLACK_CODEX_MEMORY_LIMIT=30
 SLACK_CODEX_MEMORY_TEXT_LIMIT=1500
+SLACK_CODEX_WORKER_CONTEXT_LIMIT=80
+SLACK_CODEX_WORKER_DEBOUNCE_MS=3500
 SLACK_CODEX_STATE_ENTRY_LIMIT=200
 SLACK_CODEX_WORKER_JOB_DIR=/shared/codex-worker/jobs
+SLACK_FILE_CONTEXT_DIR=/shared/codex-worker/context/slack-files
+SLACK_FILE_DOWNLOAD_MAX_BYTES=26214400
 SLACK_OAUTH_REDIRECT_URI=https://mavebot.lanawee.com/mavebot/slack/oauth/callback
 SLACK_USER_SCOPES=chat:write
 SLACK_USER_TOKEN_PATH=/shared/slack-user-tokens.json
@@ -167,6 +171,12 @@ In Slack `Event Subscriptions`, enable events and subscribe the bot to:
 - `message.channels`
 - `app_mention`
 
+For screenshots and uploads to become Codex context, add the bot token scope
+`files:read`, reinstall the Slack app, and keep the bot subscribed to channel
+messages. The bridge accepts `file_share` message events, downloads Slack files
+to `/shared/codex-worker/context/slack-files`, and includes those local paths in
+the worker job.
+
 For Socket Mode, do not enter a Request URL.
 
 When `SLACK_CODEX_FORWARD=1` and `SLACK_CODEX_FORWARD_MODE=worker`, normal
@@ -182,6 +192,7 @@ The worker keeps durable context in:
 - `/opt/urba-apps/discord-bot/shared/codex-worker/context/summary.md`
 - `/opt/urba-apps/discord-bot/shared/codex-worker/context/recent.md`
 - `/opt/urba-apps/discord-bot/shared/codex-worker/context/session.md`
+- `/opt/urba-apps/discord-bot/shared/codex-worker/context/slack-files/`
 
 `transcript.jsonl` is normalized history; low-signal smoke/status rows are
 pruned after verification. `summary.md` and `recent.md` are regenerated after

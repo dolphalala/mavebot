@@ -755,7 +755,9 @@ function promptHeader(job) {
       guildId: job.guildId || '',
       channel: job.channel || slackChannelId,
       ts: job.ts || '',
-      text: job.text || ''
+      text: job.text || '',
+      files: Array.isArray(job.files) ? job.files : [],
+      contextMessages: Array.isArray(job.contextMessages) ? job.contextMessages : []
     }, null, 2),
     '',
     'Hard rules:',

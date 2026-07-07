@@ -150,7 +150,21 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
       user: 'UACTIVE',
       channel: 'CBOT',
       ts: '1782400000.000000',
-      text: 'change /lana now'
+      text: 'change /lana now',
+      files: [
+        {
+          name: 'screen.png',
+          mimetype: 'image/png',
+          localPath: '/shared/codex-worker/context/slack-files/CBOT/1782400000/01-screen.png'
+        }
+      ],
+      contextMessages: [
+        {
+          receivedAt: '2026-07-07T05:59:00.000Z',
+          user: 'UACTIVE',
+          text: 'extra setup context'
+        }
+      ]
     },
     summary: 'old request: change /player',
     recent: 'recent request: check /ping',
@@ -190,6 +204,9 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /Discord command changes must update both src\/commands\.mjs and src\/index\.mjs/);
   assert.match(prompt, /# Extra Repo Context Files/);
   assert.match(prompt, /clash ui guidance/);
+  assert.match(prompt, /screen\.png/);
+  assert.match(prompt, /\/shared\/codex-worker\/context\/slack-files\/CBOT\/1782400000\/01-screen\.png/);
+  assert.match(prompt, /extra setup context/);
 });
 
 test('buildWorkerRuntimeSnapshot explains deploy and safety boundaries without secrets', () => {

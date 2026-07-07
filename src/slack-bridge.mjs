@@ -37,6 +37,13 @@ const codexWorkerJobDir =
   process.env.SLACK_CODEX_WORKER_JOB_DIR ||
   process.env.SLACK_WORKER_JOB_DIR ||
   '/shared/codex-worker/jobs';
+const slackFileContextDir =
+  process.env.SLACK_FILE_CONTEXT_DIR ||
+  '/shared/codex-worker/context/slack-files';
+const slackFileDownloadMaxBytes = Number.parseInt(
+  process.env.SLACK_FILE_DOWNLOAD_MAX_BYTES || String(25 * 1024 * 1024),
+  10
+);
 const codexMirrorReplies = process.env.SLACK_CODEX_MIRROR_REPLIES !== '0';
 const codexForwardInThread = process.env.SLACK_CODEX_FORWARD_IN_THREAD !== '0';
 const codexDeleteForward = process.env.SLACK_CODEX_DELETE_FORWARD === '1';
@@ -76,6 +83,14 @@ const codexMemoryTextLimit = Number.parseInt(
   process.env.SLACK_CODEX_MEMORY_TEXT_LIMIT || '1500',
   10
 );
+const codexWorkerContextLimit = Number.parseInt(
+  process.env.SLACK_CODEX_WORKER_CONTEXT_LIMIT || '80',
+  10
+);
+const codexWorkerDebounceMs = Number.parseInt(
+  process.env.SLACK_CODEX_WORKER_DEBOUNCE_MS || '3500',
+  10
+);
 const codexStateEntryLimit = Number.parseInt(
   process.env.SLACK_CODEX_STATE_ENTRY_LIMIT || '200',
   10
@@ -100,6 +115,7 @@ let socketReconnects = 0;
 let contextReadable = false;
 let bridgeStateQueue = Promise.resolve();
 const inFlightMirrors = new Set();
+const pendingWorkerJobs = new Map();
 
 function hasSlackConfig() {
   if (socketMode) {
@@ -303,8 +319,167 @@ async function saveUserToken({ userId, teamId, accessToken, scopes }) {
   await writeUserTokens(tokens);
 }
 
+function slackEventFiles(event) {
+  const files = Array.isArray(event?.files) ? [...event.files] : [];
+  if (event?.file && !files.some((file) => file?.id === event.file.id)) {
+    files.push(event.file);
+  }
+  return files.filter(Boolean);
+}
+
+function slackFileDownloadUrl(file) {
+  return file?.url_private_download || file?.url_private || '';
+}
+
+function safeFileName(value, fallback = 'slack-file') {
+  const cleaned = String(value || fallback)
+    .replace(/[/\\?%*:|"<>]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
+  return cleaned || fallback;
+}
+
+function baseSlackFileReference(file) {
+  const name = safeFileName(file?.name || file?.title || file?.id || 'slack-file');
+  return {
+    id: file?.id || '',
+    name,
+    title: file?.title || '',
+    mimetype: file?.mimetype || '',
+    filetype: file?.filetype || '',
+    mode: file?.mode || '',
+    size: Number.parseInt(file?.size || '0', 10) || 0,
+    permalink: file?.permalink || ''
+  };
+}
+
+async function downloadSlackFile(file, { channel, ts, index }) {
+  const reference = baseSlackFileReference(file);
+  const url = slackFileDownloadUrl(file);
+  if (!url) {
+    return { ...reference, downloadError: 'Slack did not provide a downloadable file URL.' };
+  }
+  if (!botToken) {
+    return { ...reference, downloadError: 'SLACK_BOT_TOKEN is not configured.' };
+  }
+  if (
+    Number.isFinite(slackFileDownloadMaxBytes) &&
+    slackFileDownloadMaxBytes > 0 &&
+    reference.size > slackFileDownloadMaxBytes
+  ) {
+    return {
+      ...reference,
+      downloadError: `File is larger than SLACK_FILE_DOWNLOAD_MAX_BYTES (${slackFileDownloadMaxBytes}).`
+    };
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${botToken}`
+      }
+    });
+    if (!response.ok) {
+      return { ...reference, downloadError: `Slack download failed with HTTP ${response.status}.` };
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (
+      Number.isFinite(slackFileDownloadMaxBytes) &&
+      slackFileDownloadMaxBytes > 0 &&
+      buffer.length > slackFileDownloadMaxBytes
+    ) {
+      return {
+        ...reference,
+        downloadError: `Downloaded file is larger than SLACK_FILE_DOWNLOAD_MAX_BYTES (${slackFileDownloadMaxBytes}).`
+      };
+    }
+
+    const dir = path.join(
+      slackFileContextDir,
+      safeIdPart(channel || 'channel'),
+      safeIdPart(ts || 'message')
+    );
+    await mkdir(dir, { recursive: true });
+    const filePath = path.join(dir, `${String(index + 1).padStart(2, '0')}-${reference.name}`);
+    await writeFile(filePath, buffer, { mode: 0o600 });
+    await chmod(filePath, 0o600).catch(() => {});
+    return { ...reference, localPath: filePath, bytes: buffer.length };
+  } catch (error) {
+    return { ...reference, downloadError: String(error?.message || error) };
+  }
+}
+
+async function materializeSlackFiles(event) {
+  const files = slackEventFiles(event);
+  if (!files.length) {
+    return [];
+  }
+
+  return Promise.all(
+    files.map((file, index) =>
+      downloadSlackFile(file, {
+        channel: event?.channel,
+        ts: event?.ts,
+        index
+      })
+    )
+  );
+}
+
+export function slackFilesToWorkerLines(files = []) {
+  return (files || [])
+    .map((file) => {
+      const parts = [`file: ${file.name || file.title || file.id || 'attachment'}`];
+      if (file.mimetype || file.filetype) {
+        parts.push(`type: ${file.mimetype || file.filetype}`);
+      }
+      if (file.localPath) {
+        parts.push(`local: ${file.localPath}`);
+      }
+      if (file.permalink) {
+        parts.push(`slack: ${file.permalink}`);
+      }
+      if (file.downloadError) {
+        parts.push(`download: ${file.downloadError}`);
+      }
+      return `[${parts.join(' | ')}]`;
+    })
+    .filter(Boolean);
+}
+
+export function slackRowsToWorkerText(rows = [], { currentUserId = '' } = {}) {
+  const normalizedRows = (rows || []).filter(Boolean);
+  if (!normalizedRows.length) {
+    return '';
+  }
+
+  if (normalizedRows.length === 1) {
+    const [row] = normalizedRows;
+    return [
+      normalizePromptText(row.text),
+      ...slackFilesToWorkerLines(row.files)
+    ].filter(Boolean).join('\n').trim();
+  }
+
+  return normalizedRows
+    .map((row) => {
+      const speaker = row.user === currentUserId ? 'current user' : row.user || 'unknown';
+      const text = normalizePromptText(row.text) || '(no text)';
+      const files = slackFilesToWorkerLines(row.files);
+      return [
+        `[${row.receivedAt || row.ts || 'unknown time'}] ${speaker}: ${text}`,
+        ...files.map((line) => `  ${line}`)
+      ].join('\n');
+    })
+    .join('\n')
+    .trim();
+}
+
 async function rememberMessage(payload, event) {
   await mkdir(path.dirname(memoryPath), { recursive: true });
+  const files = await materializeSlackFiles(event);
   const row = {
     receivedAt: new Date().toISOString(),
     teamId: payload.team_id,
@@ -312,7 +487,8 @@ async function rememberMessage(payload, event) {
     user: event.user,
     ts: event.ts,
     threadTs: event.thread_ts,
-    text: event.text || ''
+    text: event.text || '',
+    ...(files.length ? { files } : {})
   };
   await appendFile(memoryPath, `${JSON.stringify(row)}\n`, {
     encoding: 'utf8',
@@ -321,6 +497,7 @@ async function rememberMessage(payload, event) {
   await chmod(memoryPath, 0o600).catch(() => {});
   messageCount += 1;
   lastEventAt = row.receivedAt;
+  return row;
 }
 
 async function readRecentMemory(limit = codexMemoryLimit) {
@@ -392,6 +569,8 @@ function safeIdPart(value) {
 export function buildCodexWorkerJob({
   payload = {},
   event,
+  messageRows = [],
+  contextMessages = [],
   createdAt = new Date().toISOString()
 }) {
   const sourceTs = event?.ts || String(Date.now());
@@ -400,21 +579,33 @@ export function buildCodexWorkerJob({
     safeIdPart(sourceTs)
   ].join('-');
 
-  return {
+  const activeText = slackRowsToWorkerText(messageRows, {
+    currentUserId: event?.user || ''
+  }) || event?.text || '';
+  const files = messageRows.flatMap((row) => row?.files || []);
+  const job = {
     id,
+    source: 'slack',
     createdAt,
     teamId: payload.team_id || event?.team || '',
     channel: event?.channel || channelId,
     user: event?.user || '',
     ts: sourceTs,
     threadTs: event?.thread_ts || '',
-    text: event?.text || ''
+    text: activeText
   };
+  if (files.length) {
+    job.files = files;
+  }
+  if (contextMessages.length) {
+    job.contextMessages = contextMessages;
+  }
+  return job;
 }
 
-async function enqueueCodexWorkerJob(payload, event) {
+async function enqueueCodexWorkerJob(payload, event, options = {}) {
   await mkdir(codexWorkerJobDir, { recursive: true });
-  const job = buildCodexWorkerJob({ payload, event });
+  const job = buildCodexWorkerJob({ payload, event, ...options });
   const jobPath = path.join(codexWorkerJobDir, `${job.id}.json`);
 
   try {
@@ -433,12 +624,87 @@ async function enqueueCodexWorkerJob(payload, event) {
   }
 }
 
+function pendingWorkerJobKey(event) {
+  return [
+    safeIdPart(event?.channel || channelId || 'channel'),
+    safeIdPart(event?.thread_ts || 'main'),
+    safeIdPart(event?.user || 'user')
+  ].join(':');
+}
+
+function scheduleCodexWorkerJob(payload, event, row) {
+  const delayMs =
+    Number.isFinite(codexWorkerDebounceMs) && codexWorkerDebounceMs > 0
+      ? codexWorkerDebounceMs
+      : 0;
+  if (delayMs <= 0) {
+    return {
+      first: true,
+      promise: readRecentMemory(codexWorkerContextLimit).then((contextMessages) =>
+        enqueueCodexWorkerJob(payload, event, {
+          messageRows: row ? [row] : [],
+          contextMessages
+        })
+      )
+    };
+  }
+
+  const key = pendingWorkerJobKey(event);
+  let pending = pendingWorkerJobs.get(key);
+  const first = !pending;
+  if (!pending) {
+    pending = {
+      payload,
+      event,
+      rows: [],
+      timer: null
+    };
+    pendingWorkerJobs.set(key, pending);
+  }
+
+  pending.payload = payload;
+  pending.event = event;
+  if (row) {
+    pending.rows.push(row);
+  }
+  if (pending.timer) {
+    clearTimeout(pending.timer);
+  }
+
+  pending.timer = setTimeout(() => {
+    pendingWorkerJobs.delete(key);
+    (async () => {
+      const contextMessages = await readRecentMemory(codexWorkerContextLimit);
+      await enqueueCodexWorkerJob(pending.payload, pending.event, {
+        messageRows: pending.rows,
+        contextMessages
+      });
+    })().catch((error) => {
+      console.error('Failed to enqueue debounced Codex worker job:', error);
+    });
+  }, delayMs);
+  pending.timer.unref?.();
+
+  return { first, promise: Promise.resolve({ queued: true }) };
+}
+
 function formatMemoryLine(row, currentUserId) {
-  return JSON.stringify({
+  const line = {
     at: row.receivedAt || row.ts || 'unknown time',
     speaker: row.user === currentUserId ? 'current user' : row.user || 'unknown',
     text: normalizePromptText(row.text)
-  });
+  };
+  if (Array.isArray(row.files) && row.files.length) {
+    line.files = row.files.map((file) => ({
+      name: file.name || file.title || file.id || 'attachment',
+      mimetype: file.mimetype || '',
+      filetype: file.filetype || '',
+      localPath: file.localPath || '',
+      permalink: file.permalink || '',
+      downloadError: file.downloadError || ''
+    }));
+  }
+  return JSON.stringify(line);
 }
 
 export function buildCodexPromptText({
@@ -858,12 +1124,13 @@ export function buildCodexForwardPostArgs({
   };
 }
 
-async function forwardToCodex(payload, event) {
+async function forwardToCodex(payload, event, rememberedRow) {
   if (codexForwardMode === 'worker') {
-    const result = await enqueueCodexWorkerJob(payload, event);
-    if (result.queued) {
+    const result = scheduleCodexWorkerJob(payload, event, rememberedRow);
+    if (result.first) {
       await postMessage({ text: randomWorkingMessage() });
     }
+    await result.promise;
     return;
   }
 
@@ -1198,14 +1465,15 @@ async function handleSlackEvent(payload) {
     return;
   }
 
-  if (event.bot_id || event.subtype) {
+  const isHumanMessageSubtype = !event.subtype || event.subtype === 'file_share';
+  if (event.bot_id || !isHumanMessageSubtype) {
     return;
   }
 
-  await rememberMessage(payload, event);
+  const rememberedRow = await rememberMessage(payload, event);
 
   if (codexForward) {
-    await forwardToCodex(payload, event);
+    await forwardToCodex(payload, event, rememberedRow);
     return;
   }
 

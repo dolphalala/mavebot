@@ -11,7 +11,9 @@ import {
   selectCodexThreadReplies,
   selectForwardMessageTsFromHistory,
   selectForwardForCodexEvent,
-  isCodexStatusNoise
+  isCodexStatusNoise,
+  slackFilesToWorkerLines,
+  slackRowsToWorkerText
 } from '../src/slack-bridge.mjs';
 
 test('cleanCodexMirrorText strips Codex task card noise', () => {
@@ -117,6 +119,80 @@ test('buildCodexWorkerJob creates a stable job id for Slack worker mode', () => 
   assert.equal(job.channel, 'C0BCG0T838B');
   assert.equal(job.user, 'U1');
   assert.equal(job.text, 'make /lana prettier');
+});
+
+test('Slack worker context formats uploaded files as local Codex-readable paths', () => {
+  const files = [
+    {
+      name: 'screen.png',
+      mimetype: 'image/png',
+      localPath: '/shared/codex-worker/context/slack-files/C1/123/01-screen.png',
+      permalink: 'https://slack.example/files/F1'
+    }
+  ];
+
+  assert.deepEqual(slackFilesToWorkerLines(files), [
+    '[file: screen.png | type: image/png | local: /shared/codex-worker/context/slack-files/C1/123/01-screen.png | slack: https://slack.example/files/F1]'
+  ]);
+
+  const text = slackRowsToWorkerText([
+    {
+      receivedAt: '2026-07-07T06:00:00.000Z',
+      user: 'U1',
+      text: 'read this screenshot',
+      files
+    }
+  ]);
+
+  assert.match(text, /read this screenshot/);
+  assert.match(text, /local: \/shared\/codex-worker\/context\/slack-files\/C1\/123\/01-screen\.png/);
+});
+
+test('buildCodexWorkerJob bundles a Slack message burst with files and recent context', () => {
+  const job = buildCodexWorkerJob({
+    payload: { team_id: 'T1' },
+    event: {
+      channel: 'C0BCG0T838B',
+      user: 'U1',
+      ts: '1782400002.000000',
+      text: 'second message'
+    },
+    messageRows: [
+      {
+        receivedAt: '2026-07-07T06:00:00.000Z',
+        user: 'U1',
+        text: 'first message'
+      },
+      {
+        receivedAt: '2026-07-07T06:00:02.000Z',
+        user: 'U1',
+        text: 'second message',
+        files: [
+          {
+            name: 'after.png',
+            mimetype: 'image/png',
+            localPath: '/shared/codex-worker/context/slack-files/C/ts/01-after.png'
+          }
+        ]
+      }
+    ],
+    contextMessages: [
+      {
+        receivedAt: '2026-07-07T05:59:00.000Z',
+        user: 'U1',
+        text: 'previous context'
+      }
+    ],
+    createdAt: '2026-07-07T06:00:03.000Z'
+  });
+
+  assert.equal(job.id, 'C0BCG0T838B-1782400002.000000');
+  assert.equal(job.source, 'slack');
+  assert.match(job.text, /first message/);
+  assert.match(job.text, /second message/);
+  assert.match(job.text, /after\.png/);
+  assert.equal(job.files.length, 1);
+  assert.equal(job.contextMessages.length, 1);
 });
 
 test('selectCodexForwardThreadTs only threads when the trigger is in the bot channel', () => {
