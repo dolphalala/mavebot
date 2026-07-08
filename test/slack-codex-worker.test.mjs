@@ -223,6 +223,7 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /persistent Codex session/);
   assert.match(prompt, /Be as capable as a local Codex Desktop session/);
   assert.match(prompt, /local-codex-parity\.md/);
+  assert.match(prompt, /Do not say the work is ready for the worker to commit, push, deploy, or verify/);
   assert.match(prompt, /docs\/context\/remote-codex-session\.md/);
   assert.match(prompt, /Discord command changes must update both src\/commands\.mjs and src\/index\.mjs/);
   assert.match(prompt, /# Extra Repo Context Files/);
@@ -359,6 +360,23 @@ test('finalSlackMessage always returns a human success message', () => {
       runtime: { botOk: true, bridgeOk: true }
     }),
     'I updated /lana.\n\nDone and live.'
+  );
+});
+
+test('finalSlackMessage strips worker handoff boilerplate from channel replies', () => {
+  assert.equal(
+    finalSlackMessage({
+      codexMessage: [
+        'Updated the Discord #codex working acknowledgements.',
+        '',
+        'Added test coverage. Ready for the worker to commit, push, deploy, and verify live.'
+      ].join('\n'),
+      checkOk: true,
+      pushResult: { pushed: true },
+      deployResult: { matched: true },
+      runtime: { botOk: true, bridgeOk: true }
+    }),
+    'Updated the Discord #codex working acknowledgements.\n\nAdded test coverage.\n\nDone and live.'
   );
 });
 

@@ -142,6 +142,9 @@ function stripSlackLinks(text) {
     .replace(/\bChatGPT helps you get answers, find inspiration, and be more productive\.\b/gi, '')
     .replace(/\bView task\b/gi, '')
     .replace(/^Codex:\s*/gim, '')
+    .replace(/\n?Ready for (?:the )?worker to commit, push, deploy, and verify live\.?/gi, '')
+    .replace(/\n?Ready for (?:the )?worker to commit, push, and deploy\.?/gi, '')
+    .replace(/\n?Ready for (?:the )?worker to commit\/push\/deploy\.?/gi, '')
     .trim();
 }
 
@@ -813,6 +816,7 @@ function promptHeader(job) {
     '- Keep mavebot isolated from Chatwoot, Bookkeeper, nginx, and unrelated apps.',
     '- Final answer should be plain, short, and suitable to post directly as mavebot. Talk like a helpful person, not a deployment log.',
     '- Do not include commit hashes, test counts, or health-check details in the final answer unless something failed or needs user action.',
+    '- Do not say the work is ready for the worker to commit, push, deploy, or verify. The worker adds live status after verification.',
     ''
   ].join('\n');
 }
