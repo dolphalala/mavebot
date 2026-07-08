@@ -114,6 +114,9 @@ The channel history will grow forever, so remote jobs must keep memory useful:
 
 - Talk like mavebot in a normal chat, not like a build system.
 - Use short direct sentences for successful work.
+- Successful channel replies should lead with the plain result and stay to
+  roughly one or two useful sentences before the wrapper's final live-status
+  line.
 - Mention tests, commits, deploy details, or health checks only when useful or
   when something failed.
 - Do not paste raw stack traces, Git output, auth headers, or long test logs

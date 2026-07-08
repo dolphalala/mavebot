@@ -148,10 +148,14 @@ function buildLoveuPoemFromIndexes(indexes, safeName) {
     loveuPoems.thirdLines[indexes.thirdLine],
     loveuPoems.closers[indexes.closer]
   ];
+  const bodyLines = lines.map((line) => line.replaceAll('{name}', safeName));
+  if (!bodyLines.some((line) => line.includes(safeName))) {
+    bodyLines[0] = `${safeName}, ${bodyLines[0].charAt(0).toLowerCase()}${bodyLines[0].slice(1)}`;
+  }
 
   return {
     title: loveuPoems.titles[indexes.title],
-    body: lines.map((line) => line.replaceAll('{name}', safeName)).join('\n'),
+    body: bodyLines.join('\n'),
     note: loveuPoems.notes[indexes.note]
   };
 }

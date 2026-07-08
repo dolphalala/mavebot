@@ -156,6 +156,56 @@ function stripSlackLinks(text) {
     .trim();
 }
 
+const channelReplyStopPattern =
+  /(?:^|\n|\s)(?:What happened|Summary|Checks|Verification|Tests|Files changed|Committed locally|PR metadata|Implementation details|Details):/i;
+
+function takeLeadSentences(text, { maxSentences = 2, maxChars = 420 } = {}) {
+  const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  const sentencePattern = /[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g;
+  const sentences = normalized.match(sentencePattern) || [normalized];
+  let result = '';
+  for (const sentence of sentences) {
+    const next = `${result}${sentence}`.trimStart();
+    if (result && next.length > maxChars) {
+      break;
+    }
+    result = next;
+    if ((result.match(/[.!?]+(?:\s|$)/g) || []).length >= maxSentences) {
+      break;
+    }
+  }
+
+  return truncate(result.trim(), maxChars).replace(/\s+$/, '');
+}
+
+export function humanizeWorkerChannelMessage(text) {
+  const cleaned = stripSlackLinks(text);
+  if (!cleaned) {
+    return '';
+  }
+
+  const stopMatch = cleaned.match(channelReplyStopPattern);
+  const lead = stopMatch ? cleaned.slice(0, stopMatch.index).trim() : cleaned;
+  const paragraphs = lead
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .filter((paragraph) => !/^(?:Summary|Checks|Verification|Tests|Files changed|Committed|PR metadata)\b/i.test(paragraph));
+
+  const firstParagraph = paragraphs[0] || lead;
+  const noBulletDump = firstParagraph
+    .split('\n')
+    .filter((line) => !/^\s*[-*]\s+/.test(line))
+    .join(' ')
+    .trim();
+
+  return takeLeadSentences(noBulletDump || firstParagraph);
+}
+
 export function isCodexAuthError(value) {
   const text = String(value?.message || value || '');
   return /access token could not be refreshed/i.test(text) ||
@@ -1155,7 +1205,7 @@ async function runCodex(job, contextSnapshot) {
 
 export function finalSlackMessage({ codexMessage, checkOk, pushResult, deployResult, runtime }) {
   const lines = [];
-  const cleaned = stripSlackLinks(codexMessage);
+  const cleaned = humanizeWorkerChannelMessage(codexMessage);
   if (cleaned) {
     lines.push(cleaned);
   }

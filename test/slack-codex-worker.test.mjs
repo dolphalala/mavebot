@@ -15,6 +15,7 @@ import {
   compactTranscriptRows,
   commitMessageForJob,
   finalSlackMessage,
+  humanizeWorkerChannelMessage,
   isCodexImageFile,
   isCodexAuthError,
   isLowSignalTranscriptRow,
@@ -429,7 +430,7 @@ test('finalSlackMessage strips worker handoff boilerplate from channel replies',
       deployResult: { matched: true },
       runtime: { botOk: true, bridgeOk: true }
     }),
-    'Updated the Discord #codex working acknowledgements.\n\nAdded test coverage.\n\nDone and live.'
+    'Updated the Discord #codex working acknowledgements.\n\nDone and live.'
   );
 });
 
@@ -449,6 +450,45 @@ test('finalSlackMessage strips routine deploy/check chatter from Codex replies',
       runtime: { botOk: true, bridgeOk: true }
     }),
     'Fixed the remote runner behavior.\n\nDone and live.'
+  );
+});
+
+test('humanizeWorkerChannelMessage keeps channel replies short and conversational', () => {
+  const message = humanizeWorkerChannelMessage(
+    [
+      'Found and fixed another remote-runner parity gap. What happened: Discord restart/catch-up could still split a partly handled message burst, so screenshots or follow-up text could get replayed without the original prompt.',
+      '',
+      'Summary:',
+      '- Updated burst membership tracking.',
+      '- Added diagnostics.',
+      '',
+      'Checks:',
+      '- npm run check'
+    ].join('\n')
+  );
+
+  assert.equal(message, 'Found and fixed another remote-runner parity gap.');
+});
+
+test('finalSlackMessage condenses long implementation reports for channels', () => {
+  assert.equal(
+    finalSlackMessage({
+      codexMessage: [
+        'Found the remote-runner problems and tightened them up. The issues were mostly session-parity gaps, not `/player` or `/loveu` alone. Discord needed better restart recovery and screenshots needed to stay attached to the active prompt.',
+        '',
+        'Summary:',
+        '- Added image attachment support.',
+        '- Added retry handling.',
+        '',
+        'Checks:',
+        '- npm run check'
+      ].join('\n'),
+      checkOk: true,
+      pushResult: { pushed: true },
+      deployResult: { matched: true },
+      runtime: { botOk: true, bridgeOk: true }
+    }),
+    'Found the remote-runner problems and tightened them up. The issues were mostly session-parity gaps, not `/player` or `/loveu` alone.\n\nDone and live.'
   );
 });
 
