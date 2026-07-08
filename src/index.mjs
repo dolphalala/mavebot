@@ -19,7 +19,7 @@ import {
   fetchPlayer,
   normalizePlayerTag
 } from './coc.mjs';
-import { createLanaHeartPng, randomLoveLetter } from './lana-art.mjs';
+import { createLanaHeartPng, randomLoveLetter, randomLoveuPoem } from './lana-art.mjs';
 import {
   DEFAULT_LEGENDS_INTERVAL_MS,
   buildLegendsPages,
@@ -793,6 +793,46 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed], files: [attachment] });
+    return;
+  }
+
+  if (interaction.commandName === 'loveu') {
+    const targetUser = interaction.options.getUser('user', true);
+    const targetMember = interaction.options.getMember?.('user');
+    const targetName =
+      targetMember?.displayName || targetUser.globalName || targetUser.username || 'you';
+    const poem = randomLoveuPoem(targetName);
+    const heartSeed = crypto.randomInt(1, 0x7fffffff);
+    const heartPng = createLanaHeartPng({
+      variant: heartSeed
+    });
+    const attachment = new AttachmentBuilder(heartPng, {
+      name: 'loveu-heart.png'
+    });
+    const embed = new EmbedBuilder()
+      .setColor(0xf06292)
+      .setTitle(poem.title)
+      .setDescription([
+        `${userMention(targetUser.id)}, this one is for you.`,
+        '',
+        poem.body,
+        '',
+        ':heart: :sparkles: :two_hearts:'
+      ].join('\n'))
+      .addFields({
+        name: 'Tiny note',
+        value: poem.note
+      })
+      .setImage('attachment://loveu-heart.png')
+      .setFooter({ text: 'A fresh poem and a new heart every time' })
+      .setTimestamp();
+
+    await interaction.reply({
+      content: userMention(targetUser.id),
+      embeds: [embed],
+      files: [attachment],
+      allowedMentions: { users: [targetUser.id] }
+    });
     return;
   }
 

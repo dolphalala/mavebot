@@ -38,6 +38,69 @@ export const loveLetters = [
   }
 ];
 
+export const loveuPoems = [
+  {
+    title: 'A Heart Appears',
+    lines: [
+      'For {name}, a little spark arrives,',
+      'soft as a sunrise, bright as new skies.',
+      'May this heart find you right where you are,',
+      'and make the whole room feel less far.'
+    ],
+    note: 'Freshly drawn, loudly adored.'
+  },
+  {
+    title: 'Tiny Firework',
+    lines: [
+      '{name}, you get the kind of glow',
+      'that makes ordinary minutes slow.',
+      'A sweet little thunder, a bright little tune,',
+      'a heart-shaped comet crossing the moon.'
+    ],
+    note: 'A small poem with big feelings.'
+  },
+  {
+    title: 'Soft Landing',
+    lines: [
+      'If the day has been heavy, {name},',
+      'let this heart land gently by your name.',
+      'No grand speech, no perfect art,',
+      'just a happy bot with a handmade heart.'
+    ],
+    note: 'Certified gentle.'
+  },
+  {
+    title: 'Ridiculous Amounts',
+    lines: [
+      '{name}, please accept this official decree:',
+      'you are loved quite dramatically.',
+      'The evidence is glowing, pink, and true,',
+      'and mavebot drew this heart for you.'
+    ],
+    note: 'Filed under extremely important.'
+  },
+  {
+    title: 'Little Legend',
+    lines: [
+      'Some hearts whisper, some hearts sing,',
+      'some hearts show up with a sparkling thing.',
+      'This one is for {name}, clear and bright,',
+      'a pocket-sized love poem wrapped in light.'
+    ],
+    note: 'One of one, just for them.'
+  },
+  {
+    title: 'Sweet Proof',
+    lines: [
+      '{name}, here is proof in rosy hue:',
+      'someone thought a sweet thought of you.',
+      'So take this heart, uneven and warm,',
+      'a tiny shelter from any storm.'
+    ],
+    note: 'Made with sincere pixels.'
+  }
+];
+
 const palettes = [
   {
     backgroundTop: [255, 240, 247],
@@ -70,6 +133,24 @@ const palettes = [
 
 export function randomLoveLetter() {
   return loveLetters[Math.floor(Math.random() * loveLetters.length)];
+}
+
+export function randomLoveuPoem(targetName) {
+  const safeName = String(targetName || 'you').trim() || 'you';
+  const poem = loveuPoems[Math.floor(Math.random() * loveuPoems.length)];
+  return {
+    title: poem.title,
+    body: poem.lines.map((line) => line.replaceAll('{name}', safeName)).join('\n'),
+    note: poem.note
+  };
+}
+
+function seededRandom(seed) {
+  let value = Math.abs(Number.isFinite(seed) ? Math.trunc(seed) : 0) || 1;
+  return () => {
+    value = (value * 1664525 + 1013904223) >>> 0;
+    return value / 0x100000000;
+  };
 }
 
 function crc32(buffer) {
@@ -123,16 +204,36 @@ export function createLanaHeartPng({ width = 512, height = 512, variant = 0 } = 
     throw new Error('PNG dimensions must be integers >= 64.');
   }
 
-  const palette = palettes[Math.abs(variant) % palettes.length];
+  const variantSeed = Number.isFinite(variant) ? Math.trunc(variant) : 0;
+  const palette = palettes[Math.abs(variantSeed) % palettes.length];
+  const random = seededRandom(variantSeed);
   const raw = Buffer.alloc((width * 3 + 1) * height);
-  const cx = width / 2;
-  const cy = height / 2 + height * 0.03;
-  const scale = Math.min(width, height) * 0.27;
+  const cx = width / 2 + (random() - 0.5) * width * 0.035;
+  const cy = height / 2 + height * (0.015 + random() * 0.035);
+  const scale = Math.min(width, height) * (0.25 + random() * 0.04);
+  const stretchX = 0.94 + random() * 0.13;
+  const stretchY = 0.94 + random() * 0.12;
   const sparkles = [
-    [width * 0.18, height * 0.18, 11],
-    [width * 0.78, height * 0.2, 9],
-    [width * 0.82, height * 0.74, 12],
-    [width * 0.22, height * 0.78, 8]
+    [
+      width * (0.12 + random() * 0.16),
+      height * (0.12 + random() * 0.18),
+      7 + Math.floor(random() * 8)
+    ],
+    [
+      width * (0.68 + random() * 0.2),
+      height * (0.12 + random() * 0.2),
+      7 + Math.floor(random() * 7)
+    ],
+    [
+      width * (0.68 + random() * 0.18),
+      height * (0.66 + random() * 0.2),
+      8 + Math.floor(random() * 8)
+    ],
+    [
+      width * (0.12 + random() * 0.18),
+      height * (0.66 + random() * 0.2),
+      6 + Math.floor(random() * 7)
+    ]
   ];
 
   for (let y = 0; y < height; y += 1) {
@@ -143,8 +244,8 @@ export function createLanaHeartPng({ width = 512, height = 512, variant = 0 } = 
       const bgT = y / Math.max(1, height - 1);
       let [r, g, b] = mixRgb(palette.backgroundTop, palette.backgroundBottom, bgT);
 
-      const nx = (x - cx) / scale;
-      const ny = -(y - cy) / scale;
+      const nx = ((x - cx) / scale) * stretchX;
+      const ny = (-(y - cy) / scale) * stretchY;
       const v = heartValue(nx, ny);
       const distance = Math.sqrt(nx * nx + ny * ny);
       const glow = Math.max(0, 1 - Math.abs(v) * 2.2 - distance * 0.08);

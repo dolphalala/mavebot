@@ -8,6 +8,20 @@ export const commands = [
     contexts: [0]
   },
   {
+    name: 'loveu',
+    description: 'Writes a random love poem and draws a fresh heart for someone.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'user',
+        description: 'Discord user to receive the poem.',
+        type: ApplicationCommandOptionType.User,
+        required: true
+      }
+    ]
+  },
+  {
     name: 'player',
     description: 'Shows a focused Clash of Clans player card by tag.',
     integration_types: [0],

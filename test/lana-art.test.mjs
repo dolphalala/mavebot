@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createLanaHeartPng, loveLetters, randomLoveLetter } from '../src/lana-art.mjs';
+import {
+  createLanaHeartPng,
+  loveLetters,
+  loveuPoems,
+  randomLoveLetter,
+  randomLoveuPoem
+} from '../src/lana-art.mjs';
 
 test('createLanaHeartPng returns a real PNG image buffer', () => {
   const png = createLanaHeartPng({ width: 128, height: 96, variant: 1 });
@@ -23,6 +29,13 @@ test('createLanaHeartPng rejects unusable image sizes', () => {
   );
 });
 
+test('heart variants produce different image bytes', () => {
+  const first = createLanaHeartPng({ width: 128, height: 128, variant: 101 });
+  const second = createLanaHeartPng({ width: 128, height: 128, variant: 202 });
+
+  assert.notDeepEqual(first, second);
+});
+
 test('randomLoveLetter returns one of the configured Lana notes', () => {
   const letter = randomLoveLetter();
 
@@ -30,4 +43,12 @@ test('randomLoveLetter returns one of the configured Lana notes', () => {
   assert.equal(typeof letter.title, 'string');
   assert.equal(typeof letter.body, 'string');
   assert.equal(typeof letter.note, 'string');
+});
+
+test('randomLoveuPoem writes a poem for the selected target', () => {
+  const poem = randomLoveuPoem('Dolphala');
+
+  assert.equal(loveuPoems.some((candidate) => candidate.title === poem.title), true);
+  assert.match(poem.body, /Dolphala/);
+  assert.equal(typeof poem.note, 'string');
 });

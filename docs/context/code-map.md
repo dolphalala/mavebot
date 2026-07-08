@@ -25,7 +25,8 @@ It is a map, not a replacement for reading the current source.
   and page formatting.
 - `src/moderation-store.mjs`: `/elder`, `/mute`, and `/bench` durable vote and
   permanent-record storage.
-- `src/lana-art.mjs`: generated `/lana` heart image and Lana/Allen copy.
+- `src/lana-art.mjs`: generated heart images plus `/lana` and `/loveu` love
+  copy.
 - `src/slack-bridge.mjs`: Slack Socket Mode bridge and Slack `#bot` intake.
 - `src/slack-codex-worker.mjs`: remote Codex worker queue, prompt construction,
   compacted memory, checks, commits, pushes, deploy wait, and final replies.
