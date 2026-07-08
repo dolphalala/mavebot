@@ -91,6 +91,22 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
       source: 'discord',
       channel: '1523893930993778698',
       text: 'Memory compaction is clean.'
+    },
+    {
+      at: '2026-07-07T00:05:00.000Z',
+      role: 'user',
+      user: 'Codex desktop final vision verification',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'Final live verification only. Do not change files.'
+    },
+    {
+      at: '2026-07-07T00:06:00.000Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'FINAL VISION 842'
     }
   ];
 
@@ -99,6 +115,8 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.equal(isLowSignalTranscriptRow(rows[2]), true);
   assert.equal(isLowSignalTranscriptRow(rows[3]), true);
   assert.equal(isLowSignalTranscriptRow(rows[4]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[5]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[6]), true);
 
   const snapshot = compactTranscriptRows(rows, {
     recentLimit: 5,
@@ -110,7 +128,7 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.doesNotMatch(snapshot.recent, /Smoke test from the local Codex app/);
   assert.doesNotMatch(snapshot.recent, /Discord worker path is live/);
   assert.doesNotMatch(snapshot.recent, /Memory compaction is clean/);
-  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 4/);
+  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 6/);
 });
 
 test('pruneTranscriptRowsForStorage removes low-signal rows from durable storage', () => {

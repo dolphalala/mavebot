@@ -500,12 +500,18 @@ async function moveJob(jobPath, targetDir, job, extra = {}) {
 
 export function isLowSignalTranscriptRow(row) {
   const text = String(row?.text || '').toLowerCase();
+  const user = String(row?.user || '').toLowerCase();
   if (!text.trim()) {
+    return true;
+  }
+
+  if (user.includes('codex desktop') && text.includes('verification')) {
     return true;
   }
 
   return [
     /worker verification task/,
+    /live verification only/,
     /server-worker-verification/,
     /worker smoke test/,
     /smoke test from the local codex app/,
@@ -513,8 +519,10 @@ export function isLowSignalTranscriptRow(row) {
     /worker autonomous auth fixed/,
     /worker autonomous final ok/,
     /discord worker path is live/,
+    /discord codex channel worker path is live/,
     /remote codex memory contract is live/,
     /memory compaction is clean/,
+    /^(mavebot vision|final vision) \d+$/,
     /i hit a real blocker while running this on the server/
   ].some((pattern) => pattern.test(text));
 }
