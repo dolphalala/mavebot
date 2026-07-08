@@ -60,6 +60,9 @@ command.
 - On startup, Discord `#codex` should catch up recent human messages that do
   not already have a job record in `jobs`, `processing`, `done`, or `failed`.
   This prevents restart-window messages from being silently missed.
+- If a worker push is rejected because `origin/main` advanced during a job, the
+  worker should fetch, rebase, rerun checks, and retry the push instead of
+  failing the channel request.
 - Use `docs/context/local-codex-parity.md` as the checklist for matching local
   Codex Desktop quality.
 - For slash command changes, update both command registration data and runtime

@@ -17,6 +17,7 @@ import {
   isCodexImageFile,
   isCodexAuthError,
   isLowSignalTranscriptRow,
+  isNonFastForwardPushError,
   pruneTranscriptRowsForStorage,
   readRepoContextBundle
 } from '../src/slack-codex-worker.mjs';
@@ -454,6 +455,24 @@ test('isCodexAuthError detects expired server-side Codex login failures', () => 
   );
   assert.equal(isCodexAuthError('failed to connect to websocket: HTTP error: 401 Unauthorized'), true);
   assert.equal(isCodexAuthError('npm test failed'), false);
+});
+
+test('isNonFastForwardPushError detects Git push races only', () => {
+  assert.equal(
+    isNonFastForwardPushError(
+      new Error("! [rejected] HEAD -> main (fetch first)\nerror: failed to push some refs\nUpdates were rejected because the remote contains work that you do not have locally.")
+    ),
+    true
+  );
+  assert.equal(
+    isNonFastForwardPushError({
+      result: {
+        stderr: 'error: failed to push some refs\nhint: non-fast-forward'
+      }
+    }),
+    true
+  );
+  assert.equal(isNonFastForwardPushError(new Error('npm run check failed')), false);
 });
 
 test('readRepoContextBundle loads bounded extra docs/context markdown files', async (t) => {

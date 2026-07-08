@@ -959,6 +959,15 @@ async function aheadCount() {
   return Number.parseInt(count || '0', 10) || 0;
 }
 
+export function isNonFastForwardPushError(error) {
+  const text = [
+    error?.message,
+    error?.result?.stdout,
+    error?.result?.stderr
+  ].filter(Boolean).join('\n');
+  return /fetch first|non-fast-forward|Updates were rejected/i.test(text);
+}
+
 async function commitAndPush(job) {
   if (await gitHasChanges()) {
     await git(['add', '-A']);
@@ -970,8 +979,19 @@ async function commitAndPush(job) {
     return { pushed: false, commit: await gitStdout(['rev-parse', '--short', 'HEAD']) };
   }
 
-  const fullCommit = await gitStdout(['rev-parse', 'HEAD']);
-  await git(['push', 'origin', `HEAD:${branch}`], { timeoutMs: 10 * 60 * 1000 });
+  let fullCommit = await gitStdout(['rev-parse', 'HEAD']);
+  try {
+    await git(['push', 'origin', `HEAD:${branch}`], { timeoutMs: 10 * 60 * 1000 });
+  } catch (error) {
+    if (!isNonFastForwardPushError(error)) {
+      throw error;
+    }
+    await git(['fetch', 'origin', branch], { timeoutMs: 10 * 60 * 1000 });
+    await git(['rebase', `origin/${branch}`], { timeoutMs: 10 * 60 * 1000 });
+    await runChecks();
+    fullCommit = await gitStdout(['rev-parse', 'HEAD']);
+    await git(['push', 'origin', `HEAD:${branch}`], { timeoutMs: 10 * 60 * 1000 });
+  }
   return {
     pushed: true,
     commit: fullCommit.slice(0, 12),
