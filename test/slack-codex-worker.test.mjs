@@ -109,6 +109,15 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
       source: 'discord',
       channel: '1523893930993778698',
       text: 'FINAL VISION 842'
+    },
+    {
+      at: '2026-07-07T00:07:00.000Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      jobId: 'discord-code-change-ack-123',
+      text: 'Updated the Discord #codex working acknowledgements.'
     }
   ];
 
@@ -119,6 +128,7 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.equal(isLowSignalTranscriptRow(rows[4]), true);
   assert.equal(isLowSignalTranscriptRow(rows[5]), true);
   assert.equal(isLowSignalTranscriptRow(rows[6]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[7]), true);
 
   const snapshot = compactTranscriptRows(rows, {
     recentLimit: 5,
@@ -130,7 +140,38 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.doesNotMatch(snapshot.recent, /Smoke test from the local Codex app/);
   assert.doesNotMatch(snapshot.recent, /Discord worker path is live/);
   assert.doesNotMatch(snapshot.recent, /Memory compaction is clean/);
-  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 6/);
+  assert.doesNotMatch(snapshot.recent, /working acknowledgements/);
+  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 7/);
+});
+
+test('compactTranscriptRows strips worker handoff boilerplate from retained memory', () => {
+  const snapshot = compactTranscriptRows(
+    [
+      {
+        at: '2026-07-07T00:00:00.000Z',
+        role: 'assistant',
+        user: 'mavebot',
+        source: 'slack',
+        channel: 'C0BCG0T838B',
+        text: [
+          'Added `/player` pages.',
+          '',
+          'Ready for the worker to commit/push/deploy.',
+          '',
+          'Done and live.'
+        ].join('\n')
+      }
+    ],
+    {
+      recentLimit: 5,
+      summaryLimit: 5,
+      generatedAt: '2026-07-07T00:01:00.000Z'
+    }
+  );
+
+  assert.match(snapshot.recent, /Added `\/player` pages/);
+  assert.match(snapshot.recent, /Done and live/);
+  assert.doesNotMatch(snapshot.recent, /Ready for the worker/);
 });
 
 test('pruneTranscriptRowsForStorage removes low-signal rows from durable storage', () => {
@@ -158,6 +199,15 @@ test('pruneTranscriptRowsForStorage removes low-signal rows from durable storage
       source: 'discord',
       channel: '1523893930993778698',
       text: 'Memory compaction is clean.'
+    },
+    {
+      at: '2026-07-07T00:03:00.000Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      jobId: 'discord-live-verify-123',
+      text: 'live verification only ok'
     }
   ];
 

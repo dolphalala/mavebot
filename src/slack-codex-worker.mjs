@@ -504,6 +504,7 @@ async function moveJob(jobPath, targetDir, job, extra = {}) {
 export function isLowSignalTranscriptRow(row) {
   const text = String(row?.text || '').toLowerCase();
   const user = String(row?.user || '').toLowerCase();
+  const jobId = String(row?.jobId || '').toLowerCase();
   if (!text.trim()) {
     return true;
   }
@@ -512,9 +513,14 @@ export function isLowSignalTranscriptRow(row) {
     return true;
   }
 
+  if (/^(discord-live-verify-|discord-code-change-ack-)/.test(jobId)) {
+    return true;
+  }
+
   return [
     /worker verification task/,
     /live verification only/,
+    /live verification only ok/,
     /server-worker-verification/,
     /worker smoke test/,
     /smoke test from the local codex app/,
@@ -545,7 +551,8 @@ export function compactTranscriptRows(rows, options = {}) {
     const speaker = row.role === 'assistant' ? workerName : row.user || row.role || 'unknown';
     const source = row.source || 'unknown';
     const channel = row.channel ? `/${row.channel}` : '';
-    return `- ${row.at || row.createdAt || 'unknown'} [${source}${channel}] ${speaker}: ${truncate(row.text, limit).replace(/\n+/g, ' / ')}`;
+    const text = stripSlackLinks(row.text).replace(/\n+/g, ' / ');
+    return `- ${row.at || row.createdAt || 'unknown'} [${source}${channel}] ${speaker}: ${truncate(text, limit)}`;
   };
 
   const summary = [
