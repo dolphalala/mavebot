@@ -64,7 +64,12 @@ command.
   it should check bundled message IDs, not just the final job filename, and
   group remaining adjacent messages before enqueueing. This prevents
   restart-window messages from being silently missed or replayed as stale
-  standalone jobs.
+  standalone jobs. If a burst is only partially recorded, preserve the whole
+  burst as context for the catch-up job so screenshots and follow-up text are
+  not separated from the prompt that made them meaningful.
+- When Discord `#codex` intake misbehaves, check `/healthz` for
+  `discordCodexSetupReady`, `discordCodexLastCatchup`, and
+  `discordCodexLastError` before assuming the command implementation is broken.
 - If a worker push is rejected because `origin/main` advanced during a job, the
   worker should fetch, rebase, rerun checks, and retry the push instead of
   failing the channel request.

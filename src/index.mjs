@@ -53,9 +53,9 @@ import {
   discordJobContainsMessage,
   discordCodexSetupBlocker,
   enqueueDiscordCodexWorkerJob,
-  groupDiscordCodexMessageBursts,
   hasDiscordMessageContentIntentFlag,
   materializeDiscordAttachments,
+  planDiscordCodexCatchupBursts,
   randomWorkingMessage,
   shouldHandleDiscordCodexMessage
 } from './discord-codex-control.mjs';
@@ -110,6 +110,8 @@ let readyUser = null;
 let discordCodexMessageCount = 0;
 let discordCodexLastMessageAt = null;
 let discordCodexIntentWarningSent = false;
+let discordCodexLastError = null;
+let discordCodexLastCatchup = null;
 const pendingDiscordCodexJobs = new Map();
 
 async function detectMessageContentIntentAvailable() {
@@ -156,9 +158,13 @@ app.get('/healthz', (_req, res) => {
     discordFileContextDir,
     discordAttachmentDownloadMaxBytes,
     discordCodexWorkerDebounceMs,
+    discordCodexCatchupLimit,
+    discordCodexCatchupWindowMs,
     discordCodexPendingBursts: pendingDiscordCodexJobs.size,
     discordCodexMessageCount,
     discordCodexLastMessageAt,
+    discordCodexLastCatchup,
+    discordCodexLastError,
     uptimeSec: Math.floor(process.uptime())
   });
 });
@@ -178,6 +184,21 @@ const playerViews = new Map();
 const legendsViews = new Map();
 const playerViewTtlMs = 15 * 60 * 1000;
 let stopLegendsTracker = null;
+
+function summarizeRuntimeError(error) {
+  return String(error?.message || error || 'unknown error')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 500);
+}
+
+function rememberDiscordCodexError(scope, error) {
+  discordCodexLastError = {
+    at: new Date().toISOString(),
+    scope,
+    message: summarizeRuntimeError(error)
+  };
+}
 
 function createViewId() {
   return crypto.randomBytes(8).toString('hex');
@@ -252,10 +273,16 @@ async function discordCodexMessageRecordExists(message) {
 }
 
 async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup = false } = {}) {
-  const files = await materializeDiscordAttachments(message, {
-    contextDir: discordFileContextDir,
-    maxBytes: discordAttachmentDownloadMaxBytes
-  });
+  let files = [];
+  try {
+    files = await materializeDiscordAttachments(message, {
+      contextDir: discordFileContextDir,
+      maxBytes: discordAttachmentDownloadMaxBytes
+    });
+  } catch (error) {
+    rememberDiscordCodexError('attachment-download', error);
+    throw error;
+  }
   const row = buildDiscordMessageRow(message, { files });
 
   if (catchup) {
@@ -294,19 +321,29 @@ async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup
   return result;
 }
 
-async function enqueueDiscordCodexMessageBurst(messages, { acknowledge = true, catchup = false } = {}) {
+async function enqueueDiscordCodexMessageBurst(
+  messages,
+  { acknowledge = true, catchup = false, sourceMessageId = '' } = {}
+) {
   const rows = [];
   for (const message of messages) {
-    const files = await materializeDiscordAttachments(message, {
-      contextDir: discordFileContextDir,
-      maxBytes: discordAttachmentDownloadMaxBytes
-    });
+    let files = [];
+    try {
+      files = await materializeDiscordAttachments(message, {
+        contextDir: discordFileContextDir,
+        maxBytes: discordAttachmentDownloadMaxBytes
+      });
+    } catch (error) {
+      rememberDiscordCodexError('attachment-download', error);
+      throw error;
+    }
     rows.push(buildDiscordMessageRow(message, { files }));
   }
 
   const sourceMessage = messages.at(-1);
   const job = buildDiscordCodexWorkerJob(sourceMessage, {
-    messageRows: rows
+    messageRows: rows,
+    sourceMessageId
   });
   const result = await enqueueDiscordCodexWorkerJob(discordCodexWorkerJobDir, job);
   if (result.queued) {
@@ -346,25 +383,28 @@ async function catchUpDiscordCodexChannel() {
         ? discordCodexCatchupLimit
         : 12
     });
-    const unhandled = [];
-    for (const message of groupDiscordCodexMessageBursts(messages, {
+    const plan = await planDiscordCodexCatchupBursts(messages, {
       channelId: discordCodexChannelId,
       windowMs: catchupWindowMs,
-      gapMs: catchupBurstGapMs
-    }).flat()) {
-      if (!(await discordCodexMessageRecordExists(message))) {
-        unhandled.push(message);
-      }
-    }
-    const bursts = groupDiscordCodexMessageBursts(unhandled, {
-      channelId: discordCodexChannelId,
-      windowMs: catchupWindowMs,
-      gapMs: catchupBurstGapMs
+      gapMs: catchupBurstGapMs,
+      handled: discordCodexMessageRecordExists
     });
-    for (const burst of bursts) {
-      await enqueueDiscordCodexMessageBurst(burst, { catchup: true });
+    discordCodexLastCatchup = {
+      at: new Date().toISOString(),
+      scannedBursts: plan.scannedBursts,
+      queuedBursts: plan.queuedBursts,
+      skippedHandledBursts: plan.skippedHandledBursts,
+      partialBursts: plan.partialBursts,
+      handledMessages: plan.handledMessages
+    };
+    for (const entry of plan.entries) {
+      await enqueueDiscordCodexMessageBurst(entry.messages, {
+        catchup: true,
+        sourceMessageId: entry.sourceMessageId
+      });
     }
   } catch (error) {
+    rememberDiscordCodexError('catch-up', error);
     console.error('Discord Codex catch-up failed:', error);
   }
 }
@@ -416,6 +456,7 @@ function scheduleDiscordCodexWorkerJob(message, row) {
         })
       );
     })().catch((error) => {
+      rememberDiscordCodexError('enqueue', error);
       console.error('Discord Codex channel enqueue failed:', error);
       pending.message?.channel?.send?.({
         content: 'I could not start that yet. I saved the error in the server logs.',
@@ -965,6 +1006,7 @@ client.on(Events.MessageCreate, async (message) => {
   try {
     await enqueueDiscordCodexMessage(message);
   } catch (error) {
+    rememberDiscordCodexError('message-create', error);
     console.error('Discord Codex channel enqueue failed:', error);
     await message.channel.send({
       content: 'I could not start that yet. I saved the error in the server logs.',

@@ -32,3 +32,16 @@ test('player runtime replies before hydrating the heavier army image', async () 
   assert.match(source, /armyImageLoading: true/);
   assert.match(source, /void hydratePlayerArmyCard\(view, player, tag\)/);
 });
+
+test('Discord Codex runtime exposes intake diagnostics in health output', async () => {
+  const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
+
+  assert.match(source, /discordCodexLastCatchup/);
+  assert.match(source, /discordCodexLastError/);
+  assert.match(source, /discordCodexCatchupLimit/);
+  assert.match(source, /discordCodexCatchupWindowMs/);
+  assert.match(source, /rememberDiscordCodexError\('catch-up'/);
+  assert.match(source, /rememberDiscordCodexError\('enqueue'/);
+  assert.match(source, /rememberDiscordCodexError\('attachment-download'/);
+  assert.match(source, /rememberDiscordCodexError\('message-create'/);
+});

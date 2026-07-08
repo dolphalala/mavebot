@@ -90,7 +90,14 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Discord restart catch-up groups still-unhandled adjacent messages into the
   same worker job instead of replaying each recent message separately. This
   keeps post-restart behavior closer to Codex Desktop, where context,
-  screenshots, and follow-ups remain one active turn.
+  screenshots, and follow-ups remain one active turn. If only part of a recent
+  burst is already recorded, catch-up preserves the whole burst as context for
+  the remaining job instead of stripping away the handled row and replaying a
+  stale fragment.
+- The Discord bot `/healthz` response includes `discordCodexLastCatchup` and
+  `discordCodexLastError` so remote-runner intake issues can be diagnosed from
+  the server without guessing whether the fault was message intent, attachment
+  download, catch-up, enqueue, or worker queue state.
 - The deploy script builds `discord-bot`, `slack-bridge`, and `codex-worker`.
   It recreates `codex-worker` only when no worker job is active; if a job is in
   `processing`, it writes `shared/codex-worker/restart-needed` and the poll

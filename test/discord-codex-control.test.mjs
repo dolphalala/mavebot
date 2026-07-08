@@ -18,6 +18,7 @@ import {
   enqueueDiscordCodexWorkerJob,
   hasDiscordMessageContentIntentFlag,
   materializeDiscordAttachments,
+  planDiscordCodexCatchupBursts,
   randomWorkingMessage,
   recentDiscordCodexMessagesForCatchup,
   shouldHandleDiscordCodexMessage
@@ -186,6 +187,47 @@ test('buildDiscordCodexWorkerJob bundles adjacent Discord messages and files', (
   assert.equal(discordJobContainsMessage(job, 'm3'), false);
 });
 
+test('buildDiscordCodexWorkerJob can anchor bundled context to a specific source row', () => {
+  const rows = [
+    buildDiscordMessageRow({
+      id: 'unhandled',
+      channelId: '1523893930993778698',
+      guildId: 'guild-1',
+      createdTimestamp: Date.parse('2026-07-08T12:00:00.000Z'),
+      content: 'new follow-up',
+      author: { id: 'user-1', username: 'Allen', bot: false }
+    }),
+    buildDiscordMessageRow({
+      id: 'already-handled',
+      channelId: '1523893930993778698',
+      guildId: 'guild-1',
+      createdTimestamp: Date.parse('2026-07-08T12:00:05.000Z'),
+      content: 'old handled context',
+      author: { id: 'user-1', username: 'Allen', bot: false }
+    })
+  ];
+
+  const job = buildDiscordCodexWorkerJob(
+    {
+      id: 'already-handled',
+      channelId: '1523893930993778698',
+      guildId: 'guild-1',
+      author: { id: 'user-1', username: 'Allen' }
+    },
+    {
+      messageRows: rows,
+      sourceMessageId: 'unhandled',
+      createdAt: '2026-07-08T12:00:06.000Z'
+    }
+  );
+
+  assert.equal(job.id, '1523893930993778698-unhandled');
+  assert.equal(job.ts, '2026-07-08T12:00:00.000Z');
+  assert.deepEqual(job.messageIds, ['unhandled', 'already-handled']);
+  assert.match(job.text, /new follow-up/);
+  assert.match(job.text, /old handled context/);
+});
+
 test('recentDiscordCodexMessagesForCatchup selects recent unhandled human prompts', () => {
   const now = Date.parse('2026-07-08T11:20:00.000Z');
   const messages = [
@@ -290,6 +332,65 @@ test('groupDiscordCodexMessageBursts keeps restart catch-up prompts together', (
     bursts.map((burst) => burst.map((message) => message.id)),
     [['first', 'screen', 'follow-up'], ['later']]
   );
+});
+
+test('planDiscordCodexCatchupBursts keeps partially handled bursts intact', async () => {
+  const now = Date.parse('2026-07-08T12:00:00.000Z');
+  const messages = [
+    {
+      id: 'already-queued',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 20_000,
+      content: 'look into what happened',
+      author: { id: 'user-1', bot: false }
+    },
+    {
+      id: 'screenshot',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 12_000,
+      content: '',
+      attachments: attachmentMap([
+        { id: 'att-1', name: 'screen.png', url: 'https://cdn.discordapp.com/screen.png' }
+      ]),
+      author: { id: 'user-1', bot: false }
+    },
+    {
+      id: 'follow-up',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 2_000,
+      content: 'this is the same issue',
+      author: { id: 'user-1', bot: false }
+    },
+    {
+      id: 'all-handled',
+      channelId: '1523893930993778698',
+      createdTimestamp: now + 30_000,
+      content: 'old handled ask',
+      author: { id: 'user-1', bot: false }
+    }
+  ];
+
+  const plan = await planDiscordCodexCatchupBursts(messages, {
+    channelId: '1523893930993778698',
+    now: now + 30_000,
+    windowMs: 60_000,
+    gapMs: 15_000,
+    handled: async (message) => ['already-queued', 'all-handled'].includes(message.id)
+  });
+
+  assert.deepEqual(
+    plan.bursts.map((burst) => burst.map((message) => message.id)),
+    [['already-queued', 'screenshot', 'follow-up']]
+  );
+  assert.deepEqual(
+    plan.entries.map((entry) => entry.sourceMessageId),
+    ['follow-up']
+  );
+  assert.equal(plan.scannedBursts, 2);
+  assert.equal(plan.queuedBursts, 1);
+  assert.equal(plan.skippedHandledBursts, 1);
+  assert.equal(plan.partialBursts, 1);
+  assert.equal(plan.handledMessages, 2);
 });
 
 test('enqueueDiscordCodexWorkerJob writes one private worker job', async (t) => {

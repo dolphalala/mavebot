@@ -299,6 +299,71 @@ export function groupDiscordCodexMessageBursts(
   return bursts;
 }
 
+export async function planDiscordCodexCatchupBursts(
+  messages = [],
+  {
+    channelId,
+    now = Date.now(),
+    windowMs = DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS,
+    gapMs = DEFAULT_DISCORD_CODEX_BURST_GAP_MS,
+    handled = async () => false
+  } = {}
+) {
+  const bursts = groupDiscordCodexMessageBursts(messages, {
+    channelId,
+    now,
+    windowMs,
+    gapMs
+  });
+  const planned = [];
+  let skippedHandledBursts = 0;
+  let partialBursts = 0;
+  let handledMessages = 0;
+
+  for (const burst of bursts) {
+    const statuses = await Promise.all(
+      burst.map(async (message) => {
+        try {
+          return Boolean(await handled(message));
+        } catch {
+          return false;
+        }
+      })
+    );
+    const handledCount = statuses.filter(Boolean).length;
+    handledMessages += handledCount;
+
+    if (handledCount === burst.length) {
+      skippedHandledBursts += 1;
+      continue;
+    }
+
+    if (handledCount > 0) {
+      partialBursts += 1;
+    }
+
+    const sourceMessage = burst.findLast((message, index) => !statuses[index]) || burst.at(-1);
+
+    // Keep the whole partially handled burst as context. The queued job may
+    // include an already-handled row, but this preserves the local-session
+    // shape better than replaying the remaining rows as stale fragments.
+    planned.push({
+      messages: burst,
+      sourceMessageId: sourceMessage?.id || ''
+    });
+  }
+
+  return {
+    bursts: planned.map((entry) => entry.messages),
+    entries: planned,
+    scannedBursts: bursts.length,
+    queuedBursts: planned.length,
+    skippedHandledBursts,
+    partialBursts,
+    handledMessages
+  };
+}
+
 export function discordRowsToWorkerText(rows = []) {
   const normalizedRows = (rows || []).filter(Boolean);
   if (!normalizedRows.length) {
@@ -328,10 +393,18 @@ export function discordRowsToWorkerText(rows = []) {
 
 export function buildDiscordCodexWorkerJob(
   message,
-  { createdAt = new Date().toISOString(), files = [], messageRows = [] } = {}
+  {
+    createdAt = new Date().toISOString(),
+    files = [],
+    messageRows = [],
+    sourceMessageId = ''
+  } = {}
 ) {
   const rows = messageRows.length ? messageRows : [buildDiscordMessageRow(message, { files })];
-  const sourceRow = rows.at(-1) || {};
+  const sourceRow =
+    (sourceMessageId ? rows.find((row) => row?.id === sourceMessageId) : null) ||
+    rows.at(-1) ||
+    {};
   const sourceTs = sourceRow.id || message?.id || String(Date.now());
   const allFiles = rows.flatMap((row) => row?.files || []);
   const messageIds = rows.map((row) => row?.id).filter(Boolean);
