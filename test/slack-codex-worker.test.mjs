@@ -268,12 +268,18 @@ test('Codex exec args attach image files from Discord or Slack jobs', () => {
       name: 'notes.txt',
       mimetype: 'text/plain',
       localPath: '/shared/codex-worker/context/discord-files/C/M/03-notes.txt'
+    },
+    {
+      name: 'animated.gif',
+      mimetype: 'image/gif',
+      localPath: '/shared/codex-worker/context/discord-files/C/M/04-animated.gif'
     }
   ];
 
   assert.equal(isCodexImageFile(imageFiles[0]), true);
   assert.equal(isCodexImageFile(imageFiles[1]), true);
   assert.equal(isCodexImageFile(imageFiles[2]), false);
+  assert.equal(isCodexImageFile(imageFiles[3]), false);
 
   const imagePaths = codexImagePathsForJob({ files: imageFiles }, { maxImages: 1 });
   assert.deepEqual(imagePaths, ['/shared/codex-worker/context/discord-files/C/M/01-discord-screen.png']);

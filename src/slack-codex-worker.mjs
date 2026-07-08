@@ -113,7 +113,8 @@ function truncate(value, limit = 2000) {
   return `${text.slice(0, limit)}...`;
 }
 
-const codexImageExtensionPattern = /\.(?:png|jpe?g|webp|gif)$/i;
+const codexImageExtensionPattern = /\.(?:png|jpe?g|webp)$/i;
+const codexImageMimeTypes = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
 
 export function isCodexImageFile(file = {}) {
   const localPath = String(file?.localPath || '');
@@ -122,7 +123,7 @@ export function isCodexImageFile(file = {}) {
   }
 
   const mimetype = String(file?.mimetype || file?.contentType || '').toLowerCase();
-  return mimetype.startsWith('image/') || codexImageExtensionPattern.test(localPath);
+  return codexImageMimeTypes.has(mimetype) || codexImageExtensionPattern.test(localPath);
 }
 
 export function codexImagePathsForJob(job = {}, { maxImages = maxCodexImages } = {}) {
