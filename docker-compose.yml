@@ -15,6 +15,7 @@ services:
       LEGENDS_STORE_PATH: /shared/legends-tracking.json
       LEGENDS_TRACK_INTERVAL_MS: 120000
       ELDER_STORE_PATH: /shared/elder-votes.json
+      PICTIONARY_STORE_PATH: /shared/pictionary-leaderboard.json
       DISCORD_CODEX_CHANNEL_ID: "1523893930993778698"
       DISCORD_CODEX_WORKER_JOB_DIR: /shared/codex-worker/jobs
       DISCORD_FILE_CONTEXT_DIR: /shared/codex-worker/context/discord-files

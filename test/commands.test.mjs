@@ -72,6 +72,33 @@ test('legends command is guild-install only and requires a player tag option', (
   ]);
 });
 
+test('pictionary command is guild-install only and allows round settings', () => {
+  const pictionary = commands.find((command) => command.name === 'pictionary');
+
+  assert.ok(pictionary);
+  assert.match(pictionary.description, /picture guessing game/i);
+  assert.deepEqual(pictionary.integration_types, [0]);
+  assert.deepEqual(pictionary.contexts, [0]);
+  assert.deepEqual(pictionary.options, [
+    {
+      name: 'rounds',
+      description: 'Number of rounds for this game.',
+      type: ApplicationCommandOptionType.Integer,
+      required: false,
+      min_value: 3,
+      max_value: 10
+    },
+    {
+      name: 'seconds',
+      description: 'Seconds allowed for each round.',
+      type: ApplicationCommandOptionType.Integer,
+      required: false,
+      min_value: 15,
+      max_value: 90
+    }
+  ]);
+});
+
 test('elder command is guild-install only and selects a Discord user', () => {
   const elder = commands.find((command) => command.name === 'elder');
 

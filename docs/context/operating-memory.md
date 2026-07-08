@@ -19,6 +19,9 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   - `/legends`: starts or views Legend League trophy tracking for a player tag.
     The command stores snapshots in the server shared volume and shows timeline
     plus current Legend-day pages.
+  - `/pictionary`: starts a Clash of Clans picture guessing game in the current
+    channel. It uses generated Clash-themed PNG cards, random categories per
+    round, chat guesses, and a persisted guild leaderboard.
   - `/elder`: lets a server admin or existing elder grant elder status to a
     Discord user.
   - `/mute`: elder vote command. Three unique elder votes mute the target for
@@ -48,6 +51,11 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   Deploy initializes and chowns it as `/shared/elder-votes.json`; if malformed
   JSON is detected, runtime preserves the bad file as a `.corrupt-*` backup
   before starting a clean store.
+- Pictionary leaderboard store:
+  `/opt/urba-apps/discord-bot/shared/pictionary-leaderboard.json`.
+  Deploy initializes and chowns it as `/shared/pictionary-leaderboard.json`;
+  if malformed JSON is detected, runtime preserves the bad file as a
+  `.corrupt-*` backup before starting a clean store.
 - Current live Discord permissions include Administrator, Manage Roles, and
   Moderate Members, but Discord role hierarchy still applies. If mute/bench
   must affect high-role users, move the mavebot role above those users/roles in

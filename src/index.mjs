@@ -41,6 +41,20 @@ import {
   recordModerationOutcome,
   submitModerationVote
 } from './moderation-store.mjs';
+import {
+  DEFAULT_PICTIONARY_ROUND_SECONDS,
+  DEFAULT_PICTIONARY_ROUNDS,
+  buildPictionaryLeaderboard,
+  formatPictionaryLeaderboard,
+  isCorrectPictionaryGuess,
+  normalizePictionaryRoundSeconds,
+  normalizePictionaryRounds,
+  pictionaryStorePath,
+  readPictionaryStore,
+  recordPictionaryGame,
+  renderPictionaryRoundImage,
+  selectPictionaryTopic
+} from './pictionary-game.mjs';
 import { playerArmyAssetNames, renderPlayerArmyCard } from './player-card.mjs';
 import {
   DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
@@ -115,7 +129,7 @@ let discordCodexLastCatchup = null;
 const pendingDiscordCodexJobs = new Map();
 
 async function detectMessageContentIntentAvailable() {
-  if (!discordCodexChannelId || discordMessageContentIntentPreference === '0') {
+  if (discordMessageContentIntentPreference === '0') {
     return false;
   }
   if (discordMessageContentIntentPreference === '1') {
@@ -138,11 +152,12 @@ async function detectMessageContentIntentAvailable() {
 const discordMessageContentIntentAvailable =
   await detectMessageContentIntentAvailable();
 const discordMessageContentIntentRequested =
-  Boolean(discordCodexChannelId && discordMessageContentIntentAvailable);
+  Boolean(discordMessageContentIntentAvailable);
 const discordCodexSetupMessage = discordCodexSetupBlocker({
   channelIdConfigured: Boolean(discordCodexChannelId),
   messageContentIntentRequested: discordMessageContentIntentRequested
 });
+const activePictionaryGames = new Map();
 
 const app = express();
 app.get('/healthz', (_req, res) => {
@@ -165,6 +180,8 @@ app.get('/healthz', (_req, res) => {
     discordCodexLastMessageAt,
     discordCodexLastCatchup,
     discordCodexLastError,
+    pictionaryStorePath: pictionaryStorePath(),
+    pictionaryActiveGames: activePictionaryGames.size,
     uptimeSec: Math.floor(process.uptime())
   });
 });
@@ -970,6 +987,310 @@ async function handleLegendsButton(interaction) {
   await interaction.update(renderLegendsView(view, pageId));
 }
 
+function pictionaryGameKey(guildId, channelId) {
+  return `${guildId || 'dm'}:${channelId}`;
+}
+
+function discordDisplayName(user) {
+  return user?.globalName || user?.username || user?.tag || user?.id || 'Unknown player';
+}
+
+function pictionaryScoreboardLines(game) {
+  const players = [...game.players.values()].sort(
+    (left, right) =>
+      right.score - left.score ||
+      String(left.name).localeCompare(String(right.name))
+  );
+  if (!players.length) {
+    return 'No correct guesses yet.';
+  }
+  return players
+    .map((player, index) => `${index + 1}. ${player.name} - ${player.score}`)
+    .join('\n')
+    .slice(0, 900);
+}
+
+function buildPictionaryRoundEmbed(game, topic) {
+  return new EmbedBuilder()
+    .setColor(Number.parseInt(String(topic.accent || '#4fc3f7').replace('#', ''), 16) || 0x4fc3f7)
+    .setTitle(`Clash Pictionary - Round ${game.roundNumber}/${game.rounds}`)
+    .setDescription([
+      `Category: **${topic.category}**`,
+      `First exact guess in chat wins this round. You have **${game.roundSeconds}s**.`,
+      '',
+      'Type the Clash of Clans name, abbreviation, or common nickname.'
+    ].join('\n'))
+    .setImage('attachment://clash-pictionary.png')
+    .addFields({
+      name: 'This game',
+      value: pictionaryScoreboardLines(game)
+    })
+    .setFooter({ text: `Hosted by ${game.hostName}` })
+    .setTimestamp();
+}
+
+function buildPictionaryResultEmbed(game, { winnerUser = null, answer }) {
+  const description = winnerUser
+    ? `${userMention(winnerUser.id)} got it first. Answer: **${answer}**`
+    : `Time. The answer was **${answer}**.`;
+  return new EmbedBuilder()
+    .setColor(winnerUser ? 0x67d5a5 : 0xffb454)
+    .setTitle(winnerUser ? 'Round won' : 'Round ended')
+    .setDescription(description)
+    .addFields({
+      name: 'Scores',
+      value: pictionaryScoreboardLines(game)
+    })
+    .setFooter({ text: `Round ${game.roundNumber}/${game.rounds}` })
+    .setTimestamp();
+}
+
+function buildPictionaryFinalEmbed(game, leaderboard) {
+  const gameWinner = [...game.players.values()].sort(
+    (left, right) =>
+      right.score - left.score ||
+      String(left.name).localeCompare(String(right.name))
+  )[0];
+  const winnerLine = gameWinner
+    ? `Game winner: **${gameWinner.name}** with **${gameWinner.score}**.`
+    : 'Nobody scored this game.';
+
+  return new EmbedBuilder()
+    .setColor(0xf0b13b)
+    .setTitle('Clash Pictionary leaderboard')
+    .setDescription([
+      winnerLine,
+      '',
+      '**All-time stats**',
+      formatPictionaryLeaderboard(leaderboard)
+    ].join('\n'))
+    .setFooter({ text: 'Stats are saved in the server leaderboard database.' })
+    .setTimestamp();
+}
+
+async function endPictionaryGame(game) {
+  if (game.ended) {
+    return;
+  }
+  game.ended = true;
+  activePictionaryGames.delete(game.key);
+  if (game.roundTimer) {
+    clearTimeout(game.roundTimer);
+  }
+  if (game.nextRoundTimer) {
+    clearTimeout(game.nextRoundTimer);
+  }
+
+  const players = [...game.players.values()].map((player) => ({
+    user: player.user,
+    score: player.score
+  }));
+  const winner = players
+    .filter((player) => player.score > 0)
+    .sort((left, right) => right.score - left.score)[0];
+  const result = await recordPictionaryGame(game.guildId, {
+    channelId: game.channelId,
+    gameId: game.id,
+    startedAt: game.startedAt,
+    rounds: game.rounds,
+    winnerUser: winner?.user || null,
+    players,
+    storePath: pictionaryStorePath()
+  });
+
+  await game.channel.send({
+    embeds: [buildPictionaryFinalEmbed(game, result.leaderboard)],
+    allowedMentions: { parse: [] }
+  });
+}
+
+async function finishPictionaryRound(game, { winnerUser = null } = {}) {
+  if (game.ended || !game.accepting || !game.currentTopic) {
+    return;
+  }
+  game.accepting = false;
+  if (game.roundTimer) {
+    clearTimeout(game.roundTimer);
+    game.roundTimer = null;
+  }
+
+  if (winnerUser) {
+    const existing = game.players.get(winnerUser.id);
+    game.players.set(winnerUser.id, {
+      user: winnerUser,
+      name: discordDisplayName(winnerUser),
+      score: (existing?.score || 0) + 1
+    });
+  }
+
+  await game.channel.send({
+    embeds: [
+      buildPictionaryResultEmbed(game, {
+        winnerUser,
+        answer: game.currentTopic.answer
+      })
+    ],
+    allowedMentions: winnerUser ? { users: [winnerUser.id] } : { parse: [] }
+  });
+
+  if (game.roundNumber >= game.rounds) {
+    await endPictionaryGame(game);
+    return;
+  }
+
+  game.nextRoundTimer = setTimeout(() => {
+    game.nextRoundTimer = null;
+    beginPictionaryRound(game).catch(async (error) => {
+      console.error('/pictionary next round failed:', error);
+      activePictionaryGames.delete(game.key);
+      await game.channel.send({
+        content: 'The Pictionary game hit an error and had to stop.',
+        allowedMentions: { parse: [] }
+      }).catch(() => {});
+    });
+  }, 3500);
+  game.nextRoundTimer.unref?.();
+}
+
+async function beginPictionaryRound(game) {
+  if (game.ended) {
+    return;
+  }
+  game.roundNumber += 1;
+  const topic = selectPictionaryTopic({
+    usedTopicIds: game.usedTopicIds,
+    previousCategory: game.previousCategory
+  });
+  game.usedTopicIds.push(topic.id);
+  game.previousCategory = topic.category;
+  game.currentTopic = topic;
+  game.accepting = true;
+
+  const image = await renderPictionaryRoundImage(topic, {
+    round: game.roundNumber,
+    totalRounds: game.rounds,
+    seconds: game.roundSeconds
+  });
+  const attachment = new AttachmentBuilder(image, {
+    name: 'clash-pictionary.png'
+  });
+  await game.channel.send({
+    embeds: [buildPictionaryRoundEmbed(game, topic)],
+    files: [attachment],
+    allowedMentions: { parse: [] }
+  });
+
+  game.roundTimer = setTimeout(() => {
+    finishPictionaryRound(game).catch(async (error) => {
+      console.error('/pictionary timeout failed:', error);
+      activePictionaryGames.delete(game.key);
+      await game.channel.send({
+        content: 'The Pictionary game hit an error and had to stop.',
+        allowedMentions: { parse: [] }
+      }).catch(() => {});
+    });
+  }, game.roundSeconds * 1000);
+  game.roundTimer.unref?.();
+}
+
+async function handlePictionaryCommand(interaction) {
+  if (!interaction.guildId || !interaction.channel) {
+    await interaction.reply({
+      content: '/pictionary only works inside a Discord server channel.',
+      ephemeral: true
+    });
+    return;
+  }
+
+  if (!discordMessageContentIntentRequested) {
+    await interaction.reply({
+      content: 'I need Discord Message Content Intent enabled before I can read Pictionary guesses.',
+      ephemeral: true
+    });
+    return;
+  }
+
+  const key = pictionaryGameKey(interaction.guildId, interaction.channelId);
+  if (activePictionaryGames.has(key)) {
+    await interaction.reply({
+      content: 'A Clash Pictionary game is already running in this channel.',
+      ephemeral: true
+    });
+    return;
+  }
+
+  const rounds = normalizePictionaryRounds(
+    interaction.options.getInteger('rounds') || DEFAULT_PICTIONARY_ROUNDS
+  );
+  const roundSeconds = normalizePictionaryRoundSeconds(
+    interaction.options.getInteger('seconds') || DEFAULT_PICTIONARY_ROUND_SECONDS
+  );
+  const store = await readPictionaryStore(pictionaryStorePath());
+  const leaderboard = buildPictionaryLeaderboard(store, interaction.guildId, { limit: 5 });
+  const game = {
+    id: createViewId(),
+    key,
+    guildId: interaction.guildId,
+    channelId: interaction.channelId,
+    channel: interaction.channel,
+    hostId: interaction.user.id,
+    hostName: discordDisplayName(interaction.user),
+    rounds,
+    roundSeconds,
+    roundNumber: 0,
+    usedTopicIds: [],
+    previousCategory: '',
+    currentTopic: null,
+    accepting: false,
+    ended: false,
+    startedAt: new Date(),
+    players: new Map(),
+    roundTimer: null,
+    nextRoundTimer: null
+  };
+
+  activePictionaryGames.set(key, game);
+  await interaction.reply({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0x4fc3f7)
+        .setTitle('Clash Pictionary is starting')
+        .setDescription([
+          `${rounds} rounds. ${roundSeconds} seconds each.`,
+          'Guess the Clash of Clans picture in chat. First correct answer wins the round.',
+          '',
+          '**Leaderboard preview**',
+          formatPictionaryLeaderboard(leaderboard)
+        ].join('\n'))
+        .setTimestamp()
+    ],
+    allowedMentions: { parse: [] }
+  });
+
+  beginPictionaryRound(game).catch(async (error) => {
+    console.error('/pictionary start failed:', error);
+    activePictionaryGames.delete(key);
+    await interaction.channel.send({
+      content: 'I could not start the Pictionary game right now.',
+      allowedMentions: { parse: [] }
+    }).catch(() => {});
+  });
+}
+
+async function handlePictionaryGuessMessage(message) {
+  if (!message.guildId || message.author?.bot || message.system || message.webhookId) {
+    return false;
+  }
+  const game = activePictionaryGames.get(pictionaryGameKey(message.guildId, message.channelId));
+  if (!game) {
+    return false;
+  }
+  if (game.accepting && isCorrectPictionaryGuess(message.content, game.currentTopic)) {
+    await finishPictionaryRound(game, { winnerUser: message.author });
+  }
+  return true;
+}
+
 client.once(Events.ClientReady, (readyClient) => {
   ready = true;
   readyUser = readyClient.user.tag;
@@ -996,6 +1317,19 @@ client.on(Events.MessageCreate, async (message) => {
         allowedMentions: { parse: [] }
       }).catch(() => {});
     }
+    return;
+  }
+
+  try {
+    if (await handlePictionaryGuessMessage(message)) {
+      return;
+    }
+  } catch (error) {
+    console.error('/pictionary guess handling failed:', error);
+    await message.channel?.send?.({
+      content: 'I had trouble reading that Pictionary guess.',
+      allowedMentions: { parse: [] }
+    }).catch(() => {});
     return;
   }
 
@@ -1171,6 +1505,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.editReply(message);
       console.error('Legend tracker command failed:', error);
     }
+    return;
+  }
+
+  if (interaction.commandName === 'pictionary') {
+    await handlePictionaryCommand(interaction);
     return;
   }
 

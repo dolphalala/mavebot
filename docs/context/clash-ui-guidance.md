@@ -54,6 +54,18 @@ Every Slack/Codex worker task that touches Clash commands should read it after
 - Button menus may expire; expired buttons should tell the user to rerun the
   command instead of throwing Discord interaction errors.
 
+## `/pictionary` Shape
+
+- `/pictionary` should stay Clash-only across troops, heroes, spells, defenses,
+  buildings, resources, traps, siege machines, hero pets, hero equipment,
+  leagues, clan play, and Builder Base.
+- Round cards should be generated PNGs with category labels and visual/text
+  clues, but they should not print the exact answer on the card.
+- Chat guesses should be exact answer or documented common aliases so partial
+  generic words do not steal rounds.
+- Leaderboard stats are durable guild state under `/shared` and should be
+  shown at the end of each multi-round game.
+
 ## Context Hygiene
 
 - Long-lived Slack control will accumulate messages forever. Do not treat old

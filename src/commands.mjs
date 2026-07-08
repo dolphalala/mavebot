@@ -54,6 +54,30 @@ export const commands = [
     ]
   },
   {
+    name: 'pictionary',
+    description: 'Starts a Clash of Clans picture guessing game.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'rounds',
+        description: 'Number of rounds for this game.',
+        type: ApplicationCommandOptionType.Integer,
+        required: false,
+        min_value: 3,
+        max_value: 10
+      },
+      {
+        name: 'seconds',
+        description: 'Seconds allowed for each round.',
+        type: ApplicationCommandOptionType.Integer,
+        required: false,
+        min_value: 15,
+        max_value: 90
+      }
+    ]
+  },
+  {
     name: 'elder',
     description: 'Allows a server member to use elder vote commands.',
     integration_types: [0],

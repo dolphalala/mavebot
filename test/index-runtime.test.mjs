@@ -33,6 +33,20 @@ test('player runtime replies before hydrating the heavier army image', async () 
   assert.match(source, /void hydratePlayerArmyCard\(view, player, tag\)/);
 });
 
+test('pictionary runtime handles guesses before Discord Codex intake', async () => {
+  const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
+
+  assert.match(source, /handlePictionaryCommand\(interaction\)/);
+  assert.match(source, /handlePictionaryGuessMessage\(message\)/);
+  assert.match(source, /isCorrectPictionaryGuess/);
+  assert.match(source, /recordPictionaryGame/);
+  assert.ok(
+    source.indexOf('handlePictionaryGuessMessage(message)') <
+      source.indexOf('shouldHandleDiscordCodexMessage(message, discordCodexChannelId)'),
+    'pictionary guesses should not be enqueued as Codex jobs'
+  );
+});
+
 test('Discord Codex runtime exposes intake diagnostics in health output', async () => {
   const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
 
