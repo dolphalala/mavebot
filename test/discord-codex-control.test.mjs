@@ -5,10 +5,16 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   buildDiscordCodexWorkerJob,
+  buildDiscordMessageRow,
   DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE,
+  DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
   discordCodexSetupBlocker,
+  discordFilesToWorkerLines,
   discordMessageToWorkerText,
+  discordRowsToWorkerText,
   enqueueDiscordCodexWorkerJob,
+  hasDiscordMessageContentIntentFlag,
+  materializeDiscordAttachments,
   randomWorkingMessage,
   shouldHandleDiscordCodexMessage
 } from '../src/discord-codex-control.mjs';
@@ -46,6 +52,51 @@ test('discordMessageToWorkerText preserves attachment URLs for Codex context', (
   assert.match(text, /\[attachment: screen\.png\] https:\/\/cdn\.discordapp\.com\/screen\.png/);
 });
 
+test('hasDiscordMessageContentIntentFlag accepts full and limited Discord app flags', () => {
+  assert.equal(hasDiscordMessageContentIntentFlag(262144), true);
+  assert.equal(hasDiscordMessageContentIntentFlag(524288), true);
+  assert.equal(hasDiscordMessageContentIntentFlag(262144 | 524288), true);
+  assert.equal(hasDiscordMessageContentIntentFlag(0), false);
+});
+
+test('materializeDiscordAttachments downloads screenshots into local worker context', async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'mavebot-discord-files-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+
+  const files = await materializeDiscordAttachments(
+    {
+      id: 'msg-1',
+      channelId: '1523893930993778698',
+      attachments: attachmentMap([
+        {
+          id: 'att-1',
+          name: 'screen.png',
+          contentType: 'image/png',
+          size: 5,
+          url: 'https://cdn.discordapp.com/screen.png'
+        }
+      ])
+    },
+    {
+      contextDir: dir,
+      maxBytes: DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        arrayBuffer: async () => Uint8Array.from([1, 2, 3, 4, 5]).buffer
+      })
+    }
+  );
+
+  assert.equal(files.length, 1);
+  assert.match(files[0].localPath, /1523893930993778698.*msg-1.*screen\.png/);
+  assert.equal(files[0].bytes, 5);
+  assert.equal((await readFile(files[0].localPath)).length, 5);
+  assert.deepEqual(discordFilesToWorkerLines(files), [
+    `[file: screen.png | type: image/png | local: ${files[0].localPath} | discord: https://cdn.discordapp.com/screen.png]`
+  ]);
+});
+
 test('buildDiscordCodexWorkerJob marks Discord source and stable channel id', () => {
   const job = buildDiscordCodexWorkerJob(
     {
@@ -70,6 +121,55 @@ test('buildDiscordCodexWorkerJob marks Discord source and stable channel id', ()
   assert.equal(job.user, 'user-1');
   assert.equal(job.username, 'Allen#0001');
   assert.equal(job.text, 'make /test');
+});
+
+test('buildDiscordCodexWorkerJob bundles adjacent Discord messages and files', () => {
+  const rows = [
+    buildDiscordMessageRow({
+      id: 'm1',
+      channelId: '1523893930993778698',
+      guildId: 'guild-1',
+      createdTimestamp: Date.parse('2026-07-07T04:00:00.000Z'),
+      content: 'first ask',
+      author: { id: 'user-1', username: 'Allen', bot: false }
+    }),
+    buildDiscordMessageRow(
+      {
+        id: 'm2',
+        channelId: '1523893930993778698',
+        guildId: 'guild-1',
+        createdTimestamp: Date.parse('2026-07-07T04:00:02.000Z'),
+        content: '',
+        author: { id: 'user-2', username: 'Lana', bot: false }
+      },
+      {
+        files: [
+          {
+            name: 'screen.png',
+            mimetype: 'image/png',
+            localPath: '/shared/codex-worker/context/discord-files/C/m2/01-screen.png'
+          }
+        ]
+      }
+    )
+  ];
+  const job = buildDiscordCodexWorkerJob(
+    {
+      id: 'm2',
+      channelId: '1523893930993778698',
+      guildId: 'guild-1',
+      author: { id: 'user-2', username: 'Lana' }
+    },
+    { messageRows: rows, createdAt: '2026-07-07T04:00:03.000Z' }
+  );
+
+  assert.equal(job.id, '1523893930993778698-m2');
+  assert.equal(job.user, 'user-2');
+  assert.match(job.text, /Allen: first ask/);
+  assert.match(job.text, /Lana: \(no text\)/);
+  assert.match(job.text, /discord-files\/C\/m2\/01-screen\.png/);
+  assert.equal(job.files.length, 1);
+  assert.match(discordRowsToWorkerText(rows), /screen\.png/);
 });
 
 test('enqueueDiscordCodexWorkerJob writes one private worker job', async (t) => {

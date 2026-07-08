@@ -3,7 +3,6 @@ import crypto from 'node:crypto';
 import express from 'express';
 import {
   ActionRowBuilder,
-  ApplicationFlagsBitField,
   AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -42,10 +41,15 @@ import {
 } from './moderation-store.mjs';
 import { playerArmyAssetNames, renderPlayerArmyCard } from './player-card.mjs';
 import {
+  DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
   DEFAULT_DISCORD_CODEX_JOB_DIR,
+  DEFAULT_DISCORD_FILE_CONTEXT_DIR,
   buildDiscordCodexWorkerJob,
+  buildDiscordMessageRow,
   discordCodexSetupBlocker,
   enqueueDiscordCodexWorkerJob,
+  hasDiscordMessageContentIntentFlag,
+  materializeDiscordAttachments,
   randomWorkingMessage,
   shouldHandleDiscordCodexMessage
 } from './discord-codex-control.mjs';
@@ -59,6 +63,19 @@ const discordCodexWorkerJobDir =
   process.env.SLACK_CODEX_WORKER_JOB_DIR ||
   process.env.SLACK_WORKER_JOB_DIR ||
   DEFAULT_DISCORD_CODEX_JOB_DIR;
+const discordFileContextDir =
+  process.env.DISCORD_FILE_CONTEXT_DIR || DEFAULT_DISCORD_FILE_CONTEXT_DIR;
+const discordAttachmentDownloadMaxBytes = Number.parseInt(
+  process.env.DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES ||
+    String(DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES),
+  10
+);
+const discordCodexWorkerDebounceMs = Number.parseInt(
+  process.env.DISCORD_CODEX_WORKER_DEBOUNCE_MS ||
+    process.env.SLACK_CODEX_WORKER_DEBOUNCE_MS ||
+    '3500',
+  10
+);
 const discordMessageContentIntentPreference =
   process.env.DISCORD_MESSAGE_CONTENT_INTENT || 'auto';
 const configuredLegendsIntervalMs = Number.parseInt(
@@ -79,6 +96,7 @@ let readyUser = null;
 let discordCodexMessageCount = 0;
 let discordCodexLastMessageAt = null;
 let discordCodexIntentWarningSent = false;
+const pendingDiscordCodexJobs = new Map();
 
 async function detectMessageContentIntentAvailable() {
   if (!discordCodexChannelId || discordMessageContentIntentPreference === '0') {
@@ -94,7 +112,7 @@ async function detectMessageContentIntentAvailable() {
     });
     const application = await response.json();
     const flags = Number(application.flags || 0);
-    return Boolean(flags & ApplicationFlagsBitField.Flags.GatewayMessageContent);
+    return hasDiscordMessageContentIntentFlag(flags);
   } catch (error) {
     console.warn('Could not detect Discord Message Content Intent:', error);
     return false;
@@ -121,6 +139,10 @@ app.get('/healthz', (_req, res) => {
     discordCodexSetupReady: Boolean(discordCodexChannelId && discordMessageContentIntentRequested),
     discordCodexSetupMessage,
     discordCodexWorkerJobDir,
+    discordFileContextDir,
+    discordAttachmentDownloadMaxBytes,
+    discordCodexWorkerDebounceMs,
+    discordCodexPendingBursts: pendingDiscordCodexJobs.size,
     discordCodexMessageCount,
     discordCodexLastMessageAt,
     uptimeSec: Math.floor(process.uptime())
@@ -145,6 +167,69 @@ let stopLegendsTracker = null;
 
 function createViewId() {
   return crypto.randomBytes(8).toString('hex');
+}
+
+function pendingDiscordJobKey(message) {
+  return message?.channelId || discordCodexChannelId || 'discord';
+}
+
+function scheduleDiscordCodexWorkerJob(message, row) {
+  const delayMs =
+    Number.isFinite(discordCodexWorkerDebounceMs) && discordCodexWorkerDebounceMs > 0
+      ? discordCodexWorkerDebounceMs
+      : 0;
+  if (delayMs <= 0) {
+    return {
+      first: true,
+      promise: enqueueDiscordCodexWorkerJob(
+        discordCodexWorkerJobDir,
+        buildDiscordCodexWorkerJob(message, {
+          messageRows: row ? [row] : []
+        })
+      )
+    };
+  }
+
+  const key = pendingDiscordJobKey(message);
+  let pending = pendingDiscordCodexJobs.get(key);
+  const first = !pending;
+  if (!pending) {
+    pending = {
+      message,
+      rows: [],
+      timer: null
+    };
+    pendingDiscordCodexJobs.set(key, pending);
+  }
+
+  pending.message = message;
+  if (row) {
+    pending.rows.push(row);
+  }
+  if (pending.timer) {
+    clearTimeout(pending.timer);
+  }
+
+  pending.timer = setTimeout(() => {
+    pendingDiscordCodexJobs.delete(key);
+    (async () => {
+      await enqueueDiscordCodexWorkerJob(
+        discordCodexWorkerJobDir,
+        buildDiscordCodexWorkerJob(pending.message, {
+          messageRows: pending.rows
+        })
+      );
+    })().catch((error) => {
+      console.error('Discord Codex channel enqueue failed:', error);
+      pending.message?.channel?.send?.({
+        content: 'I could not start that yet. I saved the error in the server logs.',
+        allowedMentions: { parse: [] }
+      }).catch(() => {});
+    });
+  }, delayMs);
+  pending.timer.unref?.();
+
+  return { first, promise: Promise.resolve({ queued: true }) };
 }
 
 function buildEmbed(page, footer) {
@@ -642,9 +727,13 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   try {
-    const job = buildDiscordCodexWorkerJob(message);
-    const result = await enqueueDiscordCodexWorkerJob(discordCodexWorkerJobDir, job);
-    if (result.queued) {
+    const files = await materializeDiscordAttachments(message, {
+      contextDir: discordFileContextDir,
+      maxBytes: discordAttachmentDownloadMaxBytes
+    });
+    const row = buildDiscordMessageRow(message, { files });
+    const result = scheduleDiscordCodexWorkerJob(message, row);
+    if (result.first) {
       discordCodexMessageCount += 1;
       discordCodexLastMessageAt = new Date().toISOString();
       await message.channel.send({
@@ -652,6 +741,7 @@ client.on(Events.MessageCreate, async (message) => {
         allowedMentions: { parse: [] }
       });
     }
+    await result.promise;
   } catch (error) {
     console.error('Discord Codex channel enqueue failed:', error);
     await message.channel.send({

@@ -74,6 +74,8 @@ mkdir -p \
   "$CODEX_WORKER_DIR/done" \
   "$CODEX_WORKER_DIR/failed" \
   "$CODEX_WORKER_DIR/context" \
+  "$CODEX_WORKER_DIR/context/discord-files" \
+  "$CODEX_WORKER_DIR/context/slack-files" \
   "$CODEX_WORKER_DIR/repo"
 chmod 700 "$CODEX_HOME_DIR" "$CODEX_WORKER_DIR" || true
 chown -R 1000:1000 "$CODEX_HOME_DIR" "$CODEX_WORKER_DIR" 2>/dev/null || true

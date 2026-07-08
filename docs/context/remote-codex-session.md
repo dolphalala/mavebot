@@ -6,7 +6,8 @@ jobs stay close to the quality of a local Codex Desktop session.
 
 ## Session Goal
 
-- Treat Slack `#bot` and Discord `#codex` as persistent coding sessions.
+- Treat Discord `#codex` as the preferred persistent coding session and Slack
+  `#bot` as the fallback/legacy session.
 - Accept normal human messages from any user in the configured channel.
 - Treat Slack uploads and nearby consecutive Slack messages as part of the
   same working context whenever the bridge includes them in the worker job.
@@ -45,9 +46,15 @@ command.
 - If the active Slack request includes file metadata or local paths under
   `/shared/codex-worker/context/slack-files/`, inspect those files when they
   are relevant to the task instead of saying the image was not visible.
+- If the active Discord request includes file metadata or local paths under
+  `/shared/codex-worker/context/discord-files/`, inspect those files when they
+  are relevant to the task instead of saying the screenshot was not visible.
 - Slack image/file intake must accept both `message.file_share` and standalone
   `file_shared` events. When Slack only sends a file ID, resolve it with
   `files.info`, then pass the downloaded local file path to the worker.
+- Discord image/file intake should download attachments immediately because CDN
+  URLs can expire. Adjacent text and screenshot messages in `#codex` should be
+  grouped into one active request before creating the worker job.
 - Use `docs/context/local-codex-parity.md` as the checklist for matching local
   Codex Desktop quality.
 - For slash command changes, update both command registration data and runtime

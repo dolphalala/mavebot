@@ -27,6 +27,8 @@ include the smallest external action needed. Do not pretend a change is live.
 Use context in layers instead of dumping the full channel history:
 
 - Active user request is the only command for the run.
+- Discord `#codex` may combine a short burst of messages and screenshots into
+  one active request; treat that bundle as the current prompt.
 - `AGENTS.md` and `docs/context/README.md` decide how to load the repo.
 - Worker `summary.md` and `recent.md` provide bounded channel memory.
 - `operating-memory.md` owns server, deploy, command registration, and safety
@@ -37,6 +39,9 @@ Use context in layers instead of dumping the full channel history:
 - `code-map.md` points to source ownership.
 - Focused docs such as `clash-ui-guidance.md` own domain rules.
 - Source files and tests are the final authority.
+- Local attachment paths under `/shared/codex-worker/context/discord-files/` or
+  `/shared/codex-worker/context/slack-files/` are part of the active prompt when
+  present and should be inspected if relevant.
 
 Do not let old memory override the active user request. Treat old memory as
 background context that must be verified against source.

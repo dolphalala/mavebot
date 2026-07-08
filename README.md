@@ -104,7 +104,13 @@ uses that token to call the official Clash of Clans API.
 The Discord `#codex` channel control path requires Discord Developer Portal
 Message Content Intent because users type normal messages without tagging
 mavebot. The bot auto-detects whether that intent is enabled and stays online
-with a setup note if it is off.
+with a setup note if it is off. Discord may expose the enabled setting as either
+the full or limited Gateway Message Content application flag; both are accepted.
+Adjacent `#codex` messages are debounced into one worker job so users can send
+several messages and screenshots as context before mavebot starts the task.
+Discord attachments are downloaded immediately to
+`/shared/codex-worker/context/discord-files` and passed to the worker as local
+file paths.
 
 ## Slack Bridge
 
@@ -194,6 +200,7 @@ The worker keeps durable context in:
 - `/opt/urba-apps/discord-bot/shared/codex-worker/context/summary.md`
 - `/opt/urba-apps/discord-bot/shared/codex-worker/context/recent.md`
 - `/opt/urba-apps/discord-bot/shared/codex-worker/context/session.md`
+- `/opt/urba-apps/discord-bot/shared/codex-worker/context/discord-files/`
 - `/opt/urba-apps/discord-bot/shared/codex-worker/context/slack-files/`
 
 `transcript.jsonl` is normalized history; low-signal smoke/status rows are

@@ -11,6 +11,9 @@ future tasks should know.
 
 - Make Slack `#bot` and Discord `#codex` feel like normal mavebot working
   sessions.
+- Discord `#codex` is now the preferred daily control channel; Slack `#bot`
+  remains available but should not be the primary path once Discord intake is
+  healthy.
 - Users should be able to speak normally in `#bot` without tagging `@Codex`.
 - Discord users should be able to speak normally in `#codex` without tagging
   mavebot.
@@ -31,7 +34,13 @@ future tasks should know.
   channel. Any non-bot user message there should create a server-side worker
   job and receive the final answer in the same Discord channel. This requires
   Discord Developer Portal Message Content Intent; runtime auto-detects the
-  flag and stays online with a setup note if it is still off.
+  full or limited message-content application flag and stays online with a setup
+  note if it is still off.
+- Discord `#codex` should treat adjacent messages and screenshots from any
+  non-bot channel user as one working context. The runtime debounces adjacent
+  messages briefly, downloads attachments to
+  `/shared/codex-worker/context/discord-files/`, and includes local paths in the
+  worker job.
 - Brief "working" status messages should be short and human, not technical.
 - Keep replies in the main channel whenever possible so users do not have to
   open Slack thread replies to follow the session.
@@ -52,7 +61,9 @@ future tasks should know.
 - Slack `#bot` should treat adjacent text messages and uploaded files as one
   working context. The bridge accepts `file_share` messages, downloads files to
   `/shared/codex-worker/context/slack-files/`, includes local file paths in the
-  worker job, and adds recent channel rows as structured context.
+  worker job, and adds recent channel rows as structured context. Slack uploads
+  still need the installed bot token to have `files:read`; without it Slack file
+  downloads return a login/scope error instead of the image bytes.
 - `docs/context/remote-codex-session.md` is the durable behavior contract for
   making Slack `#bot` and Discord `#codex` feel like this local Codex Desktop
   session. Remote jobs should read it, follow it, and update focused context

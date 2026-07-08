@@ -3,6 +3,12 @@ import { chmod, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 export const DEFAULT_DISCORD_CODEX_JOB_DIR = '/shared/codex-worker/jobs';
+export const DEFAULT_DISCORD_FILE_CONTEXT_DIR = '/shared/codex-worker/context/discord-files';
+export const DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES = 25 * 1024 * 1024;
+export const DISCORD_GATEWAY_MESSAGE_CONTENT_FLAGS = {
+  full: 262144,
+  limited: 524288
+};
 
 const workingMessages = [
   'On it.',
@@ -20,8 +26,26 @@ function safeIdPart(value) {
     .slice(0, 96);
 }
 
+function safeFileName(value, fallback = 'discord-file') {
+  const cleaned = String(value || fallback)
+    .replace(/[/\\?%*:|"<>]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
+  return cleaned || fallback;
+}
+
 export function randomWorkingMessage(randomInt = crypto.randomInt) {
   return workingMessages[randomInt(workingMessages.length)];
+}
+
+export function hasDiscordMessageContentIntentFlag(flags) {
+  const value = Number(flags || 0);
+  return Boolean(
+    value &
+      (DISCORD_GATEWAY_MESSAGE_CONTENT_FLAGS.full |
+        DISCORD_GATEWAY_MESSAGE_CONTENT_FLAGS.limited)
+  );
 }
 
 export function discordCodexSetupBlocker({
@@ -37,14 +61,65 @@ export function discordCodexSetupBlocker({
   return DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE;
 }
 
-export function discordMessageToWorkerText(message) {
-  const text = String(message?.content || '').trim();
-  const attachments = [...(message?.attachments?.values?.() || [])]
+function collectionValues(value) {
+  if (!value) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value.values === 'function') {
+    return [...value.values()];
+  }
+  return [];
+}
+
+export function discordAttachmentReferences(message) {
+  return collectionValues(message?.attachments)
     .map((attachment) => {
-      const name = attachment.name || attachment.filename || 'attachment';
-      return `[attachment: ${name}] ${attachment.url}`;
+      const name = safeFileName(
+        attachment.name || attachment.filename || attachment.id || 'attachment'
+      );
+      return {
+        id: attachment.id || '',
+        name,
+        mimetype: attachment.contentType || attachment.content_type || '',
+        size: Number.parseInt(attachment.size || '0', 10) || 0,
+        url: attachment.url || '',
+        proxyUrl: attachment.proxyURL || attachment.proxy_url || ''
+      };
+    })
+    .filter((attachment) => attachment.url || attachment.proxyUrl || attachment.id);
+}
+
+export function discordFilesToWorkerLines(files = []) {
+  return (files || [])
+    .map((file) => {
+      const parts = [`file: ${file.name || file.id || 'attachment'}`];
+      if (file.mimetype) {
+        parts.push(`type: ${file.mimetype}`);
+      }
+      if (file.localPath) {
+        parts.push(`local: ${file.localPath}`);
+      }
+      if (file.url) {
+        parts.push(`discord: ${file.url}`);
+      }
+      if (file.downloadError) {
+        parts.push(`download: ${file.downloadError}`);
+      }
+      return `[${parts.join(' | ')}]`;
     })
     .filter(Boolean);
+}
+
+export function discordMessageToWorkerText(message, { files } = {}) {
+  const text = String(message?.content || '').trim();
+  const attachments = Array.isArray(files)
+    ? discordFilesToWorkerLines(files)
+    : discordAttachmentReferences(message).map(
+        (attachment) => `[attachment: ${attachment.name}] ${attachment.url || attachment.proxyUrl}`
+      );
 
   return [text, ...attachments].filter(Boolean).join('\n').trim();
 }
@@ -59,22 +134,156 @@ export function shouldHandleDiscordCodexMessage(message, channelId) {
   return Boolean(discordMessageToWorkerText(message));
 }
 
-export function buildDiscordCodexWorkerJob(message, { createdAt = new Date().toISOString() } = {}) {
-  const sourceTs = message?.id || String(Date.now());
+export async function downloadDiscordAttachment(
+  attachment,
+  {
+    channel,
+    messageId,
+    index = 0,
+    contextDir = DEFAULT_DISCORD_FILE_CONTEXT_DIR,
+    maxBytes = DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
+    fetchImpl = fetch
+  } = {}
+) {
+  const reference = {
+    id: attachment?.id || '',
+    name: safeFileName(attachment?.name || attachment?.filename || attachment?.id || 'attachment'),
+    mimetype: attachment?.mimetype || attachment?.contentType || attachment?.content_type || '',
+    size: Number.parseInt(attachment?.size || '0', 10) || 0,
+    url: attachment?.url || '',
+    proxyUrl: attachment?.proxyUrl || attachment?.proxyURL || attachment?.proxy_url || ''
+  };
+  const url = reference.url || reference.proxyUrl;
+  if (!url) {
+    return { ...reference, downloadError: 'Discord did not provide a downloadable attachment URL.' };
+  }
+  if (
+    Number.isFinite(maxBytes) &&
+    maxBytes > 0 &&
+    reference.size > maxBytes
+  ) {
+    return {
+      ...reference,
+      downloadError: `Attachment is larger than DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES (${maxBytes}).`
+    };
+  }
+
+  try {
+    const response = await fetchImpl(url);
+    if (!response.ok) {
+      return { ...reference, downloadError: `Discord attachment download failed with HTTP ${response.status}.` };
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (Number.isFinite(maxBytes) && maxBytes > 0 && buffer.length > maxBytes) {
+      return {
+        ...reference,
+        downloadError: `Downloaded attachment is larger than DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES (${maxBytes}).`
+      };
+    }
+    const dir = path.join(
+      contextDir,
+      safeIdPart(channel || 'channel'),
+      safeIdPart(messageId || 'message')
+    );
+    await mkdir(dir, { recursive: true });
+    const filePath = path.join(dir, `${String(index + 1).padStart(2, '0')}-${reference.name}`);
+    await writeFile(filePath, buffer, { mode: 0o600 });
+    await chmod(filePath, 0o600).catch(() => {});
+    return { ...reference, localPath: filePath, bytes: buffer.length };
+  } catch (error) {
+    return { ...reference, downloadError: String(error?.message || error) };
+  }
+}
+
+export async function materializeDiscordAttachments(
+  message,
+  {
+    contextDir = DEFAULT_DISCORD_FILE_CONTEXT_DIR,
+    maxBytes = DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
+    fetchImpl = fetch
+  } = {}
+) {
+  const attachments = discordAttachmentReferences(message);
+  if (!attachments.length) {
+    return [];
+  }
+  return Promise.all(
+    attachments.map((attachment, index) =>
+      downloadDiscordAttachment(attachment, {
+        channel: message?.channelId,
+        messageId: message?.id,
+        index,
+        contextDir,
+        maxBytes,
+        fetchImpl
+      })
+    )
+  );
+}
+
+export function buildDiscordMessageRow(message, { files = [] } = {}) {
   return {
-    id: [safeIdPart(message?.channelId || 'discord'), safeIdPart(sourceTs)].join('-'),
-    source: 'discord',
-    createdAt,
-    teamId: '',
+    receivedAt: message?.createdTimestamp
+      ? new Date(message.createdTimestamp).toISOString()
+      : new Date().toISOString(),
+    id: message?.id || String(Date.now()),
     guildId: message?.guildId || '',
     channel: message?.channelId || '',
     user: message?.author?.id || '',
     username: message?.author?.tag || message?.author?.username || '',
-    ts: message?.createdTimestamp
-      ? new Date(message.createdTimestamp).toISOString()
-      : sourceTs,
+    text: String(message?.content || '').trim(),
+    ...(files.length ? { files } : {})
+  };
+}
+
+export function discordRowsToWorkerText(rows = []) {
+  const normalizedRows = (rows || []).filter(Boolean);
+  if (!normalizedRows.length) {
+    return '';
+  }
+  if (normalizedRows.length === 1) {
+    const [row] = normalizedRows;
+    return [
+      row.text || '',
+      ...discordFilesToWorkerLines(row.files)
+    ].filter(Boolean).join('\n').trim();
+  }
+
+  return normalizedRows
+    .map((row) => {
+      const speaker = row.username || row.user || 'unknown';
+      const text = row.text || '(no text)';
+      const files = discordFilesToWorkerLines(row.files);
+      return [
+        `[${row.receivedAt || row.id || 'unknown time'}] ${speaker}: ${text}`,
+        ...files.map((line) => `  ${line}`)
+      ].join('\n');
+    })
+    .join('\n')
+    .trim();
+}
+
+export function buildDiscordCodexWorkerJob(
+  message,
+  { createdAt = new Date().toISOString(), files = [], messageRows = [] } = {}
+) {
+  const rows = messageRows.length ? messageRows : [buildDiscordMessageRow(message, { files })];
+  const sourceRow = rows.at(-1) || {};
+  const sourceTs = sourceRow.id || message?.id || String(Date.now());
+  const allFiles = rows.flatMap((row) => row?.files || []);
+  return {
+    id: [safeIdPart(sourceRow.channel || message?.channelId || 'discord'), safeIdPart(sourceTs)].join('-'),
+    source: 'discord',
+    createdAt,
+    teamId: '',
+    guildId: sourceRow.guildId || message?.guildId || '',
+    channel: sourceRow.channel || message?.channelId || '',
+    user: sourceRow.user || message?.author?.id || '',
+    username: sourceRow.username || message?.author?.tag || message?.author?.username || '',
+    ts: sourceRow.receivedAt || sourceTs,
     threadTs: '',
-    text: discordMessageToWorkerText(message)
+    text: discordRowsToWorkerText(rows),
+    ...(allFiles.length ? { files: allFiles } : {})
   };
 }
 

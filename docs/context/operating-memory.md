@@ -74,9 +74,17 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   JSON jobs in `/opt/urba-apps/discord-bot/shared/codex-worker/jobs`, and the
   worker posts the final answer back into that Discord channel. This requires
   the Discord Developer Portal Message Content Intent because users are not
-  tagging mavebot. The bot auto-detects whether that intent is enabled; if it
-  is disabled, the bot remains online and posts a one-time setup note in
-  `#codex` instead of crashing.
+  tagging mavebot. Discord can report this enabled setting as either the full
+  `GatewayMessageContent` application flag or the
+  `GatewayMessageContentLimited` flag; both mean the bot may request
+  `MessageContent`. If the intent is disabled, the bot remains online and posts
+  a one-time setup note in `#codex` instead of crashing.
+- Discord `#codex` is the preferred replacement for Slack as the normal remote
+  Codex session surface. Adjacent Discord messages are debounced into one
+  worker job so users can send multiple text messages and screenshots as one
+  prompt. Discord attachments are downloaded immediately into
+  `/opt/urba-apps/discord-bot/shared/codex-worker/context/discord-files/` and
+  passed to Codex as local files.
 - The deploy script builds `discord-bot`, `slack-bridge`, and `codex-worker`.
   It recreates `codex-worker` only when no worker job is active; if a job is in
   `processing`, it writes `shared/codex-worker/restart-needed` and the poll
