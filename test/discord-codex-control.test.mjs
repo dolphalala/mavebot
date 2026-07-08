@@ -6,6 +6,7 @@ import path from 'node:path';
 import {
   buildDiscordCodexWorkerJob,
   buildDiscordMessageRow,
+  DISCORD_CODEX_WORKING_MESSAGES,
   DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE,
   DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
   discordCodexSetupBlocker,
@@ -194,7 +195,19 @@ test('enqueueDiscordCodexWorkerJob writes one private worker job', async (t) => 
 });
 
 test('randomWorkingMessage can be deterministic for tests', () => {
-  assert.equal(randomWorkingMessage(() => 0), 'On it.');
+  assert.equal(randomWorkingMessage(() => 0), "Got it. I'll take a look.");
+  assert.equal(
+    randomWorkingMessage(() => DISCORD_CODEX_WORKING_MESSAGES.length - 1),
+    "mavebot's taking a look."
+  );
+});
+
+test('Discord Codex working messages stay short and human', () => {
+  assert.ok(DISCORD_CODEX_WORKING_MESSAGES.length >= 4);
+  for (const message of DISCORD_CODEX_WORKING_MESSAGES) {
+    assert.equal(message.length <= 36, true);
+    assert.doesNotMatch(message, /queued|worker|job|status|processing/i);
+  }
 });
 
 test('discordCodexSetupBlocker explains the required portal setting only when needed', () => {

@@ -10,12 +10,12 @@ export const DISCORD_GATEWAY_MESSAGE_CONTENT_FLAGS = {
   limited: 524288
 };
 
-const workingMessages = [
-  'On it.',
-  'Got it, checking now.',
-  'I am looking.',
-  'Working on it.',
-  'I will handle it.'
+export const DISCORD_CODEX_WORKING_MESSAGES = [
+  "Got it. I'll take a look.",
+  "I'm on it.",
+  "I'll check that now.",
+  "Got you. I'll work on it.",
+  "mavebot's taking a look."
 ];
 export const DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE =
   'Enable Message Content Intent in the Discord Developer Portal for mavebot, save it, then restart the bot so I can read normal messages in #codex.';
@@ -36,7 +36,7 @@ function safeFileName(value, fallback = 'discord-file') {
 }
 
 export function randomWorkingMessage(randomInt = crypto.randomInt) {
-  return workingMessages[randomInt(workingMessages.length)];
+  return DISCORD_CODEX_WORKING_MESSAGES[randomInt(DISCORD_CODEX_WORKING_MESSAGES.length)];
 }
 
 export function hasDiscordMessageContentIntentFlag(flags) {

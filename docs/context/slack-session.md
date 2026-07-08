@@ -41,7 +41,8 @@ future tasks should know.
   messages briefly, downloads attachments to
   `/shared/codex-worker/context/discord-files/`, and includes local paths in the
   worker job.
-- Brief "working" status messages should be short and human, not technical.
+- Brief "working" status messages should sound like a short friendly mavebot
+  helper note, not technical queue/status text.
 - Keep replies in the main channel whenever possible so users do not have to
   open Slack thread replies to follow the session.
 - Keep Discord replies in `#codex` as normal channel messages.
