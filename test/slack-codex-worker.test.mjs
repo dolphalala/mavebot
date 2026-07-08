@@ -178,6 +178,38 @@ test('compactTranscriptRows strips worker handoff boilerplate from retained memo
   assert.doesNotMatch(snapshot.recent, /Ready for the worker/);
 });
 
+test('compactTranscriptRows condenses long assistant reports for prompt memory', () => {
+  const snapshot = compactTranscriptRows(
+    [
+      {
+        at: '2026-07-07T00:00:00.000Z',
+        role: 'assistant',
+        user: 'mavebot',
+        source: 'discord',
+        channel: '1523893930993778698',
+        text: [
+          'Found and fixed another remote-runner parity gap. What happened: restart catch-up split a partly handled burst.',
+          '',
+          'Summary:',
+          '- Updated queue tracking.',
+          '- Added checks.',
+          '',
+          'Checks:',
+          '- npm run check'
+        ].join('\n')
+      }
+    ],
+    {
+      recentLimit: 5,
+      summaryLimit: 5,
+      generatedAt: '2026-07-07T00:01:00.000Z'
+    }
+  );
+
+  assert.match(snapshot.recent, /Found and fixed another remote-runner parity gap\./);
+  assert.doesNotMatch(snapshot.recent, /Summary|npm run check|partly handled burst/);
+});
+
 test('pruneTranscriptRowsForStorage removes low-signal rows from durable storage', () => {
   const rows = [
     {
@@ -226,6 +258,14 @@ test('pruneTranscriptRowsForStorage removes low-signal rows from durable storage
         '',
         'Done and live.'
       ].join('\n')
+    },
+    {
+      at: '2026-07-07T00:05:00.000Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'Remote Discord worker path is working.'
     }
   ];
 

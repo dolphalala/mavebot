@@ -603,11 +603,20 @@ export function isLowSignalTranscriptRow(row) {
     /worker autonomous final ok/,
     /discord worker path is live/,
     /discord codex channel worker path is live/,
+    /remote discord worker verification/,
+    /remote discord worker path is working/,
     /remote codex memory contract is live/,
     /memory compaction is clean/,
     /^(mavebot vision|final vision) \d+$/,
     /i hit a real blocker while running this on the server/
   ].some((pattern) => pattern.test(text));
+}
+
+function normalizeTranscriptText(row) {
+  const text = row?.role === 'assistant'
+    ? humanizeWorkerChannelMessage(row?.text)
+    : stripSlackLinks(row?.text);
+  return text.trim();
 }
 
 export function compactTranscriptRows(rows, options = {}) {
@@ -625,7 +634,7 @@ export function compactTranscriptRows(rows, options = {}) {
     const speaker = row.role === 'assistant' ? workerName : row.user || row.role || 'unknown';
     const source = row.source || 'unknown';
     const channel = row.channel ? `/${row.channel}` : '';
-    const text = stripSlackLinks(row.text).replace(/\n+/g, ' / ');
+    const text = normalizeTranscriptText(row).replace(/\n+/g, ' / ');
     return `- ${row.at || row.createdAt || 'unknown'} [${source}${channel}] ${speaker}: ${truncate(text, limit)}`;
   };
 
@@ -697,7 +706,7 @@ export function pruneTranscriptRowsForStorage(rows) {
   return rows
     .map((row) => ({
       ...row,
-      text: stripSlackLinks(row?.text)
+      text: normalizeTranscriptText(row)
     }))
     .filter((row) => !isLowSignalTranscriptRow(row));
 }
