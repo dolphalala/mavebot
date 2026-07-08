@@ -12,6 +12,8 @@ import {
   checkUrl,
   codexImagePathsForJob,
   compactTranscriptRows,
+  commitMessageForJob,
+  finalSlackMessage,
   isCodexImageFile,
   isCodexAuthError,
   isLowSignalTranscriptRow,
@@ -316,6 +318,48 @@ test('Codex exec args attach image files from Discord or Slack jobs', () => {
   assert.ok(args.includes('/shared/codex-worker/context/slack-files/C/M/02-slack-screen.webp'));
   assert.ok(!args.includes('/shared/codex-worker/context/discord-files/C/M/03-notes.txt'));
   assert.equal(args.at(-1), '-');
+});
+
+test('commitMessageForJob labels commits by the channel source', () => {
+  assert.equal(
+    commitMessageForJob({
+      source: 'discord',
+      text: 'make /lana more beautiful, please!'
+    }),
+    'Discord: make /lana more beautiful please'
+  );
+  assert.equal(
+    commitMessageForJob({
+      source: 'slack',
+      text: '<@U123> fix /player'
+    }),
+    'Slack: fix /player'
+  );
+  assert.equal(commitMessageForJob({ text: '' }), 'Remote: Remote request');
+});
+
+test('finalSlackMessage always returns a human success message', () => {
+  assert.equal(
+    finalSlackMessage({
+      codexMessage: '',
+      checkOk: true,
+      pushResult: { pushed: false },
+      deployResult: { matched: false, reason: 'no push needed' },
+      runtime: { botOk: true, bridgeOk: true }
+    }),
+    'I checked that. No code changes were needed.'
+  );
+
+  assert.equal(
+    finalSlackMessage({
+      codexMessage: 'I updated /lana.',
+      checkOk: true,
+      pushResult: { pushed: true },
+      deployResult: { matched: true },
+      runtime: { botOk: true, bridgeOk: true }
+    }),
+    'I updated /lana.\n\nDone and live.'
+  );
 });
 
 test('buildWorkerRuntimeSnapshot explains deploy and safety boundaries without secrets', () => {

@@ -918,12 +918,17 @@ export function buildCodexExecArgs({
 }
 
 function commitSubject(text) {
-  const normalized = String(text || 'Slack request')
+  const normalized = String(text || 'Remote request')
     .replace(/<@[^>]+>/g, '')
     .replace(/[^A-Za-z0-9 /._:-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  return truncate(normalized || 'Slack request', 70);
+  return truncate(normalized || 'Remote request', 70);
+}
+
+export function commitMessageForJob(job = {}) {
+  const source = job.source === 'discord' ? 'Discord' : job.source === 'slack' ? 'Slack' : 'Remote';
+  return `${source}: ${commitSubject(job.text)}`;
 }
 
 async function gitStdout(args, options = {}) {
@@ -946,7 +951,7 @@ async function aheadCount() {
 async function commitAndPush(job) {
   if (await gitHasChanges()) {
     await git(['add', '-A']);
-    await git(['commit', '-m', `Slack: ${commitSubject(job.text)}`]);
+    await git(['commit', '-m', commitMessageForJob(job)]);
   }
 
   const ahead = await aheadCount();
@@ -1093,7 +1098,7 @@ async function runCodex(job, contextSnapshot) {
   return stripSlackLinks(await readOptional(outputPath));
 }
 
-function finalSlackMessage({ codexMessage, checkOk, pushResult, deployResult, runtime }) {
+export function finalSlackMessage({ codexMessage, checkOk, pushResult, deployResult, runtime }) {
   const lines = [];
   const cleaned = stripSlackLinks(codexMessage);
   if (cleaned) {
@@ -1106,6 +1111,8 @@ function finalSlackMessage({ codexMessage, checkOk, pushResult, deployResult, ru
   if (checkOk && deployOk && runtimeOk) {
     if (pushResult.pushed) {
       lines.push('Done and live.');
+    } else if (!lines.length) {
+      lines.push('I checked that. No code changes were needed.');
     }
     return truncate(lines.filter(Boolean).join('\n\n'), 1900);
   }
