@@ -56,10 +56,14 @@ command.
   `files.info`, then pass the downloaded local file path to the worker.
 - Discord image/file intake should download attachments immediately because CDN
   URLs can expire. Adjacent text and screenshot messages in `#codex` should be
-  grouped into one active request before creating the worker job.
+  grouped into one active request before creating the worker job. Worker jobs
+  should preserve the Discord message IDs for every bundled row so restart
+  catch-up can detect already-handled messages.
 - On startup, Discord `#codex` should catch up recent human messages that do
-  not already have a job record in `jobs`, `processing`, `done`, or `failed`.
-  This prevents restart-window messages from being silently missed.
+  not already have a job record in `jobs`, `processing`, `done`, or `failed`;
+  it should check bundled message IDs, not just the final job filename. This
+  prevents restart-window messages from being silently missed or replayed as
+  stale standalone jobs.
 - If a worker push is rejected because `origin/main` advanced during a job, the
   worker should fetch, rebase, rerun checks, and retry the push instead of
   failing the channel request.
@@ -76,6 +80,9 @@ command.
 - Let the worker commit and push; do not manually commit inside Codex.
 - Do not claim a change is live until the server deploy path has picked up
   `origin/main` and health/command/runtime checks pass.
+- The worker wrapper owns verified live status. Codex subprocess output may
+  describe the code change, but premature "done/live" wording should be
+  stripped before the wrapper posts to the channel.
 
 ## Memory Maintenance
 
@@ -103,6 +110,9 @@ The channel history will grow forever, so remote jobs must keep memory useful:
 - Use short direct sentences for successful work.
 - Mention tests, commits, deploy details, or health checks only when useful or
   when something failed.
+- Do not paste raw stack traces, Git output, auth headers, or long test logs
+  into Slack or Discord. Save detailed errors in the failed job/server logs and
+  post a short human blocker message in the channel.
 - If the user must do an external UI step, say exactly what to click and why.
 - Ask questions only when the missing answer cannot be inferred safely from
   repo/server context.

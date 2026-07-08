@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
-import { access } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import express from 'express';
 import {
@@ -49,6 +49,7 @@ import {
   DEFAULT_DISCORD_FILE_CONTEXT_DIR,
   buildDiscordCodexWorkerJob,
   buildDiscordMessageRow,
+  discordJobContainsMessage,
   discordCodexSetupBlocker,
   enqueueDiscordCodexWorkerJob,
   hasDiscordMessageContentIntentFlag,
@@ -207,6 +208,48 @@ async function discordCodexJobRecordExists(jobId) {
   return false;
 }
 
+async function discordCodexMessageRecordExists(message) {
+  if (!message?.id) {
+    return false;
+  }
+
+  const exactJob = buildDiscordCodexWorkerJob(message);
+  if (await discordCodexJobRecordExists(exactJob.id)) {
+    return true;
+  }
+
+  const baseDir = path.dirname(discordCodexWorkerJobDir);
+  const dirs = [
+    discordCodexWorkerJobDir,
+    path.join(baseDir, 'processing'),
+    path.join(baseDir, 'done'),
+    path.join(baseDir, 'failed')
+  ];
+
+  for (const dir of dirs) {
+    let names = [];
+    try {
+      names = await readdir(dir);
+    } catch {
+      continue;
+    }
+
+    for (const name of names) {
+      if (!name.endsWith('.json')) {
+        continue;
+      }
+      try {
+        const job = JSON.parse(await readFile(path.join(dir, name), 'utf8'));
+        if (discordJobContainsMessage(job, message)) {
+          return true;
+        }
+      } catch {}
+    }
+  }
+
+  return false;
+}
+
 async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup = false } = {}) {
   const files = await materializeDiscordAttachments(message, {
     contextDir: discordFileContextDir,
@@ -218,7 +261,7 @@ async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup
     const job = buildDiscordCodexWorkerJob(message, {
       messageRows: [row]
     });
-    if (await discordCodexJobRecordExists(job.id)) {
+    if (await discordCodexMessageRecordExists(message)) {
       return { queued: false, duplicate: true };
     }
     const result = await enqueueDiscordCodexWorkerJob(discordCodexWorkerJobDir, job);

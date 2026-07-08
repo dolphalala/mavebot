@@ -13,7 +13,8 @@ It is a map, not a replacement for reading the current source.
 - `scripts/register-commands.mjs`: registers global or guild commands during
   deploy and clears stale guild-scoped commands when configured.
 - `src/discord-codex-control.mjs`: converts Discord `#codex` channel messages
-  into server-side worker jobs, formats bundled message bursts, and downloads
+  into server-side worker jobs, formats bundled message bursts, preserves
+  bundled Discord message IDs for restart de-duplication, and downloads
   Discord attachments into shared local context.
 
 ## Feature Modules
@@ -31,7 +32,8 @@ It is a map, not a replacement for reading the current source.
 - `src/slack-codex-worker.mjs`: remote Codex worker queue, prompt construction,
   compacted memory, checks, commits, pushes, deploy wait, and final replies.
   It attaches supported local image files from Slack/Discord jobs to
-  `codex exec` with `--image`.
+  `codex exec` with `--image` and owns the final verified live/not-live channel
+  wording after checks and deploy verification.
 
 ## Change Recipes
 
@@ -76,7 +78,7 @@ Registering a command without a matching runtime handler causes Discord's
    paths so the worker can inspect uploads from
    `/shared/codex-worker/context/slack-files/`.
 4. Add tests around prompt shape, memory compaction, queue behavior, file
-   context, or message cleaning.
+   context, message de-duplication, verified live wording, or message cleaning.
 5. Update `remote-codex-session.md` and this file when behavior or context
    loading changes.
 6. Update `local-codex-parity.md` if the standard for matching local Codex

@@ -295,6 +295,17 @@ export function buildDiscordCodexWorkerJob(
   const sourceRow = rows.at(-1) || {};
   const sourceTs = sourceRow.id || message?.id || String(Date.now());
   const allFiles = rows.flatMap((row) => row?.files || []);
+  const messageIds = rows.map((row) => row?.id).filter(Boolean);
+  const contextMessages = rows.map((row) => ({
+    receivedAt: row.receivedAt || '',
+    id: row.id || '',
+    guildId: row.guildId || '',
+    channel: row.channel || '',
+    user: row.user || '',
+    username: row.username || '',
+    text: row.text || '',
+    ...(row.files?.length ? { files: row.files } : {})
+  }));
   return {
     id: [safeIdPart(sourceRow.channel || message?.channelId || 'discord'), safeIdPart(sourceTs)].join('-'),
     source: 'discord',
@@ -307,8 +318,27 @@ export function buildDiscordCodexWorkerJob(
     ts: sourceRow.receivedAt || sourceTs,
     threadTs: '',
     text: discordRowsToWorkerText(rows),
+    messageIds,
+    contextMessages,
     ...(allFiles.length ? { files: allFiles } : {})
   };
+}
+
+export function discordJobContainsMessage(job = {}, messageOrId) {
+  const messageId = typeof messageOrId === 'string' ? messageOrId : messageOrId?.id;
+  if (!messageId) {
+    return false;
+  }
+
+  if ((job.messageIds || []).includes(messageId)) {
+    return true;
+  }
+
+  if ((job.contextMessages || []).some((row) => row?.id === messageId)) {
+    return true;
+  }
+
+  return String(job.id || '').endsWith(`-${safeIdPart(messageId)}`);
 }
 
 export async function enqueueDiscordCodexWorkerJob(jobDir, job) {

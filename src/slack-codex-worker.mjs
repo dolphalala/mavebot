@@ -142,6 +142,9 @@ function stripSlackLinks(text) {
     .replace(/\bChatGPT helps you get answers, find inspiration, and be more productive\.\b/gi, '')
     .replace(/\bView task\b/gi, '')
     .replace(/^Codex:\s*/gim, '')
+    .replace(/^\s*(?:Done and live|Done|Live)\.?\s*$/gim, '')
+    .replace(/\n?This is live(?: now)?\.?/gi, '')
+    .replace(/\n?The change is live(?: now)?\.?/gi, '')
     .replace(/\n?Ready for (?:the )?worker to commit, push, deploy, and verify live\.?/gi, '')
     .replace(/\n?Ready for (?:the )?worker to commit, push, and deploy\.?/gi, '')
     .replace(/\n?Ready for (?:the )?worker to commit\/push\/deploy\.?/gi, '')
@@ -157,23 +160,30 @@ export function isCodexAuthError(value) {
     /Please log out and sign in again/i.test(text);
 }
 
-function workerFailureMessage(error) {
+export function workerFailureMessage(error) {
   if (isCodexAuthError(error)) {
     return [
-      "I hit a server setup blocker: mavebot's Codex login on the server is expired.",
+      "I can't start Codex from the server right now because the server login expired.",
       '',
-      'Messages are reaching the server, but Codex cannot start work until CODEX_HOME is re-authenticated.',
-      'I saved the failed job and context so it can be retried after login is fixed.'
+      "I saved the request so it can be retried after the server's Codex login is refreshed."
     ].join('\n');
   }
 
-  return [
-    'I hit a real blocker while running this on the server.',
-    '',
-    truncate(redact(error.message || error), 2200),
-    '',
-    'I saved the job and context so the next run can continue from it.'
-  ].join('\n');
+  const text = String(error?.message || error || '');
+  if (/npm run check exited/i.test(text) || /\btest\b/i.test(text)) {
+    return "I found a test/check failure while working on that. I saved the details and will keep it from being marked done until the checks pass.";
+  }
+  if (isNonFastForwardPushError(error)) {
+    return "GitHub changed while I was pushing. I saved the request so the worker can retry it after syncing.";
+  }
+  if (/push\b|git\b/i.test(text)) {
+    return "I hit a GitHub sync problem before I could make this live. I saved the request and the server logs have the details.";
+  }
+  if (/deploy|health/i.test(text)) {
+    return "I made progress, but I could not verify the live bot cleanly yet. I saved the request and the server logs have the details.";
+  }
+
+  return "I hit a server-side blocker while working on that. I saved the request and the server logs have the details.";
 }
 
 function redact(value) {
@@ -488,15 +498,24 @@ async function claimNextJob() {
   return null;
 }
 
-async function moveJob(jobPath, targetDir, job, extra = {}) {
+export function buildMovedJobRecord(current = {}, extra = {}, { clearFailure = false } = {}) {
+  const record = { ...current, ...extra };
+  if (clearFailure) {
+    delete record.failedAt;
+    delete record.error;
+    delete record.contextFiles;
+    delete record.contextSize;
+  }
+  return record;
+}
+
+async function moveJob(jobPath, targetDir, job, extra = {}, options = {}) {
   const target = path.join(targetDir, `${job.id || path.basename(jobPath, '.json')}.json`);
   const current = await readJsonFile(jobPath).catch(() => job);
-  await writePrivateText(
-    jobPath,
-    `${JSON.stringify({ ...current, ...extra }, null, 2)}\n`
-  );
+  const next = buildMovedJobRecord(current, extra, options);
+  await writePrivateText(jobPath, `${JSON.stringify(next, null, 2)}\n`);
   await rename(jobPath, target).catch(async () => {
-    await writePrivateText(target, `${JSON.stringify({ ...current, ...extra }, null, 2)}\n`);
+    await writePrivateText(target, `${JSON.stringify(next, null, 2)}\n`);
     await unlink(jobPath).catch(() => {});
   });
 }
@@ -1220,7 +1239,7 @@ async function handleJob(claimed) {
       deployResult,
       runtime,
       slackPostError
-    });
+    }, { clearFailure: true });
   } catch (error) {
     const message = workerFailureMessage(error);
     console.error(redact(error.stack || error.message || error));

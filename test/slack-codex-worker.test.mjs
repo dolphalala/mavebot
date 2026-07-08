@@ -8,6 +8,7 @@ import path from 'node:path';
 import {
   buildCodexExecArgs,
   buildCodexWorkerPrompt,
+  buildMovedJobRecord,
   buildWorkerRuntimeSnapshot,
   checkUrl,
   codexImagePathsForJob,
@@ -19,7 +20,8 @@ import {
   isLowSignalTranscriptRow,
   isNonFastForwardPushError,
   pruneTranscriptRowsForStorage,
-  readRepoContextBundle
+  readRepoContextBundle,
+  workerFailureMessage
 } from '../src/slack-codex-worker.mjs';
 
 test('compactTranscriptRows keeps recent turns bounded and older turns summarized', () => {
@@ -171,7 +173,7 @@ test('compactTranscriptRows strips worker handoff boilerplate from retained memo
   );
 
   assert.match(snapshot.recent, /Added `\/player` pages/);
-  assert.match(snapshot.recent, /Done and live/);
+  assert.doesNotMatch(snapshot.recent, /Done and live/);
   assert.doesNotMatch(snapshot.recent, /Ready for the worker/);
 });
 
@@ -429,6 +431,57 @@ test('finalSlackMessage strips worker handoff boilerplate from channel replies',
     }),
     'Updated the Discord #codex working acknowledgements.\n\nAdded test coverage.\n\nDone and live.'
   );
+});
+
+test('finalSlackMessage removes premature live claims when deploy is not verified', () => {
+  assert.equal(
+    finalSlackMessage({
+      codexMessage: [
+        'Fixed the worker behavior.',
+        '',
+        'Done and live.'
+      ].join('\n'),
+      checkOk: true,
+      pushResult: { pushed: true },
+      deployResult: { matched: false, reason: 'live app stayed at oldsha' },
+      runtime: { botOk: true, bridgeOk: true }
+    }),
+    'Fixed the worker behavior.\n\nI pushed the change, but I could not confirm it is live yet: live app stayed at oldsha.'
+  );
+});
+
+test('workerFailureMessage keeps channel failures short and non-secret', () => {
+  const message = workerFailureMessage(
+    new Error('npm run check exited 1\nSECRET_TOKEN=abc123\nfull stack trace')
+  );
+
+  assert.match(message, /test\/check failure/);
+  assert.doesNotMatch(message, /SECRET_TOKEN|stack trace|npm run check exited/i);
+});
+
+test('buildMovedJobRecord clears stale failed fields after successful retry', () => {
+  const record = buildMovedJobRecord(
+    {
+      id: 'job-1',
+      failedAt: '2026-07-08T11:23:48.039Z',
+      error: 'push failed',
+      contextFiles: { recentPath: '/shared/recent.md' },
+      contextSize: 1000
+    },
+    {
+      completedAt: '2026-07-08T11:38:08.485Z',
+      pushResult: { pushed: true }
+    },
+    { clearFailure: true }
+  );
+
+  assert.equal(record.id, 'job-1');
+  assert.equal(record.completedAt, '2026-07-08T11:38:08.485Z');
+  assert.deepEqual(record.pushResult, { pushed: true });
+  assert.equal('failedAt' in record, false);
+  assert.equal('error' in record, false);
+  assert.equal('contextFiles' in record, false);
+  assert.equal('contextSize' in record, false);
 });
 
 test('buildWorkerRuntimeSnapshot explains deploy and safety boundaries without secrets', () => {

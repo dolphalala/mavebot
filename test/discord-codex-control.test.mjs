@@ -11,6 +11,7 @@ import {
   DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
   discordCodexSetupBlocker,
   discordFilesToWorkerLines,
+  discordJobContainsMessage,
   discordMessageToWorkerText,
   discordRowsToWorkerText,
   enqueueDiscordCodexWorkerJob,
@@ -123,6 +124,11 @@ test('buildDiscordCodexWorkerJob marks Discord source and stable channel id', ()
   assert.equal(job.user, 'user-1');
   assert.equal(job.username, 'Allen#0001');
   assert.equal(job.text, 'make /test');
+  assert.deepEqual(job.messageIds, ['12345']);
+  assert.equal(job.contextMessages.length, 1);
+  assert.equal(job.contextMessages[0].id, '12345');
+  assert.equal(discordJobContainsMessage(job, '12345'), true);
+  assert.equal(discordJobContainsMessage(job, 'other'), false);
 });
 
 test('buildDiscordCodexWorkerJob bundles adjacent Discord messages and files', () => {
@@ -170,8 +176,13 @@ test('buildDiscordCodexWorkerJob bundles adjacent Discord messages and files', (
   assert.match(job.text, /Allen: first ask/);
   assert.match(job.text, /Lana: \(no text\)/);
   assert.match(job.text, /discord-files\/C\/m2\/01-screen\.png/);
+  assert.deepEqual(job.messageIds, ['m1', 'm2']);
+  assert.equal(job.contextMessages.length, 2);
   assert.equal(job.files.length, 1);
   assert.match(discordRowsToWorkerText(rows), /screen\.png/);
+  assert.equal(discordJobContainsMessage(job, 'm1'), true);
+  assert.equal(discordJobContainsMessage(job, 'm2'), true);
+  assert.equal(discordJobContainsMessage(job, 'm3'), false);
 });
 
 test('recentDiscordCodexMessagesForCatchup selects recent unhandled human prompts', () => {
