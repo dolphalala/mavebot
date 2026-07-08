@@ -1,4 +1,5 @@
 const DEFAULT_COC_API_BASE_URL = 'https://api.clashofclans.com/v1';
+const DEFAULT_COC_API_TIMEOUT_MS = 8000;
 
 export class CocApiError extends Error {
   constructor(message, { status, reason } = {}) {
@@ -68,18 +69,40 @@ async function parseCocResponse(response) {
   });
 }
 
-export async function fetchPlayer(tag, { fetchImpl = fetch } = {}) {
+export async function fetchPlayer(
+  tag,
+  { fetchImpl = fetch, timeoutMs = DEFAULT_COC_API_TIMEOUT_MS } = {}
+) {
   const token = apiToken();
   if (!token) {
     throw new CocApiError('The Clash API token is not configured on the server yet.');
   }
 
-  const response = await fetchImpl(`${apiBaseUrl()}/players/${encodeCocTag(tag)}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json'
+  const controller = typeof AbortController === 'undefined' ? null : new AbortController();
+  const timer =
+    controller && Number.isFinite(timeoutMs) && timeoutMs > 0
+      ? setTimeout(() => controller.abort(), timeoutMs)
+      : null;
+
+  let response;
+  try {
+    response = await fetchImpl(`${apiBaseUrl()}/players/${encodeCocTag(tag)}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json'
+      },
+      ...(controller ? { signal: controller.signal } : {})
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new CocApiError('The Clash API did not respond quickly enough. Try again in a minute.');
     }
-  });
+    throw error;
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
 
   return parseCocResponse(response);
 }
@@ -309,7 +332,10 @@ function profileDescription(player, { league, townHall, profileUrl }) {
     .join('\n');
 }
 
-export function buildPlayerProfilePages(player, { assetUrls = new Map(), armyImageAttachment = null } = {}) {
+export function buildPlayerProfilePages(
+  player,
+  { assetUrls = new Map(), armyImageAttachment = null, armyImageLoading = false } = {}
+) {
   const league = player.league?.name || 'Unranked';
   const builderLeague = player.builderBaseLeague?.name || 'Unranked';
   const townHall = player.townHallWeaponLevel
@@ -340,7 +366,11 @@ export function buildPlayerProfilePages(player, { assetUrls = new Map(), armyIma
         title: `${player.name || 'Unknown player'} - Army`,
         description: [
           `Fast scan of the strongest visible army levels for ${player.tag || 'this player'}.`,
-          armyImageAttachment ? 'Rendered icon card attached below.' : 'Icon card unavailable; using text rows.'
+          armyImageAttachment
+            ? 'Rendered icon card attached below.'
+            : armyImageLoading
+              ? 'Icon card is still loading; text rows are ready now.'
+              : 'Icon card unavailable; using text rows.'
         ].join('\n'),
         thumbnailUrl: pageThumbnail(player, assetUrls, ['Lightning Spell', 'Archer Queen', 'Barbarian King']),
         imageUrl: armyImageAttachment ? `attachment://${armyImageAttachment}` : null,

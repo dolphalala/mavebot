@@ -113,6 +113,33 @@ test('fetchPlayer fails clearly when token is missing', async () => {
   });
 });
 
+test('fetchPlayer fails clearly when the Clash API stalls', async () => {
+  process.env.COC_API_TOKEN = 'test-token';
+  process.env.COC_API_BASE_URL = 'https://api.example.test/v1/';
+
+  await assert.rejects(
+    () =>
+      fetchPlayer('#ABC123', {
+        timeoutMs: 1,
+        fetchImpl: async (_url, options) =>
+          new Promise((_resolve, reject) => {
+            options.signal.addEventListener('abort', () => {
+              const error = new Error('aborted');
+              error.name = 'AbortError';
+              reject(error);
+            });
+          })
+      }),
+    {
+      name: 'CocApiError',
+      message: 'The Clash API did not respond quickly enough. Try again in a minute.'
+    }
+  );
+
+  delete process.env.COC_API_TOKEN;
+  delete process.env.COC_API_BASE_URL;
+});
+
 test('buildPlayerEmbedData formats the overview player page', () => {
   const embed = buildPlayerEmbedData(samplePlayer());
 
@@ -140,4 +167,13 @@ test('buildPlayerProfilePages splits player data into button pages', () => {
   assert.equal(profile.pages.find((page) => page.id === 'army').imageUrl, 'attachment://army.png');
   assert.match(profile.pages.find((page) => page.id === 'army').fields[1].value, /Rage Spell 6\/6/);
   assert.match(profile.pages.find((page) => page.id === 'heroes').fields[0].value, /Archer Queen 96\/100/);
+});
+
+test('buildPlayerProfilePages can show that the army image is still loading', () => {
+  const profile = buildPlayerProfilePages(samplePlayer(), {
+    armyImageLoading: true
+  });
+
+  assert.match(profile.pages.find((page) => page.id === 'army').description, /still loading/);
+  assert.equal(profile.pages.find((page) => page.id === 'army').imageUrl, null);
 });

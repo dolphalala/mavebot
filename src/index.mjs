@@ -763,6 +763,45 @@ async function handlePlayerButton(interaction) {
   await interaction.update(renderPlayerView(view, pageId));
 }
 
+async function hydratePlayerArmyCard(view, player, tag) {
+  try {
+    const assetUrls = await fetchCocWikiImageMap(playerArmyAssetNames(player), {
+      limit: 80
+    });
+    const safeTag = normalizePlayerTag(player.tag || tag).replace(/^#/, '').toLowerCase();
+    const armyImageName = `mavebot-player-army-${safeTag}.png`;
+    let armyImage = null;
+    try {
+      armyImage = await renderPlayerArmyCard(player, { assetUrls });
+    } catch (error) {
+      console.error('Clash player army card render failed:', error);
+    }
+
+    const profile = buildPlayerProfilePages(player, {
+      assetUrls,
+      armyImageAttachment: armyImage ? armyImageName : null
+    });
+    view.pages = profile.pages;
+    view.profileUrl = profile.profileUrl;
+    view.footer = profile.footer;
+    view.armyImage = armyImage;
+    view.armyImageName = armyImageName;
+
+    if (playerViews.get(view.id) === view && view.message) {
+      await view.message.edit(renderPlayerView(view, view.activePageId));
+    }
+  } catch (error) {
+    console.error('Clash player asset hydration failed:', error);
+    const profile = buildPlayerProfilePages(player);
+    view.pages = profile.pages;
+    view.profileUrl = profile.profileUrl;
+    view.footer = profile.footer;
+    if (playerViews.get(view.id) === view && view.message) {
+      await view.message.edit(renderPlayerView(view, view.activePageId)).catch(() => {});
+    }
+  }
+}
+
 function storeLegendsView(view, message) {
   view.message = message;
   legendsViews.set(view.id, view);
@@ -929,26 +968,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   if (interaction.commandName === 'player') {
-    const tag = interaction.options.getString('tag', true);
+    const tag = interaction.options.getString('tag') || interaction.options.getString('player');
     await interaction.deferReply();
 
     try {
-      const player = await fetchPlayer(normalizePlayerTag(tag));
-      const assetUrls = await fetchCocWikiImageMap(playerArmyAssetNames(player), {
-        limit: 80
-      });
-      let armyImage = null;
-      const safeTag = normalizePlayerTag(player.tag || tag).replace(/^#/, '').toLowerCase();
-      const armyImageName = `mavebot-player-army-${safeTag}.png`;
-      try {
-        armyImage = await renderPlayerArmyCard(player, { assetUrls });
-      } catch (error) {
-        console.error('Clash player army card render failed:', error);
+      if (!tag) {
+        await interaction.editReply('Please enter a Clash of Clans player tag.');
+        return;
       }
-
+      const player = await fetchPlayer(normalizePlayerTag(tag));
       const profile = buildPlayerProfilePages(player, {
-        assetUrls,
-        armyImageAttachment: armyImage ? armyImageName : null
+        armyImageLoading: true
       });
       const view = {
         id: createViewId(),
@@ -956,13 +986,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
         pages: profile.pages,
         profileUrl: profile.profileUrl,
         footer: profile.footer,
-        armyImage,
-        armyImageName,
+        armyImage: null,
+        armyImageName: null,
         activePageId: 'overview'
       };
 
       const message = await interaction.editReply(renderPlayerView(view, view.activePageId));
       storePlayerView(view, message);
+      void hydratePlayerArmyCard(view, player, tag);
     } catch (error) {
       const message =
         error instanceof CocApiError

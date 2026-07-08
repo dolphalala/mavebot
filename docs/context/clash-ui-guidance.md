@@ -45,6 +45,9 @@ Every Slack/Codex worker task that touches Clash commands should read it after
   - `Heroes`: hero and equipment text summary.
   - `Progress`: achievements, Legend stats, and donation totals.
 - Keep the Overview compact so the first response is readable without scrolling.
+- Send the Overview as soon as the official API lookup finishes; Fandom icon
+  lookup and army-card rendering should hydrate afterward so Discord does not
+  sit in the loading state.
 - Put high-volume item grids in an attached image card, not in many embed fields.
 - Button menus should clear stale image attachments when changing away from the
   Army page.
