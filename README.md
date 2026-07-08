@@ -110,7 +110,8 @@ Adjacent `#codex` messages are debounced into one worker job so users can send
 several messages and screenshots as context before mavebot starts the task.
 Discord attachments are downloaded immediately to
 `/shared/codex-worker/context/discord-files` and passed to the worker as local
-file paths.
+file paths. Supported image files are also attached to `codex exec` with
+`--image` so screenshots are available as visual context, not only as filenames.
 
 ## Slack Bridge
 

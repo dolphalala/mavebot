@@ -6,10 +6,13 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  buildCodexExecArgs,
   buildCodexWorkerPrompt,
   buildWorkerRuntimeSnapshot,
   checkUrl,
+  codexImagePathsForJob,
   compactTranscriptRows,
+  isCodexImageFile,
   isCodexAuthError,
   isLowSignalTranscriptRow,
   pruneTranscriptRowsForStorage,
@@ -207,6 +210,88 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /screen\.png/);
   assert.match(prompt, /\/shared\/codex-worker\/context\/slack-files\/CBOT\/1782400000\/01-screen\.png/);
   assert.match(prompt, /extra setup context/);
+});
+
+test('buildCodexWorkerPrompt puts active Discord screenshots before memory', () => {
+  const prompt = buildCodexWorkerPrompt({
+    job: {
+      source: 'discord',
+      user: 'UACTIVE',
+      username: 'Allen',
+      channel: '1523893930993778698',
+      ts: '2026-07-08T10:00:00.000Z',
+      text: 'use the screenshot to fix /player',
+      files: [
+        {
+          name: 'player-screen.png',
+          mimetype: 'image/png',
+          localPath: '/shared/codex-worker/context/discord-files/1523893930993778698/123/01-player-screen.png'
+        }
+      ]
+    },
+    summary: 'old request: work on Slack bridge',
+    recent: 'recent request: check a different command',
+    repoInstructions: 'AGENTS instructions',
+    contextIndex: 'context map',
+    runtimeSnapshot: 'runtime snapshot',
+    operatingMemory: 'operating memory',
+    slackSession: 'session memory',
+    repoContextBundle: 'remote session contract',
+    slackMemoryTail: 'raw memory'
+  });
+
+  assert.ok(
+    prompt.indexOf('Active Discord request') < prompt.indexOf('# Worker Compacted Memory'),
+    'active Discord request should be before compacted memory'
+  );
+  assert.ok(
+    prompt.indexOf('use the screenshot to fix /player') < prompt.indexOf('old request: work on Slack bridge'),
+    'active Discord request should beat older memory'
+  );
+  assert.match(prompt, /player-screen\.png/);
+  assert.match(prompt, /\/shared\/codex-worker\/context\/discord-files\/1523893930993778698\/123\/01-player-screen\.png/);
+  assert.match(prompt, /remote session contract/);
+});
+
+test('Codex exec args attach image files from Discord or Slack jobs', () => {
+  const imageFiles = [
+    {
+      name: 'discord-screen.png',
+      mimetype: 'image/png',
+      localPath: '/shared/codex-worker/context/discord-files/C/M/01-discord-screen.png'
+    },
+    {
+      name: 'slack-screen.webp',
+      localPath: '/shared/codex-worker/context/slack-files/C/M/02-slack-screen.webp'
+    },
+    {
+      name: 'notes.txt',
+      mimetype: 'text/plain',
+      localPath: '/shared/codex-worker/context/discord-files/C/M/03-notes.txt'
+    }
+  ];
+
+  assert.equal(isCodexImageFile(imageFiles[0]), true);
+  assert.equal(isCodexImageFile(imageFiles[1]), true);
+  assert.equal(isCodexImageFile(imageFiles[2]), false);
+
+  const imagePaths = codexImagePathsForJob({ files: imageFiles }, { maxImages: 1 });
+  assert.deepEqual(imagePaths, ['/shared/codex-worker/context/discord-files/C/M/01-discord-screen.png']);
+
+  const args = buildCodexExecArgs({
+    repoDir: '/repo',
+    outputPath: '/tmp/out.txt',
+    model: 'gpt-test',
+    imagePaths: codexImagePathsForJob({ files: imageFiles })
+  });
+  assert.deepEqual(
+    args.filter((arg) => arg === '--image'),
+    ['--image', '--image']
+  );
+  assert.ok(args.includes('/shared/codex-worker/context/discord-files/C/M/01-discord-screen.png'));
+  assert.ok(args.includes('/shared/codex-worker/context/slack-files/C/M/02-slack-screen.webp'));
+  assert.ok(!args.includes('/shared/codex-worker/context/discord-files/C/M/03-notes.txt'));
+  assert.equal(args.at(-1), '-');
 });
 
 test('buildWorkerRuntimeSnapshot explains deploy and safety boundaries without secrets', () => {

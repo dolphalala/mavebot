@@ -41,7 +41,9 @@ Use context in layers instead of dumping the full channel history:
 - Source files and tests are the final authority.
 - Local attachment paths under `/shared/codex-worker/context/discord-files/` or
   `/shared/codex-worker/context/slack-files/` are part of the active prompt when
-  present and should be inspected if relevant.
+  present and should be inspected if relevant. Supported image files are passed
+  to Codex with `--image` so remote screenshot work has the same visual-input
+  path as a local Codex session.
 
 Do not let old memory override the active user request. Treat old memory as
 background context that must be verified against source.

@@ -78,6 +78,7 @@ const runtimeHealthTimeoutMs = parsePositiveInt(
 const recentTurnLimit = parsePositiveInt(process.env.SLACK_WORKER_RECENT_TURNS, 40);
 const summaryTurnLimit = parsePositiveInt(process.env.SLACK_WORKER_SUMMARY_TURNS, 120);
 const maxOutputChars = parsePositiveInt(process.env.SLACK_WORKER_MAX_OUTPUT_CHARS, 20000);
+const maxCodexImages = parsePositiveInt(process.env.SLACK_WORKER_MAX_CODEX_IMAGES, 6);
 
 const transcriptPath = path.join(contextDir, 'transcript.jsonl');
 const summaryPath = path.join(contextDir, 'summary.md');
@@ -110,6 +111,28 @@ function truncate(value, limit = 2000) {
     return text;
   }
   return `${text.slice(0, limit)}...`;
+}
+
+const codexImageExtensionPattern = /\.(?:png|jpe?g|webp|gif)$/i;
+
+export function isCodexImageFile(file = {}) {
+  const localPath = String(file?.localPath || '');
+  if (!localPath) {
+    return false;
+  }
+
+  const mimetype = String(file?.mimetype || file?.contentType || '').toLowerCase();
+  return mimetype.startsWith('image/') || codexImageExtensionPattern.test(localPath);
+}
+
+export function codexImagePathsForJob(job = {}, { maxImages = maxCodexImages } = {}) {
+  const files = Array.isArray(job?.files) ? job.files : [];
+  const limit = Number.isFinite(maxImages) && maxImages > 0 ? maxImages : files.length;
+  return files
+    .filter(isCodexImageFile)
+    .map((file) => String(file.localPath || '').trim())
+    .filter(Boolean)
+    .slice(0, limit);
 }
 
 function stripSlackLinks(text) {
@@ -859,6 +882,32 @@ async function runChecks() {
   });
 }
 
+export function buildCodexExecArgs({
+  repoDir: workingRepoDir = repoDir,
+  outputPath,
+  model = codexModel,
+  imagePaths = []
+} = {}) {
+  const args = [
+    'exec',
+    '--cd',
+    workingRepoDir,
+    '--sandbox',
+    'danger-full-access',
+    '--dangerously-bypass-approvals-and-sandbox',
+    '--output-last-message',
+    outputPath
+  ];
+  for (const imagePath of imagePaths) {
+    args.push('--image', imagePath);
+  }
+  if (model) {
+    args.push('--model', model);
+  }
+  args.push('-');
+  return args;
+}
+
 function commitSubject(text) {
   const normalized = String(text || 'Slack request')
     .replace(/<@[^>]+>/g, '')
@@ -1018,20 +1067,13 @@ async function runCodex(job, contextSnapshot) {
     slackMemoryTail
   });
   const outputPath = path.join(contextDir, 'last-codex-message.md');
-  const args = [
-    'exec',
-    '--cd',
-    repoDir,
-    '--sandbox',
-    'danger-full-access',
-    '--dangerously-bypass-approvals-and-sandbox',
-    '--output-last-message',
-    outputPath
-  ];
-  if (codexModel) {
-    args.push('--model', codexModel);
+  const imagePaths = [];
+  for (const imagePath of codexImagePathsForJob(job)) {
+    if (await pathExists(imagePath)) {
+      imagePaths.push(imagePath);
+    }
   }
-  args.push('-');
+  const args = buildCodexExecArgs({ repoDir, outputPath, model: codexModel, imagePaths });
 
   await runProcess(codexBin, args, {
     cwd: repoDir,

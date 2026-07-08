@@ -49,6 +49,8 @@ command.
 - If the active Discord request includes file metadata or local paths under
   `/shared/codex-worker/context/discord-files/`, inspect those files when they
   are relevant to the task instead of saying the screenshot was not visible.
+  The worker attaches supported local image files to `codex exec` with
+  `--image`, so screenshots should be treated as actual visual context.
 - Slack image/file intake must accept both `message.file_share` and standalone
   `file_shared` events. When Slack only sends a file ID, resolve it with
   `files.info`, then pass the downloaded local file path to the worker.

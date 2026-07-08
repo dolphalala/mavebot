@@ -29,6 +29,8 @@ It is a map, not a replacement for reading the current source.
 - `src/slack-bridge.mjs`: Slack Socket Mode bridge and Slack `#bot` intake.
 - `src/slack-codex-worker.mjs`: remote Codex worker queue, prompt construction,
   compacted memory, checks, commits, pushes, deploy wait, and final replies.
+  It attaches supported local image files from Slack/Discord jobs to
+  `codex exec` with `--image`.
 
 ## Change Recipes
 
@@ -68,7 +70,7 @@ Registering a command without a matching runtime handler causes Discord's
    `src/discord-codex-control.mjs` as appropriate.
 2. For Discord files/screenshots, preserve file metadata and local shared-volume
    paths so the worker can inspect uploads from
-   `/shared/codex-worker/context/discord-files/`.
+   `/shared/codex-worker/context/discord-files/` and attach images to Codex.
 3. For Slack files/screenshots, preserve file metadata and local shared-volume
    paths so the worker can inspect uploads from
    `/shared/codex-worker/context/slack-files/`.
