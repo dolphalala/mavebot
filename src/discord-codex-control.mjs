@@ -5,6 +5,7 @@ import path from 'node:path';
 export const DEFAULT_DISCORD_CODEX_JOB_DIR = '/shared/codex-worker/jobs';
 export const DEFAULT_DISCORD_FILE_CONTEXT_DIR = '/shared/codex-worker/context/discord-files';
 export const DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES = 25 * 1024 * 1024;
+export const DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS = 30 * 60 * 1000;
 export const DISCORD_GATEWAY_MESSAGE_CONTENT_FLAGS = {
   full: 262144,
   limited: 524288
@@ -234,6 +235,29 @@ export function buildDiscordMessageRow(message, { files = [] } = {}) {
     text: String(message?.content || '').trim(),
     ...(files.length ? { files } : {})
   };
+}
+
+export function recentDiscordCodexMessagesForCatchup(
+  messages = [],
+  {
+    channelId,
+    now = Date.now(),
+    windowMs = DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS
+  } = {}
+) {
+  const values = collectionValues(messages);
+  const cutoff =
+    Number.isFinite(windowMs) && windowMs > 0
+      ? Number(now) - windowMs
+      : Number.NEGATIVE_INFINITY;
+
+  return values
+    .filter((message) => shouldHandleDiscordCodexMessage(message, channelId))
+    .filter((message) => {
+      const created = Number(message?.createdTimestamp || 0);
+      return Number.isFinite(created) && created >= cutoff;
+    })
+    .sort((left, right) => Number(left?.createdTimestamp || 0) - Number(right?.createdTimestamp || 0));
 }
 
 export function discordRowsToWorkerText(rows = []) {

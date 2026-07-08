@@ -57,6 +57,9 @@ command.
 - Discord image/file intake should download attachments immediately because CDN
   URLs can expire. Adjacent text and screenshot messages in `#codex` should be
   grouped into one active request before creating the worker job.
+- On startup, Discord `#codex` should catch up recent human messages that do
+  not already have a job record in `jobs`, `processing`, `done`, or `failed`.
+  This prevents restart-window messages from being silently missed.
 - Use `docs/context/local-codex-parity.md` as the checklist for matching local
   Codex Desktop quality.
 - For slash command changes, update both command registration data and runtime

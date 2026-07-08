@@ -17,6 +17,7 @@ import {
   hasDiscordMessageContentIntentFlag,
   materializeDiscordAttachments,
   randomWorkingMessage,
+  recentDiscordCodexMessagesForCatchup,
   shouldHandleDiscordCodexMessage
 } from '../src/discord-codex-control.mjs';
 
@@ -171,6 +172,63 @@ test('buildDiscordCodexWorkerJob bundles adjacent Discord messages and files', (
   assert.match(job.text, /discord-files\/C\/m2\/01-screen\.png/);
   assert.equal(job.files.length, 1);
   assert.match(discordRowsToWorkerText(rows), /screen\.png/);
+});
+
+test('recentDiscordCodexMessagesForCatchup selects recent unhandled human prompts', () => {
+  const now = Date.parse('2026-07-08T11:20:00.000Z');
+  const messages = [
+    {
+      id: 'old',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 31 * 60 * 1000,
+      content: 'old prompt',
+      author: { id: 'user-1', bot: false }
+    },
+    {
+      id: 'recent-2',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 60 * 1000,
+      content: 'second prompt',
+      author: { id: 'user-2', bot: false }
+    },
+    {
+      id: 'bot',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 30 * 1000,
+      content: 'bot reply',
+      author: { id: 'bot', bot: true }
+    },
+    {
+      id: 'other',
+      channelId: 'other',
+      createdTimestamp: now - 20 * 1000,
+      content: 'wrong channel',
+      author: { id: 'user-3', bot: false }
+    },
+    {
+      id: 'blank',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 10 * 1000,
+      content: '   ',
+      author: { id: 'user-4', bot: false }
+    },
+    {
+      id: 'recent-1',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 2 * 60 * 1000,
+      content: 'first prompt',
+      author: { id: 'user-5', bot: false }
+    }
+  ];
+
+  assert.deepEqual(
+    recentDiscordCodexMessagesForCatchup(messages, {
+      channelId: '1523893930993778698',
+      now,
+      windowMs: 30 * 60 * 1000
+    }).map((message) => message.id),
+    ['recent-1', 'recent-2']
+  );
 });
 
 test('enqueueDiscordCodexWorkerJob writes one private worker job', async (t) => {
