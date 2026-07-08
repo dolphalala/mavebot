@@ -11,8 +11,8 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Current slash commands:
   - `/lana`: draws a generated PNG heart image plus a randomized embed love
     note for Lana and Allen.
-  - `/loveu`: accepts a Discord user, writes a randomized love poem for them,
-    and attaches a freshly generated heart image.
+  - `/loveu`: accepts a Discord user, composes a randomized love poem from
+    shuffled line pools for them, and attaches a freshly generated heart image.
   - `/player`: looks up a Clash of Clans player by tag using the server-side
     CoC API token, then presents compact button pages plus a rendered army
     image card with Clash Wiki/Fandom item icons when available.

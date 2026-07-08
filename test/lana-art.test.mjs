@@ -48,7 +48,17 @@ test('randomLoveLetter returns one of the configured Lana notes', () => {
 test('randomLoveuPoem writes a poem for the selected target', () => {
   const poem = randomLoveuPoem('Dolphala');
 
-  assert.equal(loveuPoems.some((candidate) => candidate.title === poem.title), true);
+  assert.equal(loveuPoems.titles.includes(poem.title), true);
   assert.match(poem.body, /Dolphala/);
+  assert.equal(poem.body.split('\n').length, 4);
+  assert.equal(loveuPoems.notes.includes(poem.note), true);
   assert.equal(typeof poem.note, 'string');
+});
+
+test('randomLoveuPoem avoids repeating the exact same poem back to back', () => {
+  const first = randomLoveuPoem('Dolphala', { random: () => 0 });
+  const second = randomLoveuPoem('Dolphala', { random: () => 0 });
+
+  assert.notDeepEqual(second, first);
+  assert.match(second.body, /Dolphala/);
 });

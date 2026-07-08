@@ -93,8 +93,8 @@ future tasks should know.
 - `/ping` is no longer a public Discord slash command.
 - `/lana` replaced `/iloveyou` and sends a generated PNG heart image with a
   Lana/Allen embed. It should not regress to a text-only love letter.
-- `/loveu user:<discord user>` writes a randomized love poem for the selected
-  user and attaches a freshly generated heart image.
+- `/loveu user:<discord user>` composes a randomized love poem for the selected
+  user from shuffled line pools and attaches a freshly generated heart image.
 - `/player` is the first CoC lookup command and should stay token-backed from
   the server.
 - `/player` should stay compact: use buttons for Overview, Army, Heroes, and

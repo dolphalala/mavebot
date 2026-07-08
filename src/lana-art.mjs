@@ -38,68 +38,68 @@ export const loveLetters = [
   }
 ];
 
-export const loveuPoems = [
-  {
-    title: 'A Heart Appears',
-    lines: [
-      'For {name}, a little spark arrives,',
-      'soft as a sunrise, bright as new skies.',
-      'May this heart find you right where you are,',
-      'and make the whole room feel less far.'
-    ],
-    note: 'Freshly drawn, loudly adored.'
-  },
-  {
-    title: 'Tiny Firework',
-    lines: [
-      '{name}, you get the kind of glow',
-      'that makes ordinary minutes slow.',
-      'A sweet little thunder, a bright little tune,',
-      'a heart-shaped comet crossing the moon.'
-    ],
-    note: 'A small poem with big feelings.'
-  },
-  {
-    title: 'Soft Landing',
-    lines: [
-      'If the day has been heavy, {name},',
-      'let this heart land gently by your name.',
-      'No grand speech, no perfect art,',
-      'just a happy bot with a handmade heart.'
-    ],
-    note: 'Certified gentle.'
-  },
-  {
-    title: 'Ridiculous Amounts',
-    lines: [
-      '{name}, please accept this official decree:',
-      'you are loved quite dramatically.',
-      'The evidence is glowing, pink, and true,',
-      'and mavebot drew this heart for you.'
-    ],
-    note: 'Filed under extremely important.'
-  },
-  {
-    title: 'Little Legend',
-    lines: [
-      'Some hearts whisper, some hearts sing,',
-      'some hearts show up with a sparkling thing.',
-      'This one is for {name}, clear and bright,',
-      'a pocket-sized love poem wrapped in light.'
-    ],
-    note: 'One of one, just for them.'
-  },
-  {
-    title: 'Sweet Proof',
-    lines: [
-      '{name}, here is proof in rosy hue:',
-      'someone thought a sweet thought of you.',
-      'So take this heart, uneven and warm,',
-      'a tiny shelter from any storm.'
-    ],
-    note: 'Made with sincere pixels.'
-  }
-];
+export const loveuPoems = {
+  titles: [
+    'A Heart Appears',
+    'Tiny Firework',
+    'Soft Landing',
+    'Ridiculous Amounts',
+    'Little Legend',
+    'Sweet Proof',
+    'Fresh Dispatch',
+    'Tiny Celebration'
+  ],
+  openers: [
+    'For {name}, a little spark arrives,',
+    '{name}, you get the kind of glow',
+    'If the day has been heavy, {name},',
+    '{name}, please accept this official decree:',
+    'Some hearts whisper, some hearts sing,',
+    '{name}, here is proof in rosy hue:',
+    'A small bright message found {name},',
+    'The sky made room today for {name},'
+  ],
+  secondLines: [
+    'soft as a sunrise, bright as new skies.',
+    'that makes ordinary minutes slow.',
+    'let this heart land gently by your name.',
+    'you are loved quite dramatically.',
+    'some hearts show up with a sparkling thing.',
+    'someone thought a sweet thought of you.',
+    'wrapped up in blush-colored light.',
+    'then handed mavebot a tiny moon.'
+  ],
+  thirdLines: [
+    'May this heart find you right where you are,',
+    'A sweet little thunder, a bright little tune,',
+    'No grand speech, no perfect art,',
+    'The evidence is glowing, pink, and true,',
+    'This one is clear and bright,',
+    'So take this heart, uneven and warm,',
+    'It carries a cheer, a wink, and a start,',
+    'It drew a warm circle around your name,'
+  ],
+  closers: [
+    'and make the whole room feel less far.',
+    'a heart-shaped comet crossing the moon.',
+    'just a happy bot with a handmade heart.',
+    'and mavebot drew this heart for you.',
+    'a pocket-sized love poem wrapped in light.',
+    'a tiny shelter from any storm.',
+    'then turned all that sweetness into art.',
+    'and left every corner a little more tame.'
+  ],
+  notes: [
+    'Freshly drawn, loudly adored.',
+    'A small poem with big feelings.',
+    'Certified gentle.',
+    'Filed under extremely important.',
+    'One of one, just for them.',
+    'Made with sincere pixels.',
+    'Freshly shuffled by mavebot.',
+    'New heart, new poem, same affection.'
+  ]
+};
 
 const palettes = [
   {
@@ -135,14 +135,66 @@ export function randomLoveLetter() {
   return loveLetters[Math.floor(Math.random() * loveLetters.length)];
 }
 
-export function randomLoveuPoem(targetName) {
-  const safeName = String(targetName || 'you').trim() || 'you';
-  const poem = loveuPoems[Math.floor(Math.random() * loveuPoems.length)];
+let previousLoveuPoemKey = '';
+
+function choice(list, random) {
+  return Math.floor(random() * list.length) % list.length;
+}
+
+function buildLoveuPoemFromIndexes(indexes, safeName) {
+  const lines = [
+    loveuPoems.openers[indexes.opener],
+    loveuPoems.secondLines[indexes.secondLine],
+    loveuPoems.thirdLines[indexes.thirdLine],
+    loveuPoems.closers[indexes.closer]
+  ];
+
   return {
-    title: poem.title,
-    body: poem.lines.map((line) => line.replaceAll('{name}', safeName)).join('\n'),
-    note: poem.note
+    title: loveuPoems.titles[indexes.title],
+    body: lines.map((line) => line.replaceAll('{name}', safeName)).join('\n'),
+    note: loveuPoems.notes[indexes.note]
   };
+}
+
+function loveuPoemKey(indexes) {
+  return [
+    indexes.title,
+    indexes.opener,
+    indexes.secondLine,
+    indexes.thirdLine,
+    indexes.closer,
+    indexes.note
+  ].join(':');
+}
+
+function randomLoveuPoemIndexes(random) {
+  return {
+    title: choice(loveuPoems.titles, random),
+    opener: choice(loveuPoems.openers, random),
+    secondLine: choice(loveuPoems.secondLines, random),
+    thirdLine: choice(loveuPoems.thirdLines, random),
+    closer: choice(loveuPoems.closers, random),
+    note: choice(loveuPoems.notes, random)
+  };
+}
+
+export function randomLoveuPoem(targetName, { random = Math.random } = {}) {
+  const safeName = String(targetName || 'you').trim() || 'you';
+  const randomSource = typeof random === 'function' ? random : Math.random;
+  let indexes = randomLoveuPoemIndexes(randomSource);
+  let key = loveuPoemKey(indexes);
+
+  if (key === previousLoveuPoemKey) {
+    indexes = {
+      ...indexes,
+      closer: (indexes.closer + 1) % loveuPoems.closers.length,
+      note: (indexes.note + 1) % loveuPoems.notes.length
+    };
+    key = loveuPoemKey(indexes);
+  }
+
+  previousLoveuPoemKey = key;
+  return buildLoveuPoemFromIndexes(indexes, safeName);
 }
 
 function seededRandom(seed) {
