@@ -212,12 +212,26 @@ test('pruneTranscriptRowsForStorage removes low-signal rows from durable storage
       channel: '1523893930993778698',
       jobId: 'discord-live-verify-123',
       text: 'live verification only ok'
+    },
+    {
+      at: '2026-07-07T00:04:00.000Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: [
+        'Added `/player` pages.',
+        '',
+        'Ready for the worker to commit/push/deploy.',
+        '',
+        'Done and live.'
+      ].join('\n')
     }
   ];
 
   assert.deepEqual(
     pruneTranscriptRowsForStorage(rows).map((row) => row.text),
-    ['make /player show better army cards']
+    ['make /player show better army cards', 'Added `/player` pages.']
   );
 });
 

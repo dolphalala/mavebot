@@ -694,7 +694,12 @@ export function compactTranscriptRows(rows, options = {}) {
 }
 
 export function pruneTranscriptRowsForStorage(rows) {
-  return rows.filter((row) => !isLowSignalTranscriptRow(row));
+  return rows
+    .map((row) => ({
+      ...row,
+      text: stripSlackLinks(row?.text)
+    }))
+    .filter((row) => !isLowSignalTranscriptRow(row));
 }
 
 function serializeTranscriptRows(rows) {
