@@ -6,6 +6,7 @@ export const DEFAULT_DISCORD_CODEX_JOB_DIR = '/shared/codex-worker/jobs';
 export const DEFAULT_DISCORD_FILE_CONTEXT_DIR = '/shared/codex-worker/context/discord-files';
 export const DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES = 25 * 1024 * 1024;
 export const DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS = 30 * 60 * 1000;
+export const DEFAULT_DISCORD_CODEX_BURST_GAP_MS = 15000;
 export const DISCORD_GATEWAY_MESSAGE_CONTENT_FLAGS = {
   full: 262144,
   limited: 524288
@@ -258,6 +259,44 @@ export function recentDiscordCodexMessagesForCatchup(
       return Number.isFinite(created) && created >= cutoff;
     })
     .sort((left, right) => Number(left?.createdTimestamp || 0) - Number(right?.createdTimestamp || 0));
+}
+
+export function groupDiscordCodexMessageBursts(
+  messages = [],
+  {
+    channelId,
+    now = Date.now(),
+    windowMs = DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS,
+    gapMs = DEFAULT_DISCORD_CODEX_BURST_GAP_MS
+  } = {}
+) {
+  const recentMessages = recentDiscordCodexMessagesForCatchup(messages, {
+    channelId,
+    now,
+    windowMs
+  });
+  const maxGap = Number.isFinite(gapMs) && gapMs >= 0 ? gapMs : DEFAULT_DISCORD_CODEX_BURST_GAP_MS;
+  const bursts = [];
+
+  for (const message of recentMessages) {
+    const previousBurst = bursts.at(-1);
+    const previousMessage = previousBurst?.at(-1);
+    const previousTimestamp = Number(previousMessage?.createdTimestamp || 0);
+    const currentTimestamp = Number(message?.createdTimestamp || 0);
+    const sameBurst =
+      previousBurst &&
+      Number.isFinite(previousTimestamp) &&
+      Number.isFinite(currentTimestamp) &&
+      currentTimestamp - previousTimestamp <= maxGap;
+
+    if (sameBurst) {
+      previousBurst.push(message);
+    } else {
+      bursts.push([message]);
+    }
+  }
+
+  return bursts;
 }
 
 export function discordRowsToWorkerText(rows = []) {

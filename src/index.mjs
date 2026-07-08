@@ -44,6 +44,7 @@ import {
 import { playerArmyAssetNames, renderPlayerArmyCard } from './player-card.mjs';
 import {
   DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
+  DEFAULT_DISCORD_CODEX_BURST_GAP_MS,
   DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS,
   DEFAULT_DISCORD_CODEX_JOB_DIR,
   DEFAULT_DISCORD_FILE_CONTEXT_DIR,
@@ -52,10 +53,10 @@ import {
   discordJobContainsMessage,
   discordCodexSetupBlocker,
   enqueueDiscordCodexWorkerJob,
+  groupDiscordCodexMessageBursts,
   hasDiscordMessageContentIntentFlag,
   materializeDiscordAttachments,
   randomWorkingMessage,
-  recentDiscordCodexMessagesForCatchup,
   shouldHandleDiscordCodexMessage
 } from './discord-codex-control.mjs';
 
@@ -293,12 +294,49 @@ async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup
   return result;
 }
 
+async function enqueueDiscordCodexMessageBurst(messages, { acknowledge = true, catchup = false } = {}) {
+  const rows = [];
+  for (const message of messages) {
+    const files = await materializeDiscordAttachments(message, {
+      contextDir: discordFileContextDir,
+      maxBytes: discordAttachmentDownloadMaxBytes
+    });
+    rows.push(buildDiscordMessageRow(message, { files }));
+  }
+
+  const sourceMessage = messages.at(-1);
+  const job = buildDiscordCodexWorkerJob(sourceMessage, {
+    messageRows: rows
+  });
+  const result = await enqueueDiscordCodexWorkerJob(discordCodexWorkerJobDir, job);
+  if (result.queued) {
+    discordCodexMessageCount += messages.length;
+    discordCodexLastMessageAt = new Date().toISOString();
+    if (acknowledge) {
+      const content = catchup && messages.length > 1
+        ? "I caught these after restart. I'll work on them together."
+        : "I caught this after restart. I'll work on it.";
+      await sourceMessage.channel?.send?.({
+        content,
+        allowedMentions: { parse: [] }
+      }).catch(() => {});
+    }
+  }
+  return result;
+}
+
 async function catchUpDiscordCodexChannel() {
   if (!discordCodexChannelId || !discordMessageContentIntentRequested) {
     return;
   }
 
   try {
+    const catchupWindowMs = Number.isFinite(discordCodexCatchupWindowMs) && discordCodexCatchupWindowMs > 0
+      ? discordCodexCatchupWindowMs
+      : DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS;
+    const catchupBurstGapMs = Number.isFinite(discordCodexWorkerDebounceMs) && discordCodexWorkerDebounceMs > 0
+      ? Math.max(discordCodexWorkerDebounceMs, DEFAULT_DISCORD_CODEX_BURST_GAP_MS)
+      : DEFAULT_DISCORD_CODEX_BURST_GAP_MS;
     const channel = await client.channels.fetch(discordCodexChannelId);
     if (!channel?.messages?.fetch) {
       return;
@@ -308,13 +346,23 @@ async function catchUpDiscordCodexChannel() {
         ? discordCodexCatchupLimit
         : 12
     });
-    for (const message of recentDiscordCodexMessagesForCatchup(messages, {
+    const unhandled = [];
+    for (const message of groupDiscordCodexMessageBursts(messages, {
       channelId: discordCodexChannelId,
-      windowMs: Number.isFinite(discordCodexCatchupWindowMs) && discordCodexCatchupWindowMs > 0
-        ? discordCodexCatchupWindowMs
-        : DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS
-    })) {
-      await enqueueDiscordCodexMessage(message, { catchup: true });
+      windowMs: catchupWindowMs,
+      gapMs: catchupBurstGapMs
+    }).flat()) {
+      if (!(await discordCodexMessageRecordExists(message))) {
+        unhandled.push(message);
+      }
+    }
+    const bursts = groupDiscordCodexMessageBursts(unhandled, {
+      channelId: discordCodexChannelId,
+      windowMs: catchupWindowMs,
+      gapMs: catchupBurstGapMs
+    });
+    for (const burst of bursts) {
+      await enqueueDiscordCodexMessageBurst(burst, { catchup: true });
     }
   } catch (error) {
     console.error('Discord Codex catch-up failed:', error);

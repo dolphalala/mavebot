@@ -11,6 +11,7 @@ import {
   DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
   discordCodexSetupBlocker,
   discordFilesToWorkerLines,
+  groupDiscordCodexMessageBursts,
   discordJobContainsMessage,
   discordMessageToWorkerText,
   discordRowsToWorkerText,
@@ -239,6 +240,55 @@ test('recentDiscordCodexMessagesForCatchup selects recent unhandled human prompt
       windowMs: 30 * 60 * 1000
     }).map((message) => message.id),
     ['recent-1', 'recent-2']
+  );
+});
+
+test('groupDiscordCodexMessageBursts keeps restart catch-up prompts together', () => {
+  const now = Date.parse('2026-07-08T12:00:00.000Z');
+  const messages = [
+    {
+      id: 'first',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 20_000,
+      content: 'here is the issue',
+      author: { id: 'user-1', bot: false }
+    },
+    {
+      id: 'screen',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 12_000,
+      content: '',
+      attachments: attachmentMap([
+        { id: 'att-1', name: 'screen.png', url: 'https://cdn.discordapp.com/screen.png' }
+      ]),
+      author: { id: 'user-1', bot: false }
+    },
+    {
+      id: 'follow-up',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 2_000,
+      content: 'and fix it like desktop would',
+      author: { id: 'user-2', bot: false }
+    },
+    {
+      id: 'later',
+      channelId: '1523893930993778698',
+      createdTimestamp: now + 30_000,
+      content: 'separate request',
+      author: { id: 'user-1', bot: false }
+    }
+  ];
+
+  const bursts = groupDiscordCodexMessageBursts(messages, {
+    channelId: '1523893930993778698',
+    now: now + 30_000,
+    windowMs: 60_000,
+    gapMs: 15_000
+  });
+
+  assert.deepEqual(
+    bursts.map((burst) => burst.map((message) => message.id)),
+    [['first', 'screen', 'follow-up'], ['later']]
   );
 });
 

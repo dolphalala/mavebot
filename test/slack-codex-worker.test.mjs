@@ -433,6 +433,25 @@ test('finalSlackMessage strips worker handoff boilerplate from channel replies',
   );
 });
 
+test('finalSlackMessage strips routine deploy/check chatter from Codex replies', () => {
+  assert.equal(
+    finalSlackMessage({
+      codexMessage: [
+        'Fixed the remote runner behavior.',
+        'Checks passed: npm install and npm run check.',
+        'Pushed to main: abc123def456.',
+        'Server deploy picked it up: abc123def456.',
+        'Runtime health: Discord ok, Slack bridge ok.'
+      ].join('\n'),
+      checkOk: true,
+      pushResult: { pushed: true },
+      deployResult: { matched: true },
+      runtime: { botOk: true, bridgeOk: true }
+    }),
+    'Fixed the remote runner behavior.\n\nDone and live.'
+  );
+});
+
 test('finalSlackMessage removes premature live claims when deploy is not verified', () => {
   assert.equal(
     finalSlackMessage({

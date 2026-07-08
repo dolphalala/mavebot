@@ -45,8 +45,9 @@ Use context in layers instead of dumping the full channel history:
   to Codex with `--image` so remote screenshot work has the same visual-input
   path as a local Codex session.
 - Discord worker jobs should preserve bundled message rows and message IDs so
-  the active prompt matches the channel burst and restart catch-up does not
-  replay part of an already-handled request.
+  the active prompt matches the channel burst and restart catch-up groups any
+  still-unhandled adjacent messages instead of replaying them as separate
+  stale requests.
 
 Do not let old memory override the active user request. Treat old memory as
 background context that must be verified against source.
@@ -87,6 +88,9 @@ The channel answer should be short and human:
 - Only the worker wrapper should add verified live status. Codex subprocess
   output may describe the code change, but premature "done/live" wording should
   be stripped before the worker posts to the channel.
+- Routine success lines from the subprocess, such as checks passed, pushed,
+  deploy picked up, and health ok, should be stripped from normal channel
+  replies unless they explain a blocker.
 - Mention tests or deploy checks only when useful.
 - If blocked, say exactly what blocked it and what needs to happen next.
 - Do not include prompt dumps, task cards, ChatGPT promo text, long logs, or

@@ -61,9 +61,10 @@ command.
   catch-up can detect already-handled messages.
 - On startup, Discord `#codex` should catch up recent human messages that do
   not already have a job record in `jobs`, `processing`, `done`, or `failed`;
-  it should check bundled message IDs, not just the final job filename. This
-  prevents restart-window messages from being silently missed or replayed as
-  stale standalone jobs.
+  it should check bundled message IDs, not just the final job filename, and
+  group remaining adjacent messages before enqueueing. This prevents
+  restart-window messages from being silently missed or replayed as stale
+  standalone jobs.
 - If a worker push is rejected because `origin/main` advanced during a job, the
   worker should fetch, rebase, rerun checks, and retry the push instead of
   failing the channel request.
@@ -113,6 +114,9 @@ The channel history will grow forever, so remote jobs must keep memory useful:
 - Do not paste raw stack traces, Git output, auth headers, or long test logs
   into Slack or Discord. Save detailed errors in the failed job/server logs and
   post a short human blocker message in the channel.
+- Strip routine success chatter from the inner Codex response, including
+  check/pass, push, deploy, and health lines. The worker wrapper owns verified
+  status and channel replies should stay human unless something failed.
 - If the user must do an external UI step, say exactly what to click and why.
 - Ask questions only when the missing answer cannot be inferred safely from
   repo/server context.

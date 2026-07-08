@@ -87,6 +87,10 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   prompt. Discord attachments are downloaded immediately into
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/discord-files/` and
   passed to Codex as local files.
+- Discord restart catch-up groups still-unhandled adjacent messages into the
+  same worker job instead of replaying each recent message separately. This
+  keeps post-restart behavior closer to Codex Desktop, where context,
+  screenshots, and follow-ups remain one active turn.
 - The deploy script builds `discord-bot`, `slack-bridge`, and `codex-worker`.
   It recreates `codex-worker` only when no worker job is active; if a job is in
   `processing`, it writes `shared/codex-worker/restart-needed` and the poll

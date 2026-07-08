@@ -59,6 +59,11 @@ future tasks should know.
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/`. `transcript.jsonl`
   is normalized history, and `summary.md` plus `recent.md` keep future prompts
   bounded.
+- Discord remote-runner issues should be diagnosed as session/queue/context
+  parity problems before assuming a command is broken. Recent root causes were
+  missing Message Content Intent, screenshot/file intake gaps, Discord restart
+  catch-up replaying messages too separately, and inner Codex replies leaking
+  routine check/deploy chatter.
 - Slack `#bot` should treat adjacent text messages and uploaded files as one
   working context. The bridge accepts `file_share` messages, downloads files to
   `/shared/codex-worker/context/slack-files/`, includes local file paths in the
