@@ -84,6 +84,8 @@ const transcriptPath = path.join(contextDir, 'transcript.jsonl');
 const summaryPath = path.join(contextDir, 'summary.md');
 const recentPath = path.join(contextDir, 'recent.md');
 const sessionPath = path.join(contextDir, 'session.md');
+const codexOutputPath =
+  process.env.SLACK_WORKER_CODEX_OUTPUT_PATH || path.join(sharedDir, 'last-codex-message.md');
 const repoContextDir = process.env.SLACK_WORKER_REPO_CONTEXT_DIR || path.join(repoDir, 'docs/context');
 const repoContextMaxChars = parsePositiveInt(
   process.env.SLACK_WORKER_REPO_CONTEXT_MAX_CHARS,
@@ -1199,14 +1201,13 @@ async function runCodex(job, contextSnapshot) {
     repoContextBundle,
     slackMemoryTail
   });
-  const outputPath = path.join(contextDir, 'last-codex-message.md');
   const imagePaths = [];
   for (const imagePath of codexImagePathsForJob(job)) {
     if (await pathExists(imagePath)) {
       imagePaths.push(imagePath);
     }
   }
-  const args = buildCodexExecArgs({ repoDir, outputPath, model: codexModel, imagePaths });
+  const args = buildCodexExecArgs({ repoDir, outputPath: codexOutputPath, model: codexModel, imagePaths });
 
   await runProcess(codexBin, args, {
     cwd: repoDir,
@@ -1214,7 +1215,7 @@ async function runCodex(job, contextSnapshot) {
     timeoutMs: jobTimeoutMs
   });
 
-  return stripSlackLinks(await readOptional(outputPath));
+  return stripSlackLinks(await readOptional(codexOutputPath));
 }
 
 export function finalSlackMessage({ codexMessage, checkOk, pushResult, deployResult, runtime }) {
@@ -1339,6 +1340,7 @@ async function handleJob(claimed) {
 
 async function loop() {
   await ensureDirectories();
+  await unlink(path.join(contextDir, 'last-codex-message.md')).catch(() => {});
   await rebuildContextFiles({ pruneTranscript: true });
   console.log(`${workerName} Codex worker started. Watching ${jobDir}.`);
 
