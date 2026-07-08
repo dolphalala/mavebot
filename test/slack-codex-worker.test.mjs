@@ -122,6 +122,15 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
       channel: '1523893930993778698',
       jobId: 'discord-code-change-ack-123',
       text: 'Updated the Discord #codex working acknowledgements.'
+    },
+    {
+      at: '2026-07-07T00:08:00.000Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      jobId: '1523893930993778698-codex-parity-live-123',
+      text: 'Confirmed: I can read the attached image file and post a normal Discord channel reply.'
     }
   ];
 
@@ -133,6 +142,7 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.equal(isLowSignalTranscriptRow(rows[5]), true);
   assert.equal(isLowSignalTranscriptRow(rows[6]), true);
   assert.equal(isLowSignalTranscriptRow(rows[7]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[8]), true);
 
   const snapshot = compactTranscriptRows(rows, {
     recentLimit: 5,
@@ -145,7 +155,8 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.doesNotMatch(snapshot.recent, /Discord worker path is live/);
   assert.doesNotMatch(snapshot.recent, /Memory compaction is clean/);
   assert.doesNotMatch(snapshot.recent, /working acknowledgements/);
-  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 7/);
+  assert.doesNotMatch(snapshot.recent, /attached image file/);
+  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 8/);
 });
 
 test('compactTranscriptRows strips worker handoff boilerplate from retained memory', () => {
@@ -266,6 +277,15 @@ test('pruneTranscriptRowsForStorage removes low-signal rows from durable storage
       source: 'discord',
       channel: '1523893930993778698',
       text: 'Remote Discord worker path is working.'
+    },
+    {
+      at: '2026-07-07T00:06:00.000Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      jobId: '1523893930993778698-codex-desktop-parity-123',
+      text: 'Confirmed: I can read the attached image file and post a normal Discord channel reply.'
     }
   ];
 

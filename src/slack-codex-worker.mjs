@@ -589,7 +589,10 @@ export function isLowSignalTranscriptRow(row) {
     return true;
   }
 
-  if (/^(discord-live-verify-|discord-code-change-ack-)/.test(jobId)) {
+  if (
+    /^(discord-live-verify-|discord-code-change-ack-)/.test(jobId) ||
+    /(?:codex-(?:desktop-)?parity|worker-auth-smoke)/.test(jobId)
+  ) {
     return true;
   }
 
@@ -607,6 +610,7 @@ export function isLowSignalTranscriptRow(row) {
     /discord codex channel worker path is live/,
     /remote discord worker verification/,
     /remote discord worker path is working/,
+    /can read the attached image file and post a normal discord channel reply/,
     /remote codex memory contract is live/,
     /memory compaction is clean/,
     /^(mavebot vision|final vision) \d+$/,
