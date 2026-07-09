@@ -56,6 +56,7 @@ test('Discord Codex runtime exposes intake diagnostics in health output', async 
   assert.match(source, /discordCodexAuthBlockedJobs/);
   assert.match(source, /readDiscordCodexWorkerAuthState/);
   assert.match(source, /auth-retry-state\.json/);
+  assert.match(source, /verifiedByExec/);
   assert.match(source, /discordCodexCatchupLimit/);
   assert.match(source, /discordCodexContextBackfillLimit/);
   assert.match(source, /discordCodexCatchupWindowMs/);

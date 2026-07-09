@@ -166,7 +166,9 @@ remote work.
   distinguished from a server Codex-login blocker without reading container
   logs. `discordCodexWorkerAuth.blockedJobs` reflects the current
   `auth-blocked/` queue count, while `lastProbeBlockedJobs` preserves the
-  count from the last worker auth probe.
+  count from the last worker auth probe. `verifiedByExec` is `false` for the
+  worker's low-cost `codex login status` heartbeat and `true` only after a full
+  `codex exec` auth probe.
 - The deploy script normally builds `discord-bot` and `codex-worker`, then
   stops/removes the legacy Slack bridge. It only builds/starts `slack-bridge`
   when `ENABLE_SLACK_BRIDGE=1`. It recreates `codex-worker` only when no worker
@@ -189,6 +191,10 @@ remote work.
   auth probe before requeueing the saved jobs. This keeps requests retryable
   after a server login refresh without replaying them while auth is still
   broken.
+- The worker also refreshes `context/auth-retry-state.json` on startup and on a
+  heartbeat with `codex login status`, even when there are no blocked jobs, so
+  `/healthz` does not keep showing a stale logged-out state after a manual
+  server login.
 - Discord restart catch-up treats `auth-blocked/` records as already handled
   message IDs, so login-held requests are not duplicated after a bot restart.
 - `codex login status` can still say "Logged in using ChatGPT" after the

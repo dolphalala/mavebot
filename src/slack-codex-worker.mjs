@@ -113,6 +113,11 @@ const authRetryProbeIntervalMs = parsePositiveInt(
     process.env.SLACK_WORKER_AUTH_RETRY_PROBE_INTERVAL_MS,
   5 * 60 * 1000
 );
+const authStatusHeartbeatIntervalMs = parsePositiveInt(
+  process.env.CODEX_WORKER_AUTH_STATUS_HEARTBEAT_INTERVAL_MS ||
+    process.env.SLACK_WORKER_AUTH_STATUS_HEARTBEAT_INTERVAL_MS,
+  5 * 60 * 1000
+);
 const recentTurnLimit = parsePositiveInt(
   process.env.CODEX_WORKER_RECENT_TURNS || process.env.SLACK_WORKER_RECENT_TURNS,
   40
@@ -138,6 +143,7 @@ const transcriptPath = path.join(contextDir, 'transcript.jsonl');
 const summaryPath = path.join(contextDir, 'summary.md');
 const recentPath = path.join(contextDir, 'recent.md');
 const sessionPath = path.join(contextDir, 'session.md');
+const authRetryStatePath = path.join(contextDir, 'auth-retry-state.json');
 const authProbeOutputPath = path.join(contextDir, 'auth-probe-last-message.md');
 const codexOutputPath =
   process.env.CODEX_WORKER_CODEX_OUTPUT_PATH ||
@@ -161,6 +167,7 @@ const repoContextPriority = [
 ];
 
 let nextAuthRetryProbeAt = 0;
+let nextAuthStatusHeartbeatAt = 0;
 let lastAuthRetryProbe = null;
 
 function parsePositiveInt(value, fallback) {
@@ -829,6 +836,48 @@ async function claimNextJob() {
   return null;
 }
 
+export function workerAuthStatusRecord(
+  probe = {},
+  {
+    at = new Date().toISOString(),
+    blockedJobs = 0,
+    verifiedByExec = false
+  } = {}
+) {
+  return {
+    at,
+    blockedJobs: Number.parseInt(blockedJobs || '0', 10) || 0,
+    verifiedByExec: Boolean(verifiedByExec),
+    ready: Boolean(probe.ready),
+    reason: probe.reason || ''
+  };
+}
+
+async function writeAuthRetryState(record) {
+  await writePrivateText(authRetryStatePath, `${JSON.stringify(record, null, 2)}\n`);
+}
+
+async function codexLoginStatusProbe() {
+  const statusDir = (await pathExists(repoDir)) ? repoDir : sharedDir;
+  await mkdir(statusDir, { recursive: true });
+  const status = await runProcess(codexBin, ['login', 'status'], {
+    cwd: statusDir,
+    timeoutMs: 30_000,
+    allowFailure: true
+  });
+  if (!codexLoginStatusLooksReady(status)) {
+    return {
+      ready: false,
+      reason: truncate((status.stdout || status.stderr || 'Codex is not logged in.').trim(), 300)
+    };
+  }
+
+  return {
+    ready: true,
+    reason: truncate((status.stdout || status.stderr || 'Codex login status looks ready.').trim(), 300)
+  };
+}
+
 async function codexAuthProbe() {
   const statusDir = (await pathExists(repoDir)) ? repoDir : sharedDir;
   await mkdir(statusDir, { recursive: true });
@@ -875,6 +924,26 @@ async function codexAuthProbe() {
   return { ready: true, reason: 'Codex auth probe passed.' };
 }
 
+async function refreshAuthStatusHeartbeat({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && now < nextAuthStatusHeartbeatAt) {
+    return lastAuthRetryProbe;
+  }
+  nextAuthStatusHeartbeatAt = now + authStatusHeartbeatIntervalMs;
+
+  const names = await listJsonFiles(authBlockedDir);
+  const probe = await codexLoginStatusProbe().catch((error) => ({
+    ready: false,
+    reason: safeErrorText(error, 500)
+  }));
+  lastAuthRetryProbe = workerAuthStatusRecord(probe, {
+    blockedJobs: names.length,
+    verifiedByExec: false
+  });
+  await writeAuthRetryState(lastAuthRetryProbe).catch(() => {});
+  return lastAuthRetryProbe;
+}
+
 async function requeueAuthBlockedJobsIfReady() {
   const names = await listJsonFiles(authBlockedDir);
   if (!names.length) {
@@ -892,14 +961,12 @@ async function requeueAuthBlockedJobsIfReady() {
     reason: safeErrorText(error, 500)
   }));
   lastAuthRetryProbe = {
-    at: new Date().toISOString(),
-    blockedJobs: names.length,
-    ...probe
+    ...workerAuthStatusRecord(probe, {
+      blockedJobs: names.length,
+      verifiedByExec: true
+    })
   };
-  await writePrivateText(
-    path.join(contextDir, 'auth-retry-state.json'),
-    `${JSON.stringify(lastAuthRetryProbe, null, 2)}\n`
-  ).catch(() => {});
+  await writeAuthRetryState(lastAuthRetryProbe).catch(() => {});
 
   if (!probe.ready) {
     console.log(`Codex auth still blocked; ${names.length} saved job(s) remain held.`);
@@ -1934,9 +2001,11 @@ async function loop() {
   await ensureDirectories();
   await unlink(path.join(contextDir, 'last-codex-message.md')).catch(() => {});
   await rebuildContextFiles({ pruneTranscript: true });
+  await refreshAuthStatusHeartbeat({ force: true });
   console.log(`${workerName} Codex worker started. Watching ${jobDir}.`);
 
   for (;;) {
+    await refreshAuthStatusHeartbeat();
     await requeueAuthBlockedJobsIfReady();
     const claimed = await claimNextJob();
     if (!claimed) {

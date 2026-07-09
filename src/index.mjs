@@ -386,6 +386,7 @@ async function readDiscordCodexWorkerAuthState({ currentBlockedJobs = null } = {
       ready: Boolean(state.ready),
       blockedJobs: Number.isFinite(currentBlockedJobs) ? currentBlockedJobs : lastProbeBlockedJobs,
       lastProbeBlockedJobs,
+      verifiedByExec: Boolean(state.verifiedByExec),
       reason: String(state.reason || '').slice(0, 300)
     };
   } catch {

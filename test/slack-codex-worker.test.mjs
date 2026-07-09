@@ -28,6 +28,7 @@ import {
   pruneTranscriptRowsForStorage,
   readRecentWorkerJobHistory,
   readRepoContextBundle,
+  workerAuthStatusRecord,
   workerFailureMessage
 } from '../src/slack-codex-worker.mjs';
 
@@ -968,6 +969,34 @@ test('codexLoginStatusLooksReady rejects logged-out status before retry probe', 
   assert.equal(codexLoginStatusLooksReady({ code: 1, stdout: 'Not logged in' }), false);
   assert.equal(codexLoginStatusLooksReady({ code: 0, stdout: 'Not logged in' }), false);
   assert.equal(codexLoginStatusLooksReady('Please sign in again'), false);
+});
+
+test('workerAuthStatusRecord distinguishes status heartbeat from exec probe', () => {
+  assert.deepEqual(
+    workerAuthStatusRecord(
+      { ready: true, reason: 'Logged in using ChatGPT' },
+      {
+        at: '2026-07-09T20:00:00.000Z',
+        blockedJobs: 0,
+        verifiedByExec: false
+      }
+    ),
+    {
+      at: '2026-07-09T20:00:00.000Z',
+      blockedJobs: 0,
+      verifiedByExec: false,
+      ready: true,
+      reason: 'Logged in using ChatGPT'
+    }
+  );
+
+  assert.equal(
+    workerAuthStatusRecord(
+      { ready: true, reason: 'Codex auth probe passed.' },
+      { blockedJobs: 2, verifiedByExec: true }
+    ).verifiedByExec,
+    true
+  );
 });
 
 test('auth-blocked job records can be cleaned when requeued', () => {
