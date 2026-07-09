@@ -345,6 +345,11 @@ function appendLimited(current, chunk) {
   return next.slice(-maxOutputChars);
 }
 
+function safeErrorText(error, maxChars = 4000) {
+  const value = error?.stack || error?.message || error;
+  return truncate(redact(String(value || 'unknown error')), maxChars);
+}
+
 async function pathExists(filePath) {
   try {
     await access(filePath);
@@ -612,12 +617,9 @@ async function claimNextJob() {
       const job = await readJsonFile(target);
       return { job: await markJobStarted(target, job), path: target };
     } catch (error) {
+      console.error(`Failed to claim job ${name}: ${safeErrorText(error)}`);
       if (await pathExists(target)) {
-        const fallbackJob = { id: path.basename(name, '.json') };
-        await moveJob(target, failedDir, fallbackJob, {
-          failedAt: new Date().toISOString(),
-          error: truncate(redact(error.message || error), 4000)
-        }).catch(() => {});
+        await quarantineUnclaimableJob(target, error);
       }
       continue;
     }
@@ -645,6 +647,48 @@ async function moveJob(jobPath, targetDir, job, extra = {}, options = {}) {
     await writePrivateText(target, `${JSON.stringify(next, null, 2)}\n`);
     await unlink(jobPath).catch(() => {});
   });
+}
+
+async function quarantineUnclaimableJob(jobPath, error) {
+  const id = path.basename(jobPath, '.json');
+  const failedAt = new Date().toISOString();
+  const claimError = safeErrorText(error);
+  const fallbackJob = { id };
+  try {
+    await moveJob(jobPath, failedDir, fallbackJob, {
+      failedAt,
+      error: claimError,
+      claimFailed: true
+    });
+    console.error(`Moved unclaimable job ${id} to failed after claim failure.`);
+    return;
+  } catch (moveError) {
+    const suffix = `claim-failed-${Date.now()}`;
+    const quarantinePath = path.join(failedDir, `${id}.${suffix}.json`);
+    const sidecarPath = path.join(failedDir, `${id}.${suffix}.error.txt`);
+    const moveErrorText = safeErrorText(moveError);
+    try {
+      await mkdir(failedDir, { recursive: true });
+      await rename(jobPath, quarantinePath);
+      await writePrivateText(
+        sidecarPath,
+        [
+          `failedAt: ${failedAt}`,
+          `job: ${id}`,
+          `claimError: ${claimError}`,
+          `metadataMoveError: ${moveErrorText}`,
+          ''
+        ].join('\n')
+      ).catch(() => {});
+      console.error(
+        `Quarantined unclaimable job ${id} without metadata after claim failure. Metadata move failed: ${moveErrorText}`
+      );
+    } catch (renameError) {
+      console.error(
+        `Could not quarantine unclaimable job ${id}. Claim failure: ${claimError}. Quarantine failure: ${safeErrorText(renameError)}`
+      );
+    }
+  }
 }
 
 export function isLowSignalTranscriptRow(row) {
