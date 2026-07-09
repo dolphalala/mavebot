@@ -32,17 +32,17 @@ export const PICTIONARY_DIFFICULTIES = {
     id: 'hard',
     label: 'Hard',
     seconds: DEFAULT_PICTIONARY_ROUND_SECONDS,
-    clueCount: 1,
+    clueCount: 2,
     reveal: 'cropped',
-    topicRanks: [2, 3, 4]
+    topicRanks: [3, 4]
   },
   expert: {
     id: 'expert',
     label: 'Expert',
     seconds: 25,
-    clueCount: 0,
+    clueCount: 1,
     reveal: 'silhouette',
-    topicRanks: [3, 4]
+    topicRanks: [4]
   },
   mixed: {
     id: 'mixed',
@@ -358,6 +358,7 @@ export const PICTIONARY_TOPICS = [
     answer: 'Heal Spell',
     aliases: ['heal'],
     category: 'Spells',
+    assetName: 'Healing Spell',
     shape: 'spell',
     accent: '#ffd166',
     clues: ['golden ring', 'keeps troops up', 'green plus']
@@ -938,6 +939,8 @@ export const PICTIONARY_TOPICS = [
     answer: 'Builder Base',
     aliases: ['bb'],
     category: 'Builder Base',
+    assetName: 'Builder Hall',
+    assetAliases: ['Builder Hall10', 'Boat'],
     shape: 'building',
     accent: '#4fc3f7',
     clues: ['night village', 'boat trip', 'two stages']
@@ -947,6 +950,8 @@ export const PICTIONARY_TOPICS = [
     answer: 'Clan War',
     aliases: ['war', 'cw'],
     category: 'Clan Play',
+    assetName: 'Clan Wars',
+    assetAliases: ['Clan War Leagues'],
     shape: 'league',
     accent: '#e74c3c',
     clues: ['two attacks', 'stars decide', 'battle day']
@@ -956,9 +961,350 @@ export const PICTIONARY_TOPICS = [
     answer: 'Raid Weekend',
     aliases: ['capital raid', 'raids'],
     category: 'Clan Capital',
+    assetName: 'Raid Weekends',
+    assetAliases: ['Raid Medal', 'Capital Hall'],
     shape: 'league',
     accent: '#67d5a5',
     clues: ['capital gold', 'districts', 'weekend attacks']
+  },
+  {
+    id: 'party-wizard',
+    answer: 'Party Wizard',
+    aliases: ['party wiz'],
+    category: 'Limited-Time Troops',
+    shape: 'spell',
+    accent: '#4fc3f7',
+    clues: ['anniversary wizard', 'throws party fire', 'temporary troop']
+  },
+  {
+    id: 'ice-wizard',
+    answer: 'Ice Wizard',
+    aliases: ['ice wiz'],
+    category: 'Limited-Time Troops',
+    shape: 'spell',
+    accent: '#7ee7ff',
+    clues: ['holiday wizard', 'slows targets', 'blue crossover troop']
+  },
+  {
+    id: 'royal-ghost',
+    answer: 'Royal Ghost',
+    aliases: ['ghost'],
+    category: 'Limited-Time Troops',
+    shape: 'troop',
+    accent: '#d9e6f2',
+    clues: ['invisible visitor', 'halloween event', 'floats through bases']
+  },
+  {
+    id: 'el-primo',
+    answer: 'El Primo',
+    aliases: ['primo'],
+    category: 'Limited-Time Troops',
+    shape: 'troop',
+    accent: '#2f7dff',
+    clues: ['brawler crossover', 'jumps into defenses', 'blue wrestler']
+  },
+  {
+    id: 'ram-rider',
+    answer: 'Ram Rider',
+    aliases: ['ram'],
+    category: 'Limited-Time Troops',
+    shape: 'troop',
+    accent: '#d9a066',
+    clues: ['holiday rider', 'leaps walls', 'ram charge']
+  },
+  {
+    id: 'single-player-campaign',
+    answer: 'Single Player Campaign',
+    aliases: ['goblin map', 'single player'],
+    category: 'Clash History',
+    shape: 'league',
+    accent: '#7bd88f',
+    clues: ['goblin bases', 'old offline grind', 'campaign map']
+  },
+  {
+    id: 'goblin-king',
+    answer: 'Goblin King',
+    aliases: ['goblin king boss'],
+    category: 'Goblin Lore',
+    shape: 'hero',
+    accent: '#7bd88f',
+    clues: ['goblin boss', 'single-player royalty', 'green crown']
+  },
+  {
+    id: 'goblin-queen',
+    answer: 'Goblin Queen',
+    aliases: ['goblin queen boss'],
+    category: 'Goblin Lore',
+    shape: 'hero',
+    accent: '#ff7bac',
+    clues: ['goblin royalty', 'campaign queen', 'green ruler']
+  },
+  {
+    id: 'golden-dragon',
+    answer: 'Golden Dragon',
+    aliases: ['gold dragon'],
+    category: 'Goblin Lore',
+    shape: 'air',
+    accent: '#ffd166',
+    clues: ['campaign boss', 'golden flyer', 'goblin map monster']
+  },
+  {
+    id: 'clash-release',
+    answer: 'Clash of Clans',
+    aliases: ['global launch', 'release day'],
+    category: 'Clash History',
+    assetName: 'Clash of Clans',
+    shape: 'league',
+    accent: '#f0b13b',
+    clues: ['2012 start', 'village era begins', 'original app icon']
+  },
+  {
+    id: 'town-hall-8',
+    answer: 'Town Hall 8',
+    aliases: ['th8'],
+    category: 'Old Town Hall Meta',
+    assetName: 'Town Hall8',
+    assetAliases: ['Town Hall 8'],
+    shape: 'building',
+    accent: '#d9a066',
+    clues: ['old GoWiPe era', 'dragon spam memories', 'orange roof hall']
+  },
+  {
+    id: 'town-hall-10',
+    answer: 'Town Hall 10',
+    aliases: ['th10'],
+    category: 'Old Town Hall Meta',
+    assetName: 'Town Hall10',
+    assetAliases: ['Town Hall 10'],
+    shape: 'building',
+    accent: '#f24f3d',
+    clues: ['inferno era', 'classic max base wall', 'red lava hall']
+  },
+  {
+    id: 'giga-tesla',
+    answer: 'Giga Tesla',
+    aliases: ['th12 weapon'],
+    category: 'Town Hall Weapons',
+    shape: 'defense',
+    accent: '#65e4ff',
+    clues: ['first town hall weapon', 'electric death damage', 'th12 core']
+  },
+  {
+    id: 'giga-inferno',
+    answer: 'Giga Inferno',
+    aliases: ['th13 weapon', 'th14 weapon'],
+    category: 'Town Hall Weapons',
+    assetName: 'Town Hall13',
+    assetAliases: ['Town Hall14', 'Town Hall15'],
+    shape: 'defense',
+    accent: '#5ce0d8',
+    clues: ['poison bomb era', 'burning town hall core', 'post-tesla weapon']
+  },
+  {
+    id: 'clan-games',
+    answer: 'Clan Games',
+    aliases: ['games'],
+    category: 'Clash History',
+    shape: 'league',
+    accent: '#f0b13b',
+    clues: ['task board', 'reward tiers', '2017 clan grind']
+  },
+  {
+    id: 'clan-war-leagues',
+    answer: 'Clan War Leagues',
+    aliases: ['cwl'],
+    category: 'Clan Play',
+    shape: 'league',
+    accent: '#d45bff',
+    clues: ['monthly war week', 'league medals', 'crystal champion master']
+  },
+  {
+    id: 'world-championship',
+    answer: 'World Championship',
+    aliases: ['clash worlds', 'worlds'],
+    category: 'Esports History',
+    assetName: 'Trophy',
+    assetAliases: ['Legend League'],
+    shape: 'league',
+    accent: '#f0b13b',
+    clues: ['pro finals', 'golden ticket era', 'best clans on stage']
+  },
+  {
+    id: 'jorge-yao',
+    answer: 'Jorge Yao',
+    aliases: ['jorge'],
+    category: 'Old Clash Players',
+    assetName: 'Trophy',
+    assetAliases: ['Legend League'],
+    shape: 'league',
+    accent: '#ffd166',
+    clues: ['old trophy legend', 'early leaderboard name', 'pre-Legends icon']
+  },
+  {
+    id: 'chief-pat',
+    answer: 'Chief Pat',
+    aliases: ['pat'],
+    category: 'Old Clash Creators',
+    assetName: 'Clash of Clans',
+    assetAliases: ['Trophy'],
+    shape: 'hero',
+    accent: '#4fc3f7',
+    clues: ['early Clash YouTube', 'attack strategy videos', 'old-school creator']
+  },
+  {
+    id: 'galadon',
+    answer: 'Galadon',
+    aliases: ['gala'],
+    category: 'Old Clash Creators',
+    assetName: 'Clash of Clans',
+    assetAliases: ['Trophy'],
+    shape: 'hero',
+    accent: '#7bd88f',
+    clues: ['early base coverage', 'longtime Clash creator', 'update narrator']
+  },
+  {
+    id: 'fortune-tree',
+    answer: 'Fortune Tree',
+    aliases: ['lunar tree'],
+    category: 'Rare Obstacles',
+    shape: 'resource',
+    accent: '#ff7043',
+    clues: ['limited obstacle', 'lunar decoration', 'red-gold tree']
+  },
+  {
+    id: 'glowy-lantern',
+    answer: 'Glowy Lantern',
+    aliases: ['lantern'],
+    category: 'Rare Obstacles',
+    shape: 'resource',
+    accent: '#f6d365',
+    clues: ['seasonal obstacle', 'yellow glow', 'collector flex']
+  },
+  {
+    id: 'dragon-statue',
+    answer: 'Dragon Statue',
+    aliases: ['dragon decoration'],
+    category: 'Rare Decorations',
+    shape: 'air',
+    accent: '#67d5a5',
+    clues: ['shop decoration', 'green dragon pose', 'base flex item']
+  },
+  {
+    id: 'shovel-of-obstacles',
+    answer: 'Shovel of Obstacles',
+    aliases: ['shovel'],
+    category: 'Magic Items',
+    shape: 'resource',
+    accent: '#b88954',
+    clues: ['moves rare trees', 'collector tool', 'obstacle magic item']
+  },
+  {
+    id: 'book-of-heroes',
+    answer: 'Book of Heroes',
+    aliases: ['boh'],
+    category: 'Magic Items',
+    shape: 'hero',
+    accent: '#f0b13b',
+    clues: ['finish hero upgrade', 'gold book', 'no sleeping queen']
+  },
+  {
+    id: 'hammer-of-fighting',
+    answer: 'Hammer of Fighting',
+    aliases: ['fighting hammer'],
+    category: 'Magic Items',
+    shape: 'troop',
+    accent: '#ff7043',
+    clues: ['league medal item', 'instant troop upgrade', 'battle hammer']
+  },
+  {
+    id: 'glowy-ore',
+    answer: 'Glowy Ore',
+    aliases: ['glowy'],
+    category: 'Hero Equipment Economy',
+    shape: 'equipment',
+    accent: '#67d5a5',
+    clues: ['equipment currency', 'green ore', 'middle upgrade bottleneck']
+  },
+  {
+    id: 'starry-ore',
+    answer: 'Starry Ore',
+    aliases: ['starry'],
+    category: 'Hero Equipment Economy',
+    shape: 'equipment',
+    accent: '#f6d365',
+    clues: ['epic equipment currency', 'yellow ore', 'rarest ore']
+  },
+  {
+    id: 'builder-star-jar',
+    answer: 'Builder Star Jar',
+    aliases: ['star jar'],
+    category: 'Magic Items',
+    shape: 'resource',
+    accent: '#65e4ff',
+    clues: ['builder bonus reset', 'star bonus item', 'night village loot']
+  },
+  {
+    id: 'otto',
+    answer: 'O.T.T.O',
+    aliases: ['otto'],
+    category: 'Builder Base History',
+    shape: 'pet',
+    accent: '#65e4ff',
+    clues: ['sixth builder path', 'little robot', 'builder base grind']
+  },
+  {
+    id: 'bob',
+    answer: 'B.O.B',
+    aliases: ['bob'],
+    category: 'Builder Base History',
+    shape: 'pet',
+    accent: '#f0b13b',
+    clues: ['newer builder robot', 'home village helper', 'builder base 2.0 reward']
+  },
+  {
+    id: 'master-builder',
+    answer: 'Master Builder',
+    aliases: ['master builder'],
+    category: 'Builder Base History',
+    shape: 'hero',
+    accent: '#d9a066',
+    clues: ['boat owner', 'battle machine pilot', 'night village builder']
+  },
+  {
+    id: 'super-witch',
+    answer: 'Super Witch',
+    aliases: ['big boy witch'],
+    category: 'Super Troops',
+    shape: 'troop',
+    accent: '#7e6bff',
+    clues: ['summons Big Boy', 'super troop version', 'purple summoner']
+  },
+  {
+    id: 'sneaky-goblin',
+    answer: 'Sneaky Goblin',
+    aliases: ['sneaky gobs', 'sneaky gob'],
+    category: 'Super Troops',
+    shape: 'troop',
+    accent: '#7bd88f',
+    clues: ['resource assassin', 'invisible opener', 'farming legend']
+  },
+  {
+    id: 'inferno-dragon',
+    answer: 'Inferno Dragon',
+    aliases: ['inferno drag', 'idrag'],
+    category: 'Super Troops',
+    shape: 'air',
+    accent: '#ff7043',
+    clues: ['single beam flyer', 'super baby dragon cousin', 'melts tanks']
+  },
+  {
+    id: 'mega-sparky',
+    answer: 'Mega Sparky',
+    aliases: ['sparky'],
+    category: 'Clan Capital',
+    shape: 'defense',
+    accent: '#65e4ff',
+    clues: ['capital shock cannon', 'slow huge zap', 'capital peak nightmare']
   }
 ];
 
@@ -1026,7 +1372,33 @@ const EXPERT_TOPIC_IDS = new Set([
   'crusher',
   'roaster',
   'clan-capital',
-  'raid-weekend'
+  'raid-weekend',
+  'party-wizard',
+  'ice-wizard',
+  'royal-ghost',
+  'el-primo',
+  'ram-rider',
+  'single-player-campaign',
+  'goblin-king',
+  'goblin-queen',
+  'golden-dragon',
+  'clash-release',
+  'town-hall-8',
+  'town-hall-10',
+  'giga-tesla',
+  'clan-games',
+  'clan-war-leagues',
+  'fortune-tree',
+  'glowy-lantern',
+  'dragon-statue',
+  'shovel-of-obstacles',
+  'book-of-heroes',
+  'hammer-of-fighting',
+  'builder-star-jar',
+  'master-builder',
+  'super-witch',
+  'sneaky-goblin',
+  'inferno-dragon'
 ]);
 
 const VERY_HARD_TOPIC_IDS = new Set([
@@ -1036,13 +1408,24 @@ const VERY_HARD_TOPIC_IDS = new Set([
   'magic-mirror',
   'rocket-spear',
   'fireball',
+  'giga-inferno',
   'tornado-trap',
   'battle-drill',
   'angry-jelly',
   'sneezy',
   'roaster',
   'clan-capital',
-  'raid-weekend'
+  'raid-weekend',
+  'golden-dragon',
+  'world-championship',
+  'jorge-yao',
+  'chief-pat',
+  'galadon',
+  'glowy-ore',
+  'starry-ore',
+  'otto',
+  'bob',
+  'mega-sparky'
 ]);
 
 export function pictionaryTopicDifficultyRank(topic) {

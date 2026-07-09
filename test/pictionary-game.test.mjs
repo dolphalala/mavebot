@@ -57,7 +57,9 @@ test('pictionary round settings clamp to safe values', () => {
   assert.equal(normalizePictionaryDifficulty('expert'), 'expert');
   assert.equal(normalizePictionaryDifficulty('unknown'), 'hard');
   assert.equal(pictionaryDifficultySettings('easy').clueCount, 3);
-  assert.equal(pictionaryDifficultySettings('expert').clueCount, 0);
+  assert.deepEqual(pictionaryDifficultySettings('hard').topicRanks, [3, 4]);
+  assert.deepEqual(pictionaryDifficultySettings('expert').topicRanks, [4]);
+  assert.equal(pictionaryDifficultySettings('expert').clueCount, 1);
 });
 
 test('selectPictionaryTopic avoids used topics, respects categories, and supports difficulty pools', () => {
@@ -87,6 +89,22 @@ test('pictionary uses explicit Clash art names for level-named building assets',
     'Inferno Tower1 Single'
   ]);
   assert.deepEqual(pictionaryTopicAssetNames(townHall), ['Town Hall15', 'Town Hall', 'Town Hall13']);
+});
+
+test('pictionary uses asset aliases for history and abstract Clash topics', () => {
+  const healSpell = PICTIONARY_TOPICS.find((topic) => topic.id === 'heal-spell');
+  const raidWeekend = PICTIONARY_TOPICS.find((topic) => topic.id === 'raid-weekend');
+  const jorgeYao = PICTIONARY_TOPICS.find((topic) => topic.id === 'jorge-yao');
+
+  assert.deepEqual(pictionaryTopicAssetNames(healSpell), ['Healing Spell', 'Heal Spell']);
+  assert.deepEqual(pictionaryTopicAssetNames(raidWeekend), [
+    'Raid Weekends',
+    'Raid Weekend',
+    'Raid Medal',
+    'Capital Hall'
+  ]);
+  assert.deepEqual(pictionaryTopicAssetNames(jorgeYao), ['Trophy', 'Jorge Yao', 'Legend League']);
+  assert.equal(pictionaryTopicDifficultyRank(jorgeYao), 4);
 });
 
 test('recordPictionaryGame persists leaderboard stats and corrupt backups', async (t) => {
