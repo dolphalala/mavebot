@@ -397,13 +397,27 @@ export function discordRowsToWorkerText(rows = []) {
     .trim();
 }
 
+export function discordRowsToContextMessages(rows = []) {
+  return (rows || []).filter(Boolean).map((row) => ({
+    receivedAt: row.receivedAt || '',
+    id: row.id || '',
+    guildId: row.guildId || '',
+    channel: row.channel || '',
+    user: row.user || '',
+    username: row.username || '',
+    text: row.text || '',
+    ...(row.files?.length ? { files: row.files } : {})
+  }));
+}
+
 export function buildDiscordCodexWorkerJob(
   message,
   {
     createdAt = new Date().toISOString(),
     files = [],
     messageRows = [],
-    sourceMessageId = ''
+    sourceMessageId = '',
+    nearbyRows = []
   } = {}
 ) {
   const rows = messageRows.length ? messageRows : [buildDiscordMessageRow(message, { files })];
@@ -414,16 +428,11 @@ export function buildDiscordCodexWorkerJob(
   const sourceTs = sourceRow.id || message?.id || String(Date.now());
   const allFiles = rows.flatMap((row) => row?.files || []);
   const messageIds = rows.map((row) => row?.id).filter(Boolean);
-  const contextMessages = rows.map((row) => ({
-    receivedAt: row.receivedAt || '',
-    id: row.id || '',
-    guildId: row.guildId || '',
-    channel: row.channel || '',
-    user: row.user || '',
-    username: row.username || '',
-    text: row.text || '',
-    ...(row.files?.length ? { files: row.files } : {})
-  }));
+  const contextMessages = discordRowsToContextMessages(rows);
+  const activeMessageIds = new Set(messageIds);
+  const nearbyContextRows = (nearbyRows || [])
+    .filter((row) => row?.id && !activeMessageIds.has(row.id));
+  const nearbyFiles = nearbyContextRows.flatMap((row) => row?.files || []);
   return {
     id: [safeIdPart(sourceRow.channel || message?.channelId || 'discord'), safeIdPart(sourceTs)].join('-'),
     source: 'discord',
@@ -438,7 +447,14 @@ export function buildDiscordCodexWorkerJob(
     text: discordRowsToWorkerText(rows),
     messageIds,
     contextMessages,
-    ...(allFiles.length ? { files: allFiles } : {})
+    ...(nearbyContextRows.length
+      ? {
+          nearbyText: discordRowsToWorkerText(nearbyContextRows),
+          nearbyContextMessages: discordRowsToContextMessages(nearbyContextRows)
+        }
+      : {}),
+    ...(allFiles.length ? { files: allFiles } : {}),
+    ...(nearbyFiles.length ? { nearbyFiles } : {})
   };
 }
 

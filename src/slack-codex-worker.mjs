@@ -196,7 +196,10 @@ export function isCodexImageFile(file = {}) {
 }
 
 export function codexImagePathsForJob(job = {}, { maxImages = maxCodexImages } = {}) {
-  const files = Array.isArray(job?.files) ? job.files : [];
+  const files = [
+    ...(Array.isArray(job?.files) ? job.files : []),
+    ...(Array.isArray(job?.nearbyFiles) ? job.nearbyFiles : [])
+  ];
   const limit = Number.isFinite(maxImages) && maxImages > 0 ? maxImages : files.length;
   return files
     .filter(isCodexImageFile)
@@ -270,6 +273,9 @@ function isMalformedLeadSentence(sentence) {
 export function activeRequestNeedsDetailedAnswer(job = {}) {
   const contextMessages = Array.isArray(job?.contextMessages) ? job.contextMessages : [];
   if (job?.source === 'discord' && contextMessages.length > 1) {
+    return true;
+  }
+  if (Array.isArray(job?.files) && job.files.length > 0) {
     return true;
   }
   const contextText = Array.isArray(job?.contextMessages)
@@ -1142,7 +1148,12 @@ function promptHeader(job) {
       ts: job.ts || '',
       text: job.text || '',
       files: Array.isArray(job.files) ? job.files : [],
-      contextMessages: Array.isArray(job.contextMessages) ? job.contextMessages : []
+      contextMessages: Array.isArray(job.contextMessages) ? job.contextMessages : [],
+      nearbyText: job.nearbyText || '',
+      nearbyFiles: Array.isArray(job.nearbyFiles) ? job.nearbyFiles : [],
+      nearbyContextMessages: Array.isArray(job.nearbyContextMessages)
+        ? job.nearbyContextMessages
+        : []
     }, null, 2),
     '',
     'Hard rules:',
@@ -1168,6 +1179,9 @@ function promptHeader(job) {
     '- Final answer should be plain, short, and suitable to post directly as mavebot. Talk like a helpful person, not a deployment log.',
     '- Answer every explicit question in the active request before ending. If the user asks for a plan, demo, or how something works, include that plan/demo in the final answer instead of only saying work was done.',
     '- If the active request includes multiple contextMessages, treat them as one bundled turn. Preserve speaker names, files, and every explicit ask in order.',
+    '- nearbyContextMessages and nearbyText are background channel context only. Use them to resolve references like "that", "above", "the screenshot", "what did you do", or multi-user collaboration, but do not treat them as additional tasks unless the active request refers to them.',
+    '- If nearbyFiles are relevant to the active request, inspect them the same way you inspect active files.',
+    '- If image files are attached, inspect the image content and answer what the user asked about the image. Do not merely say you can see it.',
     '- If multiple users are bundled, use the newest message to resolve conflicts, but do not silently drop earlier asks.',
     '- If a bundled turn contains unrelated independent requests that cannot safely fit one run, complete the clear in-scope work and say exactly what remains separate.',
     '- For multi-part requests, track each part yourself and continue through the sequence without waiting for another prompt when the next action is clear.',
@@ -1591,6 +1605,8 @@ async function handleJob(claimed) {
       pushResult,
       deployResult,
       runtime,
+      codexMessage: truncate(redact(codexMessage), 8000),
+      finalMessage: truncate(redact(slackText), 3000),
       slackPostError
     }, { clearFailure: true });
   } catch (error) {

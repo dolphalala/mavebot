@@ -119,6 +119,14 @@ const discordCodexCatchupWindowMs = Number.parseInt(
   process.env.DISCORD_CODEX_CATCHUP_WINDOW_MS || String(DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS),
   10
 );
+const discordCodexRecentContextWindowMs = Number.parseInt(
+  process.env.DISCORD_CODEX_RECENT_CONTEXT_WINDOW_MS || String(10 * 60 * 1000),
+  10
+);
+const discordCodexRecentContextLimit = Number.parseInt(
+  process.env.DISCORD_CODEX_RECENT_CONTEXT_LIMIT || '12',
+  10
+);
 const discordMessageContentIntentPreference =
   process.env.DISCORD_MESSAGE_CONTENT_INTENT || 'auto';
 const configuredLegendsIntervalMs = Number.parseInt(
@@ -158,6 +166,7 @@ let discordCodexIntentWarningSent = false;
 let discordCodexLastError = null;
 let discordCodexLastCatchup = null;
 const pendingDiscordCodexJobs = new Map();
+const recentDiscordCodexRows = [];
 
 async function detectMessageContentIntentAvailable() {
   if (discordMessageContentIntentPreference === '0') {
@@ -211,6 +220,9 @@ app.get('/healthz', async (_req, res) => {
     discordCodexWorkerDebounceMs,
     discordCodexCatchupLimit,
     discordCodexCatchupWindowMs,
+    discordCodexRecentContextWindowMs,
+    discordCodexRecentContextLimit,
+    discordCodexRecentContextRows: recentDiscordCodexRows.length,
     discordCodexPendingBursts: pendingDiscordCodexJobs.size,
     discordCodexMessageCount,
     discordCodexLastMessageAt,
@@ -266,6 +278,73 @@ function createViewId() {
 
 function pendingDiscordJobKey(message) {
   return discordLiveBurstKey(message, discordCodexChannelId || 'discord');
+}
+
+function normalizedDiscordRecentContextWindowMs() {
+  return Number.isFinite(discordCodexRecentContextWindowMs) && discordCodexRecentContextWindowMs > 0
+    ? discordCodexRecentContextWindowMs
+    : 10 * 60 * 1000;
+}
+
+function normalizedDiscordRecentContextLimit() {
+  return Number.isFinite(discordCodexRecentContextLimit) && discordCodexRecentContextLimit > 0
+    ? discordCodexRecentContextLimit
+    : 12;
+}
+
+function discordRowTime(row) {
+  const parsed = Date.parse(row?.receivedAt || '');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function pruneRecentDiscordCodexRows(now = Date.now()) {
+  const windowMs = normalizedDiscordRecentContextWindowMs();
+  const keepAfter = now - windowMs;
+  for (let i = recentDiscordCodexRows.length - 1; i >= 0; i -= 1) {
+    const rowTime = discordRowTime(recentDiscordCodexRows[i]);
+    if (rowTime && rowTime < keepAfter) {
+      recentDiscordCodexRows.splice(i, 1);
+    }
+  }
+
+  const maxRows = normalizedDiscordRecentContextLimit() * 3;
+  while (recentDiscordCodexRows.length > maxRows) {
+    recentDiscordCodexRows.shift();
+  }
+}
+
+function rememberDiscordCodexRow(row) {
+  if (!row?.id) {
+    return;
+  }
+  const existingIndex = recentDiscordCodexRows.findIndex((recentRow) => recentRow?.id === row.id);
+  if (existingIndex >= 0) {
+    recentDiscordCodexRows.splice(existingIndex, 1);
+  }
+  recentDiscordCodexRows.push(row);
+  pruneRecentDiscordCodexRows(discordRowTime(row) || Date.now());
+}
+
+function recentDiscordCodexContextRows(message, activeRows = []) {
+  pruneRecentDiscordCodexRows();
+
+  const activeIds = new Set((activeRows || []).map((row) => row?.id).filter(Boolean));
+  const channelId = message?.channelId || activeRows.at(-1)?.channel || discordCodexChannelId;
+  const anchorTime =
+    Date.parse(activeRows.at(-1)?.receivedAt || '') ||
+    Number(message?.createdTimestamp || 0) ||
+    Date.now();
+  const windowMs = normalizedDiscordRecentContextWindowMs();
+  const limit = normalizedDiscordRecentContextLimit();
+
+  return recentDiscordCodexRows
+    .filter((row) => row?.channel === channelId)
+    .filter((row) => row?.id && !activeIds.has(row.id))
+    .filter((row) => {
+      const rowTime = discordRowTime(row);
+      return rowTime && Math.abs(anchorTime - rowTime) <= windowMs;
+    })
+    .slice(-limit);
 }
 
 async function discordCodexJobRecordExists(jobId) {
@@ -344,6 +423,7 @@ async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup
     throw error;
   }
   const row = buildDiscordMessageRow(message, { files });
+  rememberDiscordCodexRow(row);
 
   if (catchup) {
     const job = buildDiscordCodexWorkerJob(message, {
@@ -399,6 +479,7 @@ async function enqueueDiscordCodexMessageBurst(
     }
     rows.push(buildDiscordMessageRow(message, { files }));
   }
+  rows.forEach(rememberDiscordCodexRow);
 
   const sourceMessage = messages.at(-1);
   const job = buildDiscordCodexWorkerJob(sourceMessage, {
@@ -480,7 +561,8 @@ function scheduleDiscordCodexWorkerJob(message, row) {
       promise: enqueueDiscordCodexWorkerJob(
         discordCodexWorkerJobDir,
         buildDiscordCodexWorkerJob(message, {
-          messageRows: row ? [row] : []
+          messageRows: row ? [row] : [],
+          nearbyRows: recentDiscordCodexContextRows(message, row ? [row] : [])
         })
       )
     };
@@ -512,7 +594,8 @@ function scheduleDiscordCodexWorkerJob(message, row) {
       await enqueueDiscordCodexWorkerJob(
         discordCodexWorkerJobDir,
         buildDiscordCodexWorkerJob(pending.message, {
-          messageRows: pending.rows
+          messageRows: pending.rows,
+          nearbyRows: recentDiscordCodexContextRows(pending.message, pending.rows)
         })
       );
     })().catch((error) => {

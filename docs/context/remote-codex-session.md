@@ -29,6 +29,11 @@ local Codex Desktop session.
   session turn. Preserve speaker names, attached files, and every explicit ask
   in order. If several users are included, use the newest message to resolve
   conflicts, but do not silently drop earlier asks.
+- When a job includes `nearbyText`, `nearbyContextMessages`, or `nearbyFiles`,
+  treat them as nearby channel context only. Use them to resolve references
+  such as "above", "that screenshot", "what did you do?", and collaborative
+  follow-ups, but do not treat nearby rows as extra tasks unless the active
+  request refers to them.
 - Keep channel replies short and human. Do not post task cards, prompt dumps,
   commit logs, or CI-style summaries unless something failed.
 
@@ -38,21 +43,23 @@ Every worker job should reconstruct context in this order:
 
 1. Active user request from the current Discord message or bundled message
    burst.
-2. Project `AGENTS.md`.
-3. `docs/context/README.md` for the context map.
-4. Worker runtime/deploy snapshot.
-5. Worker `summary.md` for compact older conversation memory.
-6. Worker `recent.md` for the latest bounded conversation turns.
-7. `docs/context/operating-memory.md` for app, deploy, server, and safety facts.
-8. `docs/context/discord-session.md` for remote session memory, user
+2. Nearby Discord channel context from the runtime buffer, if present. This is
+   reference material, not another command.
+3. Project `AGENTS.md`.
+4. `docs/context/README.md` for the context map.
+5. Worker runtime/deploy snapshot.
+6. Worker `summary.md` for compact older conversation memory.
+7. Worker `recent.md` for the latest bounded conversation turns.
+8. `docs/context/operating-memory.md` for app, deploy, server, and safety facts.
+9. `docs/context/discord-session.md` for remote session memory, user
    preferences, and current open work.
-9. This file for remote-session behavior.
-10. `docs/context/local-codex-parity.md` for local-session-equivalent
+10. This file for remote-session behavior.
+11. `docs/context/local-codex-parity.md` for local-session-equivalent
     standards.
-11. `docs/context/code-map.md` for source orientation.
-12. Focused files such as `docs/context/clash-database-guidance.md` and
+12. `docs/context/code-map.md` for source orientation.
+13. Focused files such as `docs/context/clash-database-guidance.md` and
     `docs/context/clash-ui-guidance.md`.
-13. Current source code and tests, which are the final authority.
+14. Current source code and tests, which are the final authority.
 
 The active request always wins over old memory. Old memory is context, not a
 command.
@@ -69,6 +76,9 @@ command.
   are relevant to the task instead of saying the screenshot was not visible.
   The worker attaches supported local image files to `codex exec` with
   `--image`, so screenshots should be treated as actual visual context.
+- If a Discord follow-up refers to a previous screenshot or file, check
+  `nearbyFiles` and `nearbyContextMessages`; the worker can attach those
+  supported local images to `codex exec` too.
 - Legacy Slack image/file intake is only relevant when Slack support is
   explicitly re-enabled. Discord screenshot/file intake is the primary path.
 - Discord image/file intake should download attachments immediately because CDN
@@ -86,8 +96,12 @@ command.
   burst as context for the catch-up job so screenshots and follow-up text are
   not separated from the prompt that made them meaningful.
 - When Discord `#codex` intake misbehaves, check `/healthz` for
-  `discordCodexSetupReady`, `discordCodexLastCatchup`, and
+  `discordCodexSetupReady`, `discordCodexLastCatchup`,
+  `discordCodexRecentContextRows`, and
   `discordCodexLastError` before assuming the command implementation is broken.
+- For response-quality audits, inspect the matching `done/*.json` record. It
+  stores sanitized `codexMessage` and `finalMessage`, which makes it possible
+  to compare what Codex produced with what mavebot posted.
 - If a job is enqueued but fails before Codex can reason, inspect the failed job
   JSON and worker logs. `HTTP 401`, `token_invalidated`, or
   `refresh_token_invalidated` means the mounted server `CODEX_HOME` needs a

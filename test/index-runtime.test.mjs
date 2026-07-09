@@ -54,6 +54,10 @@ test('Discord Codex runtime exposes intake diagnostics in health output', async 
   assert.match(source, /discordCodexLastError/);
   assert.match(source, /discordCodexCatchupLimit/);
   assert.match(source, /discordCodexCatchupWindowMs/);
+  assert.match(source, /discordCodexRecentContextWindowMs/);
+  assert.match(source, /discordCodexRecentContextLimit/);
+  assert.match(source, /discordCodexRecentContextRows/);
+  assert.match(source, /recentDiscordCodexContextRows/);
   assert.match(source, /rememberDiscordCodexError\('catch-up'/);
   assert.match(source, /rememberDiscordCodexError\('enqueue'/);
   assert.match(source, /rememberDiscordCodexError\('attachment-download'/);

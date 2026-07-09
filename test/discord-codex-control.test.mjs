@@ -188,6 +188,65 @@ test('buildDiscordCodexWorkerJob bundles adjacent Discord messages and files', (
   assert.equal(discordJobContainsMessage(job, 'm3'), false);
 });
 
+test('buildDiscordCodexWorkerJob keeps nearby channel context out of handled ids', () => {
+  const activeRows = [
+    buildDiscordMessageRow({
+      id: 'active-1',
+      channelId: '1523893930993778698',
+      guildId: 'guild-1',
+      createdTimestamp: Date.parse('2026-07-09T10:00:10.000Z'),
+      content: 'what did you do with the screenshot above?',
+      author: { id: 'user-1', username: 'Allen', bot: false }
+    })
+  ];
+  const nearbyRows = [
+    buildDiscordMessageRow(
+      {
+        id: 'nearby-1',
+        channelId: '1523893930993778698',
+        guildId: 'guild-1',
+        createdTimestamp: Date.parse('2026-07-09T10:00:00.000Z'),
+        content: 'this is the screenshot',
+        author: { id: 'user-2', username: 'Lana', bot: false }
+      },
+      {
+        files: [
+          {
+            name: 'screen.png',
+            mimetype: 'image/png',
+            localPath: '/shared/codex-worker/context/discord-files/C/nearby-1/01-screen.png'
+          }
+        ]
+      }
+    ),
+    activeRows[0]
+  ];
+
+  const job = buildDiscordCodexWorkerJob(
+    {
+      id: 'active-1',
+      channelId: '1523893930993778698',
+      guildId: 'guild-1',
+      author: { id: 'user-1', username: 'Allen' }
+    },
+    {
+      messageRows: activeRows,
+      nearbyRows,
+      createdAt: '2026-07-09T10:00:12.000Z'
+    }
+  );
+
+  assert.deepEqual(job.messageIds, ['active-1']);
+  assert.equal(job.contextMessages.length, 1);
+  assert.equal(job.nearbyContextMessages.length, 1);
+  assert.equal(job.nearbyContextMessages[0].id, 'nearby-1');
+  assert.match(job.nearbyText, /this is the screenshot/);
+  assert.equal(job.nearbyContextMessages[0].username, 'Lana');
+  assert.equal(job.nearbyFiles.length, 1);
+  assert.equal(discordJobContainsMessage(job, 'active-1'), true);
+  assert.equal(discordJobContainsMessage(job, 'nearby-1'), false);
+});
+
 test('buildDiscordCodexWorkerJob can anchor bundled context to a specific source row', () => {
   const rows = [
     buildDiscordMessageRow({

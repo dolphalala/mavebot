@@ -124,6 +124,12 @@ remote work.
   users. Discord attachments are downloaded immediately into
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/discord-files/` and
   passed to Codex as local files.
+- Discord `#codex` also keeps a small in-memory nearby-channel context buffer.
+  When a job is queued, recent same-channel human messages that are not part of
+  the active burst are included as `nearbyText`, `nearbyContextMessages`, and
+  `nearbyFiles`. This helps follow-ups like "what did you do?", "that
+  screenshot above", and multi-user collaboration without marking those nearby
+  messages as handled worker jobs.
 - Discord restart catch-up groups still-unhandled adjacent messages into the
   same worker job instead of replaying each recent message separately. This
   keeps post-restart behavior closer to Codex Desktop, where context,
@@ -135,6 +141,10 @@ remote work.
   `discordCodexLastError` so remote-runner intake issues can be diagnosed from
   the server without guessing whether the fault was message intent, attachment
   download, catch-up, enqueue, or worker queue state.
+- The Discord bot `/healthz` response also includes
+  `discordCodexRecentContextWindowMs`, `discordCodexRecentContextLimit`, and
+  `discordCodexRecentContextRows` so the nearby-context layer can be checked
+  without reading process memory.
 - The deploy script normally builds `discord-bot` and `codex-worker`, then
   stops/removes the legacy Slack bridge. It only builds/starts `slack-bridge`
   when `ENABLE_SLACK_BRIDGE=1`. It recreates `codex-worker` only when no worker
@@ -211,6 +221,9 @@ remote work.
   `session.md` are regenerated after each turn to keep prompts bounded. The
   regenerated prompt memory and transcript storage prune low-signal smoke tests
   and old verification chatter.
+- Completed worker job JSON records in `done/` include sanitized `codexMessage`
+  and `finalMessage` fields. Use these for later audits of what the inner
+  Codex subprocess answered versus what mavebot posted to the channel.
 - Slack uploads from `#bot` are downloaded by the bridge into
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/slack-files/` and
   referenced by local path in worker jobs. The bridge handles both

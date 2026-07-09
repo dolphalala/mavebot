@@ -15,6 +15,9 @@ long-lived server state.
   they are sent close together.
 - Live Discord intake should keep one user's quick follow-up messages together
   but avoid merging different users' simultaneous prompts into one job.
+- Nearby Discord channel messages from any user should be available as
+  background context for follow-ups, screenshots, and collaboration without
+  becoming extra hidden tasks.
 - mavebot should post normal channel replies, not thread-only replies, task
   cards, prompt dumps, or deployment logs.
 - The server-side `codex-worker` container is the normal backend for repo
@@ -94,6 +97,9 @@ long-lived server state.
 - Keep Discord file/screenshot intake reliable: attachments should be
   downloaded to `/shared/codex-worker/context/discord-files/` and supported
   images should be passed to `codex exec` with `--image`.
+- Keep response-quality audits possible: completed worker jobs should preserve
+  sanitized inner Codex output and final mavebot channel output so skipped asks
+  can be diagnosed from server records instead of guessing from chat alone.
 - Keep memory efficient as Discord channel history grows: summarize durable
   facts, move domain guidance into focused files, and delete duplicated stale
   notes once the facts are preserved.

@@ -15,7 +15,9 @@ It is a map, not a replacement for reading the current source.
 - `src/discord-codex-control.mjs`: converts Discord `#codex` channel messages
   into server-side worker jobs, formats bundled message bursts, preserves
   bundled Discord message IDs for restart de-duplication, and downloads
-  Discord attachments into shared local context.
+  Discord attachments into shared local context. It also separates active
+  `contextMessages` from nearby background context so follow-ups can refer to
+  prior channel messages without marking those messages as handled jobs.
 
 ## Feature Modules
 
@@ -40,10 +42,12 @@ It is a map, not a replacement for reading the current source.
   service to be running.
 - `src/slack-codex-worker.mjs`: remote Codex worker queue, prompt construction,
   compacted memory, checks, commits, pushes, deploy wait, and final replies.
-  It attaches supported local image files from Discord jobs, and from legacy
-  Slack jobs when explicitly enabled, to
+  It attaches supported local image files from active Discord jobs, nearby
+  Discord context, and legacy Slack jobs when explicitly enabled, to
   `codex exec` with `--image` and owns the final verified live/not-live channel
-  wording after checks and deploy verification.
+  wording after checks and deploy verification. Completed job records keep
+  sanitized copies of the inner Codex response and final channel message for
+  later response-quality audits.
 
 ## Change Recipes
 
@@ -86,13 +90,16 @@ Registering a command without a matching runtime handler causes Discord's
 2. For Discord files/screenshots, preserve file metadata and local shared-volume
    paths so the worker can inspect uploads from
    `/shared/codex-worker/context/discord-files/` and attach images to Codex.
-3. For Slack files/screenshots, preserve file metadata and local shared-volume
+3. Keep active message IDs separate from nearby background context. Nearby
+   rows can help resolve "above" and "that screenshot", but they must not count
+   as handled worker messages unless they are part of the active burst.
+4. For Slack files/screenshots, preserve file metadata and local shared-volume
    paths so the worker can inspect uploads from
    `/shared/codex-worker/context/slack-files/`.
-4. Add tests around prompt shape, memory compaction, queue behavior, file
+5. Add tests around prompt shape, memory compaction, queue behavior, file
    context, message de-duplication, verified live wording, or message cleaning.
-5. Update `remote-codex-session.md` and this file when behavior or context
+6. Update `remote-codex-session.md` and this file when behavior or context
    loading changes.
-6. Update `local-codex-parity.md` if the standard for matching local Codex
+7. Update `local-codex-parity.md` if the standard for matching local Codex
    Desktop behavior changes.
-7. Verify the worker queue, generated memory files, and live channel response.
+8. Verify the worker queue, generated memory files, and live channel response.

@@ -362,7 +362,8 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /multiple users are bundled/);
   assert.match(prompt, /unrelated independent requests/);
   assert.match(prompt, /For multi-part requests, track each part yourself/);
-  assert.match(prompt, /active request does not explicitly ask for a plan\/demo/i);
+  assert.match(prompt, /asks for a plan\/demo\/how-it-works answer/i);
+  assert.match(prompt, /image files are attached, inspect the image content/i);
   assert.match(prompt, /docs\/context\/remote-codex-session\.md/);
   assert.match(prompt, /Discord command changes must update both src\/commands\.mjs and src\/index\.mjs/);
   assert.match(prompt, /# Extra Repo Context Files/);
@@ -414,6 +415,76 @@ test('buildCodexWorkerPrompt marks plan and demo requests for detailed answers',
   assert.match(prompt, /asks for a plan\/demo\/how-it-works answer/);
   assert.match(prompt, /Do not answer with only an acknowledgement/);
   assert.match(prompt, /compact plan, a concrete demo\/example/);
+});
+
+test('buildCodexWorkerPrompt includes nearby Discord context as background only', () => {
+  const prompt = buildCodexWorkerPrompt({
+    job: {
+      source: 'discord',
+      user: 'UACTIVE',
+      username: 'Allen',
+      channel: '1523893930993778698',
+      ts: '2026-07-09T10:00:10.000Z',
+      text: 'what did you do with the screenshot above?',
+      contextMessages: [
+        {
+          receivedAt: '2026-07-09T10:00:10.000Z',
+          id: 'active-1',
+          user: 'UACTIVE',
+          username: 'Allen',
+          text: 'what did you do with the screenshot above?'
+        }
+      ],
+      nearbyText: '[2026-07-09T10:00:00.000Z] Lana: screenshot for context',
+      nearbyFiles: [
+        {
+          name: 'screen.png',
+          mimetype: 'image/png',
+          localPath: '/shared/codex-worker/context/discord-files/C/nearby-1/01-screen.png'
+        }
+      ],
+      nearbyContextMessages: [
+        {
+          receivedAt: '2026-07-09T10:00:00.000Z',
+          id: 'nearby-1',
+          user: 'ULANA',
+          username: 'Lana',
+          text: 'screenshot for context',
+          files: [
+            {
+              name: 'screen.png',
+              mimetype: 'image/png',
+              localPath: '/shared/codex-worker/context/discord-files/C/nearby-1/01-screen.png'
+            }
+          ]
+        }
+      ]
+    },
+    summary: '',
+    recent: '',
+    repoInstructions: '',
+    contextIndex: '',
+    runtimeSnapshot: '',
+    operatingMemory: '',
+    slackSession: '',
+    repoContextBundle: '',
+    slackMemoryTail: ''
+  });
+
+  assert.equal(
+    activeRequestNeedsDetailedAnswer({
+      source: 'discord',
+      text: '',
+      files: [{ name: 'screen.png', mimetype: 'image/png', localPath: '/tmp/screen.png' }]
+    }),
+    true
+  );
+  assert.match(prompt, /nearbyContextMessages and nearbyText are background channel context only/);
+  assert.match(prompt, /do not treat them as additional tasks unless the active request refers to them/);
+  assert.match(prompt, /If image files are attached, inspect the image content/);
+  assert.match(prompt, /Do not merely say you can see it/);
+  assert.match(prompt, /screenshot for context/);
+  assert.match(prompt, /nearbyFiles/);
 });
 
 test('buildCodexWorkerPrompt uses Discord session memory without Slack tail noise by default', () => {
@@ -512,6 +583,13 @@ test('Codex exec args attach image files from Discord or Slack jobs', () => {
 
   const imagePaths = codexImagePathsForJob({ files: imageFiles }, { maxImages: 1 });
   assert.deepEqual(imagePaths, ['/shared/codex-worker/context/discord-files/C/M/01-discord-screen.png']);
+  assert.deepEqual(
+    codexImagePathsForJob({
+      files: [],
+      nearbyFiles: [imageFiles[1]]
+    }),
+    ['/shared/codex-worker/context/slack-files/C/M/02-slack-screen.webp']
+  );
 
   const args = buildCodexExecArgs({
     repoDir: '/repo',
