@@ -47,9 +47,12 @@ import {
   buildPictionaryLeaderboard,
   formatPictionaryLeaderboard,
   isCorrectPictionaryGuess,
+  normalizePictionaryDifficulty,
   normalizePictionaryRoundSeconds,
   normalizePictionaryRounds,
+  pictionaryDifficultySettings,
   pictionaryStorePath,
+  pictionaryTopicAssetNames,
   readPictionaryStore,
   recordPictionaryGame,
   renderPictionaryRoundImage,
@@ -1011,12 +1014,13 @@ function pictionaryScoreboardLines(game) {
 }
 
 function buildPictionaryRoundEmbed(game, topic) {
+  const difficulty = pictionaryDifficultySettings(game.difficulty);
   return new EmbedBuilder()
     .setColor(Number.parseInt(String(topic.accent || '#4fc3f7').replace('#', ''), 16) || 0x4fc3f7)
     .setTitle(`Clash Pictionary - Round ${game.roundNumber}/${game.rounds}`)
     .setDescription([
       `Category: **${topic.category}**`,
-      `First exact guess in chat wins this round. You have **${game.roundSeconds}s**.`,
+      `Difficulty: **${difficulty.label}**. First exact guess in chat wins in **${game.roundSeconds}s**.`,
       '',
       'Type the Clash of Clans name, abbreviation, or common nickname.'
     ].join('\n'))
@@ -1159,17 +1163,24 @@ async function beginPictionaryRound(game) {
   game.roundNumber += 1;
   const topic = selectPictionaryTopic({
     usedTopicIds: game.usedTopicIds,
-    previousCategory: game.previousCategory
+    previousCategory: game.previousCategory,
+    difficulty: game.difficulty
   });
   game.usedTopicIds.push(topic.id);
   game.previousCategory = topic.category;
   game.currentTopic = topic;
   game.accepting = true;
 
+  const assetUrls = await fetchCocWikiImageMap(pictionaryTopicAssetNames(topic), {
+    limit: 8,
+    timeoutMs: 2500
+  });
   const image = await renderPictionaryRoundImage(topic, {
     round: game.roundNumber,
     totalRounds: game.rounds,
-    seconds: game.roundSeconds
+    seconds: game.roundSeconds,
+    difficulty: game.difficulty,
+    assetUrls
   });
   const attachment = new AttachmentBuilder(image, {
     name: 'clash-pictionary.png'
@@ -1222,8 +1233,10 @@ async function handlePictionaryCommand(interaction) {
   const rounds = normalizePictionaryRounds(
     interaction.options.getInteger('rounds') || DEFAULT_PICTIONARY_ROUNDS
   );
+  const difficulty = normalizePictionaryDifficulty(interaction.options.getString('difficulty'));
+  const difficultySettings = pictionaryDifficultySettings(difficulty);
   const roundSeconds = normalizePictionaryRoundSeconds(
-    interaction.options.getInteger('seconds') || DEFAULT_PICTIONARY_ROUND_SECONDS
+    interaction.options.getInteger('seconds') || difficultySettings.seconds || DEFAULT_PICTIONARY_ROUND_SECONDS
   );
   const store = await readPictionaryStore(pictionaryStorePath());
   const leaderboard = buildPictionaryLeaderboard(store, interaction.guildId, { limit: 5 });
@@ -1237,6 +1250,7 @@ async function handlePictionaryCommand(interaction) {
     hostName: discordDisplayName(interaction.user),
     rounds,
     roundSeconds,
+    difficulty,
     roundNumber: 0,
     usedTopicIds: [],
     previousCategory: '',
@@ -1256,7 +1270,7 @@ async function handlePictionaryCommand(interaction) {
         .setColor(0x4fc3f7)
         .setTitle('Clash Pictionary is starting')
         .setDescription([
-          `${rounds} rounds. ${roundSeconds} seconds each.`,
+          `${rounds} rounds. ${roundSeconds} seconds each. Difficulty: **${difficultySettings.label}**.`,
           'Guess the Clash of Clans picture in chat. First correct answer wins the round.',
           '',
           '**Leaderboard preview**',

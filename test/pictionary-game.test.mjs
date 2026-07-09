@@ -8,8 +8,12 @@ import {
   buildPictionaryLeaderboard,
   formatPictionaryLeaderboard,
   isCorrectPictionaryGuess,
+  normalizePictionaryDifficulty,
   normalizePictionaryRoundSeconds,
   normalizePictionaryRounds,
+  pictionaryDifficultySettings,
+  pictionaryTopicAssetNames,
+  pictionaryTopicDifficultyRank,
   readPictionaryStore,
   recordPictionaryGame,
   renderPictionaryRoundImage,
@@ -48,19 +52,27 @@ test('pictionary round settings clamp to safe values', () => {
   assert.equal(normalizePictionaryRounds(undefined), 5);
   assert.equal(normalizePictionaryRoundSeconds(2), 15);
   assert.equal(normalizePictionaryRoundSeconds(1000), 90);
-  assert.equal(normalizePictionaryRoundSeconds(undefined), 45);
+  assert.equal(normalizePictionaryRoundSeconds(undefined), 35);
+  assert.equal(normalizePictionaryDifficulty('expert'), 'expert');
+  assert.equal(normalizePictionaryDifficulty('unknown'), 'hard');
+  assert.equal(pictionaryDifficultySettings('easy').clueCount, 3);
+  assert.equal(pictionaryDifficultySettings('expert').clueCount, 0);
 });
 
-test('selectPictionaryTopic avoids used topics and repeats categories only when needed', () => {
-  const first = selectPictionaryTopic({ random: () => 0 });
+test('selectPictionaryTopic avoids used topics, respects categories, and supports difficulty pools', () => {
+  const first = selectPictionaryTopic({ difficulty: 'easy', random: () => 0 });
   const second = selectPictionaryTopic({
     usedTopicIds: [first.id],
     previousCategory: first.category,
+    difficulty: 'easy',
     random: () => 0
   });
+  const expert = selectPictionaryTopic({ difficulty: 'expert', random: () => 0 });
 
   assert.notEqual(second.id, first.id);
   assert.notEqual(second.category, first.category);
+  assert.ok(pictionaryTopicDifficultyRank(expert) >= 3);
+  assert.deepEqual(pictionaryTopicAssetNames(expert), [expert.answer]);
 });
 
 test('recordPictionaryGame persists leaderboard stats and corrupt backups', async (t) => {
@@ -100,11 +112,47 @@ test('renderPictionaryRoundImage returns a valid Discord PNG card', async () => 
   const image = await renderPictionaryRoundImage(topic, {
     round: 2,
     totalRounds: 5,
-    seconds: 30
+    seconds: 30,
+    difficulty: 'hard'
   });
   const metadata = await sharp(image).metadata();
 
   assert.equal(image.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
   assert.equal(metadata.width, 960);
   assert.equal(metadata.height, 540);
+});
+
+test('renderPictionaryRoundImage composites fetched Clash-style artwork when available', async () => {
+  const topic = {
+    id: 'magic-mirror',
+    answer: 'Magic Mirror',
+    aliases: ['mirror'],
+    category: 'Hero Equipment',
+    shape: 'equipment',
+    accent: '#9ad7ff',
+    clues: ['queen copies', 'two illusions', 'glass frame']
+  };
+  const icon = await sharp({
+    create: {
+      width: 128,
+      height: 128,
+      channels: 4,
+      background: '#ff2fb3'
+    }
+  })
+    .png()
+    .toBuffer();
+  const fetchImpl = async () => new Response(icon, { status: 200 });
+  const image = await renderPictionaryRoundImage(topic, {
+    round: 1,
+    totalRounds: 3,
+    seconds: 25,
+    difficulty: 'expert',
+    assetUrls: new Map([['Magic Mirror', 'https://example.test/magic-mirror.png']]),
+    fetchImpl
+  });
+  const stats = await sharp(image).stats();
+
+  assert.equal(image.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  assert.ok(stats.channels[0].max > 80);
 });

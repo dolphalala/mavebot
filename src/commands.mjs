@@ -1,4 +1,5 @@
 import { ApplicationCommandOptionType } from 'discord.js';
+import { PICTIONARY_DIFFICULTY_CHOICES } from './pictionary-game.mjs';
 
 export const commands = [
   {
@@ -59,6 +60,13 @@ export const commands = [
     integration_types: [0],
     contexts: [0],
     options: [
+      {
+        name: 'difficulty',
+        description: 'How obscure and hidden the picture should be.',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        choices: PICTIONARY_DIFFICULTY_CHOICES
+      },
       {
         name: 'rounds',
         description: 'Number of rounds for this game.',

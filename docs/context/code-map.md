@@ -26,8 +26,9 @@ It is a map, not a replacement for reading the current source.
   and page formatting.
 - `src/moderation-store.mjs`: `/elder`, `/mute`, and `/bench` durable vote and
   permanent-record storage.
-- `src/pictionary-game.mjs`: `/pictionary` topic pool, answer matching,
-  generated PNG round cards, and durable leaderboard storage.
+- `src/pictionary-game.mjs`: `/pictionary` topic pool, difficulty settings,
+  answer matching, Clash asset-backed PNG round cards, and durable leaderboard
+  storage.
 - `src/lana-art.mjs`: generated heart images plus `/lana` and `/loveu` love
   copy.
 - `src/slack-bridge.mjs`: Slack Socket Mode bridge and Slack `#bot` intake.

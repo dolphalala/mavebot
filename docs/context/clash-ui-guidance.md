@@ -59,8 +59,14 @@ Every Slack/Codex worker task that touches Clash commands should read it after
 - `/pictionary` should stay Clash-only across troops, heroes, spells, defenses,
   buildings, resources, traps, siege machines, hero pets, hero equipment,
   leagues, clan play, and Builder Base.
-- Round cards should be generated PNGs with category labels and visual/text
-  clues, but they should not print the exact answer on the card.
+- Round cards should be generated PNGs that use Clash Wiki/Fandom item art
+  when available. Generated shape art is only a fallback when an asset lookup
+  fails or no reliable asset exists.
+- Difficulty settings should affect both answer pool and card reveal style:
+  hard/expert modes should favor obscure Clash topics, shorter timers, fewer
+  text clues, and cropped or silhouetted item art.
+- Round cards should include category labels and optional visual/text clues,
+  but they should not print the exact answer on the card.
 - Chat guesses should be exact answer or documented common aliases so partial
   generic words do not steal rounds.
 - Leaderboard stats are durable guild state under `/shared` and should be

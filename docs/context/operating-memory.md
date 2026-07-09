@@ -20,8 +20,9 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
     The command stores snapshots in the server shared volume and shows timeline
     plus current Legend-day pages.
   - `/pictionary`: starts a Clash of Clans picture guessing game in the current
-    channel. It uses generated Clash-themed PNG cards, random categories per
-    round, chat guesses, and a persisted guild leaderboard.
+    channel. It uses Clash Wiki/Fandom item art in generated PNG cards when
+    available, difficulty settings, random categories per round, chat guesses,
+    and a persisted guild leaderboard.
   - `/elder`: lets a server admin or existing elder grant elder status to a
     Discord user.
   - `/mute`: elder vote command. Three unique elder votes mute the target for

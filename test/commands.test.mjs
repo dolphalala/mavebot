@@ -81,6 +81,19 @@ test('pictionary command is guild-install only and allows round settings', () =>
   assert.deepEqual(pictionary.contexts, [0]);
   assert.deepEqual(pictionary.options, [
     {
+      name: 'difficulty',
+      description: 'How obscure and hidden the picture should be.',
+      type: ApplicationCommandOptionType.String,
+      required: false,
+      choices: [
+        { name: 'Easy', value: 'easy' },
+        { name: 'Normal', value: 'normal' },
+        { name: 'Hard (default)', value: 'hard' },
+        { name: 'Expert', value: 'expert' },
+        { name: 'Mixed', value: 'mixed' }
+      ]
+    },
+    {
       name: 'rounds',
       description: 'Number of rounds for this game.',
       type: ApplicationCommandOptionType.Integer,

@@ -110,8 +110,9 @@ future tasks should know.
   tracked player per 2-minute cycle, and shows Timeline plus Today button
   pages. The Legend day starts at 23:00 fixed MST.
 - `/pictionary` starts a Clash of Clans picture guessing game in the current
-  Discord channel. It renders generated Clash-themed PNG round cards, rotates
-  random categories, reads chat guesses, and stores the guild leaderboard in
+  Discord channel. It renders Clash Wiki/Fandom item art into generated PNG
+  round cards when available, supports difficulty settings, rotates random
+  categories, reads chat guesses, and stores the guild leaderboard in
   `/shared/pictionary-leaderboard.json`.
 - `/elder user:<discord user>` grants elder command access. Server admins or
   existing elders can grant it. `/mute` and `/bench` require elder access,

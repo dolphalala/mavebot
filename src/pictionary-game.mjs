@@ -4,11 +4,62 @@ import sharp from 'sharp';
 
 const DEFAULT_STORE_PATH = '/shared/pictionary-leaderboard.json';
 export const DEFAULT_PICTIONARY_ROUNDS = 5;
-export const DEFAULT_PICTIONARY_ROUND_SECONDS = 45;
+export const DEFAULT_PICTIONARY_ROUND_SECONDS = 35;
+export const DEFAULT_PICTIONARY_DIFFICULTY = 'hard';
 export const MIN_PICTIONARY_ROUNDS = 3;
 export const MAX_PICTIONARY_ROUNDS = 10;
 export const MIN_PICTIONARY_ROUND_SECONDS = 15;
 export const MAX_PICTIONARY_ROUND_SECONDS = 90;
+
+export const PICTIONARY_DIFFICULTIES = {
+  easy: {
+    id: 'easy',
+    label: 'Easy',
+    seconds: 50,
+    clueCount: 3,
+    reveal: 'full',
+    topicRanks: [1, 2]
+  },
+  normal: {
+    id: 'normal',
+    label: 'Normal',
+    seconds: 42,
+    clueCount: 2,
+    reveal: 'full',
+    topicRanks: [1, 2, 3]
+  },
+  hard: {
+    id: 'hard',
+    label: 'Hard',
+    seconds: DEFAULT_PICTIONARY_ROUND_SECONDS,
+    clueCount: 1,
+    reveal: 'cropped',
+    topicRanks: [2, 3, 4]
+  },
+  expert: {
+    id: 'expert',
+    label: 'Expert',
+    seconds: 25,
+    clueCount: 0,
+    reveal: 'silhouette',
+    topicRanks: [3, 4]
+  },
+  mixed: {
+    id: 'mixed',
+    label: 'Mixed',
+    seconds: 40,
+    clueCount: 1,
+    reveal: 'cropped',
+    topicRanks: [1, 2, 3, 4]
+  }
+};
+
+export const PICTIONARY_DIFFICULTY_CHOICES = Object.values(PICTIONARY_DIFFICULTIES).map(
+  ({ id, label }) => ({
+    name: id === DEFAULT_PICTIONARY_DIFFICULTY ? `${label} (default)` : label,
+    value: id
+  })
+);
 
 let storeQueue = Promise.resolve();
 
@@ -87,6 +138,15 @@ export function normalizePictionaryRoundSeconds(value) {
     max: MAX_PICTIONARY_ROUND_SECONDS,
     fallback: DEFAULT_PICTIONARY_ROUND_SECONDS
   });
+}
+
+export function normalizePictionaryDifficulty(value) {
+  const key = String(value || DEFAULT_PICTIONARY_DIFFICULTY).toLowerCase();
+  return PICTIONARY_DIFFICULTIES[key] ? key : DEFAULT_PICTIONARY_DIFFICULTY;
+}
+
+export function pictionaryDifficultySettings(value = DEFAULT_PICTIONARY_DIFFICULTY) {
+  return PICTIONARY_DIFFICULTIES[normalizePictionaryDifficulty(value)];
 }
 
 export function pictionaryStorePath() {
@@ -627,6 +687,240 @@ export const PICTIONARY_TOPICS = [
     clues: ['warden invincible', 'gold book', 'push button timing']
   },
   {
+    id: 'life-gem',
+    answer: 'Life Gem',
+    aliases: ['lifegem'],
+    category: 'Hero Equipment',
+    shape: 'equipment',
+    accent: '#67d5a5',
+    clues: ['warden aura', 'extra hitpoints', 'green gem']
+  },
+  {
+    id: 'rage-gem',
+    answer: 'Rage Gem',
+    aliases: ['ragegem'],
+    category: 'Hero Equipment',
+    shape: 'equipment',
+    accent: '#c56cff',
+    clues: ['warden damage aura', 'purple gem', 'army boost']
+  },
+  {
+    id: 'fireball',
+    answer: 'Fireball',
+    aliases: ['warden fireball'],
+    category: 'Hero Equipment',
+    shape: 'equipment',
+    accent: '#ff7043',
+    clues: ['warden nuke', 'long range blast', 'orange orb']
+  },
+  {
+    id: 'magic-mirror',
+    answer: 'Magic Mirror',
+    aliases: ['mirror'],
+    category: 'Hero Equipment',
+    shape: 'equipment',
+    accent: '#9ad7ff',
+    clues: ['queen copies', 'two illusions', 'glass frame']
+  },
+  {
+    id: 'rocket-spear',
+    answer: 'Rocket Spear',
+    aliases: ['spear'],
+    category: 'Hero Equipment',
+    shape: 'equipment',
+    accent: '#67d5a5',
+    clues: ['champion range', 'rocket throw', 'green spear']
+  },
+  {
+    id: 'seeking-shield',
+    answer: 'Seeking Shield',
+    aliases: ['shield'],
+    category: 'Hero Equipment',
+    shape: 'equipment',
+    accent: '#f0b13b',
+    clues: ['champion bounces', 'four defenses', 'round throw']
+  },
+  {
+    id: 'air-sweeper',
+    answer: 'Air Sweeper',
+    aliases: ['sweeper'],
+    category: 'Defenses',
+    shape: 'defense',
+    accent: '#9ad7ff',
+    clues: ['pushes flyers', 'fan cone', 'no damage']
+  },
+  {
+    id: 'bomb-tower',
+    answer: 'Bomb Tower',
+    aliases: ['bt'],
+    category: 'Defenses',
+    shape: 'defense',
+    accent: '#ff7043',
+    clues: ['death explosion', 'ground splash', 'barrel stack']
+  },
+  {
+    id: 'monolith',
+    answer: 'Monolith',
+    aliases: ['mono'],
+    category: 'Defenses',
+    shape: 'defense',
+    accent: '#30233d',
+    clues: ['dark elixir shot', 'hero melter', 'black tower']
+  },
+  {
+    id: 'ricochet-cannon',
+    answer: 'Ricochet Cannon',
+    aliases: ['ricochet'],
+    category: 'Defenses',
+    shape: 'defense',
+    accent: '#f0b13b',
+    clues: ['merged cannon', 'bouncing shot', 'town hall 16']
+  },
+  {
+    id: 'multi-archer-tower',
+    answer: 'Multi-Archer Tower',
+    aliases: ['multi archer', 'mat'],
+    category: 'Defenses',
+    shape: 'defense',
+    accent: '#ff7bac',
+    clues: ['merged tower', 'many arrows', 'town hall 16']
+  },
+  {
+    id: 'tornado-trap',
+    answer: 'Tornado Trap',
+    aliases: ['nado'],
+    category: 'Traps',
+    shape: 'trap',
+    accent: '#7ee7ff',
+    clues: ['spins army', 'one tile chaos', 'town hall bait']
+  },
+  {
+    id: 'skeleton-trap',
+    answer: 'Skeleton Trap',
+    aliases: ['skelly trap'],
+    category: 'Traps',
+    shape: 'trap',
+    accent: '#f7f2d4',
+    clues: ['tiny defenders', 'air or ground', 'surprise bones']
+  },
+  {
+    id: 'stone-slammer',
+    answer: 'Stone Slammer',
+    aliases: ['slammer', 'ss'],
+    category: 'Siege Machines',
+    shape: 'siege',
+    accent: '#8f9aa8',
+    clues: ['flying siege', 'drops boulders', 'defense targeter']
+  },
+  {
+    id: 'siege-barracks',
+    answer: 'Siege Barracks',
+    aliases: ['barracks'],
+    category: 'Siege Machines',
+    shape: 'siege',
+    accent: '#f0b13b',
+    clues: ['spawns pekka', 'side funnel', 'troops after timer']
+  },
+  {
+    id: 'battle-drill',
+    answer: 'Battle Drill',
+    aliases: ['drill'],
+    category: 'Siege Machines',
+    shape: 'siege',
+    accent: '#b88954',
+    clues: ['underground siege', 'stuns defense', 'pops up']
+  },
+  {
+    id: 'poison-lizard',
+    answer: 'Poison Lizard',
+    aliases: ['lizard'],
+    category: 'Hero Pets',
+    shape: 'pet',
+    accent: '#7bd88f',
+    clues: ['fast pet', 'poison shots', 'green tail']
+  },
+  {
+    id: 'angry-jelly',
+    answer: 'Angry Jelly',
+    aliases: ['jelly'],
+    category: 'Hero Pets',
+    shape: 'pet',
+    accent: '#65e4ff',
+    clues: ['redirects hero', 'blue blob', 'defense focus']
+  },
+  {
+    id: 'sneezy',
+    answer: 'Sneezy',
+    aliases: ['sneeze'],
+    category: 'Hero Pets',
+    shape: 'pet',
+    accent: '#7bd88f',
+    clues: ['long range pet', 'splash sneeze', 'green critter']
+  },
+  {
+    id: 'mighty-yak',
+    answer: 'Mighty Yak',
+    aliases: ['yak'],
+    category: 'Hero Pets',
+    shape: 'pet',
+    accent: '#b88954',
+    clues: ['breaks walls', 'king buddy', 'horned tank']
+  },
+  {
+    id: 'battle-copter',
+    answer: 'Battle Copter',
+    aliases: ['copter'],
+    category: 'Builder Base',
+    shape: 'air',
+    accent: '#ff7043',
+    clues: ['builder hero air', 'machine hero', 'rotor']
+  },
+  {
+    id: 'boxer-giant',
+    answer: 'Boxer Giant',
+    aliases: ['boxer'],
+    category: 'Builder Base',
+    shape: 'troop',
+    accent: '#d9a066',
+    clues: ['builder tank', 'first punch', 'giant gloves']
+  },
+  {
+    id: 'night-witch',
+    answer: 'Night Witch',
+    aliases: ['nw'],
+    category: 'Builder Base',
+    shape: 'troop',
+    accent: '#7e6bff',
+    clues: ['summons bats', 'builder base witch', 'purple hood']
+  },
+  {
+    id: 'crusher',
+    answer: 'Crusher',
+    aliases: ['crushers'],
+    category: 'Builder Base',
+    shape: 'defense',
+    accent: '#8f9aa8',
+    clues: ['smashes ground', 'builder base defense', 'stone press']
+  },
+  {
+    id: 'roaster',
+    answer: 'Roaster',
+    aliases: ['roasters'],
+    category: 'Builder Base',
+    shape: 'defense',
+    accent: '#ff7043',
+    clues: ['burns swarms', 'builder base flames', 'hot turret']
+  },
+  {
+    id: 'clan-capital',
+    answer: 'Clan Capital',
+    aliases: ['capital'],
+    category: 'Clan Capital',
+    shape: 'building',
+    accent: '#67d5a5',
+    clues: ['district map', 'capital hall', 'shared upgrades']
+  },
+  {
     id: 'legend-league',
     answer: 'Legend League',
     aliases: ['legends', 'legend'],
@@ -664,6 +958,110 @@ export const PICTIONARY_TOPICS = [
   }
 ];
 
+const EASY_TOPIC_IDS = new Set([
+  'barbarian',
+  'archer',
+  'giant',
+  'balloon',
+  'wizard',
+  'dragon',
+  'pekka',
+  'hog-rider',
+  'barbarian-king',
+  'archer-queen',
+  'rage-spell',
+  'heal-spell',
+  'freeze-spell',
+  'cannon',
+  'archer-tower',
+  'mortar',
+  'town-hall',
+  'clan-castle',
+  'gold-storage',
+  'elixir-storage',
+  'builder-hut'
+]);
+
+const EXPERT_TOPIC_IDS = new Set([
+  'invisibility-spell',
+  'recall-spell',
+  'spell-tower',
+  'blacksmith',
+  'seeking-air-mine',
+  'spring-trap',
+  'giant-bomb',
+  'flame-flinger',
+  'log-launcher',
+  'spiky-ball',
+  'giant-gauntlet',
+  'frozen-arrow',
+  'eternal-tome',
+  'life-gem',
+  'rage-gem',
+  'fireball',
+  'magic-mirror',
+  'rocket-spear',
+  'seeking-shield',
+  'air-sweeper',
+  'bomb-tower',
+  'monolith',
+  'ricochet-cannon',
+  'multi-archer-tower',
+  'tornado-trap',
+  'skeleton-trap',
+  'stone-slammer',
+  'siege-barracks',
+  'battle-drill',
+  'poison-lizard',
+  'angry-jelly',
+  'sneezy',
+  'mighty-yak',
+  'battle-copter',
+  'boxer-giant',
+  'night-witch',
+  'crusher',
+  'roaster',
+  'clan-capital',
+  'raid-weekend'
+]);
+
+const VERY_HARD_TOPIC_IDS = new Set([
+  'monolith',
+  'ricochet-cannon',
+  'multi-archer-tower',
+  'magic-mirror',
+  'rocket-spear',
+  'fireball',
+  'tornado-trap',
+  'battle-drill',
+  'angry-jelly',
+  'sneezy',
+  'roaster',
+  'clan-capital',
+  'raid-weekend'
+]);
+
+export function pictionaryTopicDifficultyRank(topic) {
+  if (VERY_HARD_TOPIC_IDS.has(topic?.id)) {
+    return 4;
+  }
+  if (EXPERT_TOPIC_IDS.has(topic?.id)) {
+    return 3;
+  }
+  if (EASY_TOPIC_IDS.has(topic?.id)) {
+    return 1;
+  }
+  return 2;
+}
+
+export function pictionaryTopicAssetNames(topic) {
+  return [
+    topic?.assetName,
+    topic?.answer,
+    ...(topic?.assetAliases || [])
+  ].filter(Boolean);
+}
+
 export function normalizePictionaryGuess(value) {
   return String(value || '')
     .toLowerCase()
@@ -686,10 +1084,18 @@ export function isCorrectPictionaryGuess(content, topic) {
 export function selectPictionaryTopic({
   usedTopicIds = [],
   previousCategory = '',
+  difficulty = DEFAULT_PICTIONARY_DIFFICULTY,
   random = Math.random
 } = {}) {
   const used = new Set(usedTopicIds);
-  let pool = PICTIONARY_TOPICS.filter((topic) => !used.has(topic.id));
+  const settings = pictionaryDifficultySettings(difficulty);
+  const allowedRanks = new Set(settings.topicRanks);
+  let pool = PICTIONARY_TOPICS.filter(
+    (topic) => allowedRanks.has(pictionaryTopicDifficultyRank(topic)) && !used.has(topic.id)
+  );
+  if (!pool.length) {
+    pool = PICTIONARY_TOPICS.filter((topic) => allowedRanks.has(pictionaryTopicDifficultyRank(topic)));
+  }
   if (!pool.length) {
     pool = [...PICTIONARY_TOPICS];
   }
@@ -809,23 +1215,132 @@ function shapeSvg(topic) {
   ].join('');
 }
 
-function clueChips(topic) {
-  return (topic.clues || []).slice(0, 3).map((clue, index) => {
-    const x = 108 + index * 248;
+function clueChips(topic, { clueCount = 1 } = {}) {
+  const clues = (topic.clues || []).slice(0, clueCount);
+  if (!clues.length) {
     return [
-      `<rect x="${x}" y="438" width="220" height="44" rx="14" fill="#151b27" stroke="${escapeXml(topic.accent)}" stroke-opacity="0.55" stroke-width="2"/>`,
-      `<text x="${x + 110}" y="466" text-anchor="middle" fill="#f4f7fb" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="800">${escapeXml(clue)}</text>`
+      `<rect x="322" y="438" width="316" height="44" rx="14" fill="#151b27" stroke="${escapeXml(topic.accent)}" stroke-opacity="0.55" stroke-width="2"/>`,
+      '<text x="480" y="466" text-anchor="middle" fill="#f4f7fb" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="800">No text clue - image only</text>'
+    ].join('');
+  }
+
+  const chipWidth = clueCount === 1 ? 360 : clueCount === 2 ? 276 : 220;
+  const totalWidth = clues.length * chipWidth + Math.max(0, clues.length - 1) * 28;
+  const startX = 480 - totalWidth / 2;
+  return clues.map((clue, index) => {
+    const x = startX + index * (chipWidth + 28);
+    return [
+      `<rect x="${x}" y="438" width="${chipWidth}" height="44" rx="14" fill="#151b27" stroke="${escapeXml(topic.accent)}" stroke-opacity="0.55" stroke-width="2"/>`,
+      `<text x="${x + chipWidth / 2}" y="466" text-anchor="middle" fill="#f4f7fb" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="800">${escapeXml(clue)}</text>`
     ].join('');
   }).join('');
 }
 
+function topicAssetUrl(topic, assetUrls = new Map()) {
+  for (const name of pictionaryTopicAssetNames(topic)) {
+    const normalized = String(name || '').trim();
+    const url = assetUrls.get(normalized) || assetUrls.get(normalized.toLowerCase());
+    if (url) {
+      return url;
+    }
+  }
+  return null;
+}
+
+async function fetchPictionaryIconBuffer(url, { fetchImpl = fetch, timeoutMs = 3000 } = {}) {
+  const controller = typeof AbortController === 'undefined' ? null : new AbortController();
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const response = await fetchImpl(url, {
+      headers: {
+        'User-Agent': 'mavebot/0.1 Discord bot Clash pictionary renderer'
+      },
+      ...(controller ? { signal: controller.signal } : {})
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return Buffer.from(await response.arrayBuffer());
+  } catch {
+    return null;
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
+
+async function topicIconComposite(topic, { assetUrls, difficulty, fetchImpl }) {
+  const url = topicAssetUrl(topic, assetUrls);
+  if (!url) {
+    return {
+      input: Buffer.from(`<svg width="960" height="540" viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg">${shapeSvg(topic)}</svg>`),
+      left: 0,
+      top: 0
+    };
+  }
+
+  const source = await fetchPictionaryIconBuffer(url, { fetchImpl });
+  if (!source) {
+    return {
+      input: Buffer.from(`<svg width="960" height="540" viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg">${shapeSvg(topic)}</svg>`),
+      left: 0,
+      top: 0
+    };
+  }
+
+  const settings = pictionaryDifficultySettings(difficulty);
+  const image =
+    settings.reveal === 'full'
+      ? await sharp(source)
+          .resize(244, 244, {
+            fit: 'contain',
+            background: { r: 0, g: 0, b: 0, alpha: 0 }
+          })
+          .png()
+          .toBuffer()
+      : settings.reveal === 'silhouette'
+        ? await sharp(source)
+            .resize(376, 232, {
+              fit: 'cover',
+              background: { r: 0, g: 0, b: 0, alpha: 0 }
+            })
+            .grayscale()
+            .blur(1.4)
+            .modulate({ brightness: 0.72, saturation: 0.1 })
+            .png()
+            .toBuffer()
+        : await sharp(source)
+            .resize(376, 232, {
+              fit: 'cover',
+              background: { r: 0, g: 0, b: 0, alpha: 0 }
+            })
+            .blur(0.8)
+            .modulate({ brightness: 0.88, saturation: 0.68 })
+            .png()
+            .toBuffer();
+
+  if (settings.reveal === 'full') {
+    return { input: image, left: 358, top: 144 };
+  }
+  return { input: image, left: 292, top: 160 };
+}
+
 export async function renderPictionaryRoundImage(
   topic,
-  { round = 1, totalRounds = DEFAULT_PICTIONARY_ROUNDS, seconds = DEFAULT_PICTIONARY_ROUND_SECONDS } = {}
+  {
+    round = 1,
+    totalRounds = DEFAULT_PICTIONARY_ROUNDS,
+    seconds = DEFAULT_PICTIONARY_ROUND_SECONDS,
+    difficulty = DEFAULT_PICTIONARY_DIFFICULTY,
+    assetUrls = new Map(),
+    fetchImpl = fetch
+  } = {}
 ) {
   const width = 960;
   const height = 540;
   const accent = escapeXml(topic.accent || '#4fc3f7');
+  const settings = pictionaryDifficultySettings(difficulty);
   const svg = `
     <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -845,14 +1360,30 @@ export async function renderPictionaryRoundImage(
       <text x="82" y="88" fill="#f8fafc" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="900">Clash Pictionary</text>
       <text x="82" y="124" fill="${accent}" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="800">${escapeXml(topic.category)}</text>
       <text x="878" y="88" text-anchor="end" fill="#dbe7ff" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="800">Round ${round}/${totalRounds}</text>
-      <text x="878" y="124" text-anchor="end" fill="#93a4bd" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700">${seconds}s to guess</text>
-      ${shapeSvg(topic)}
-      ${clueChips(topic)}
-      <text x="480" y="416" text-anchor="middle" fill="#93a4bd" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700">Guess the Clash of Clans answer in chat</text>
+      <text x="878" y="124" text-anchor="end" fill="#93a4bd" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700">${escapeXml(settings.label)} - ${seconds}s</text>
+      <rect x="268" y="136" width="424" height="280" rx="24" fill="#141b28" stroke="${accent}" stroke-opacity="0.66" stroke-width="3"/>
+      <rect x="292" y="160" width="376" height="232" rx="18" fill="#253044" opacity="0.62"/>
+      <path d="M308 394 H652" stroke="#0b111b" stroke-width="18" stroke-linecap="round" opacity="0.45"/>
+      ${clueChips(topic, { clueCount: settings.clueCount })}
     </svg>
   `;
 
-  return sharp(Buffer.from(svg)).png().toBuffer();
+  const icon = await topicIconComposite(topic, {
+    assetUrls,
+    difficulty,
+    fetchImpl
+  });
+  const overlay = Buffer.from(`
+    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+      <rect x="268" y="136" width="424" height="280" rx="24" fill="none" stroke="#f8fafc" stroke-opacity="0.18" stroke-width="2"/>
+      ${settings.reveal === 'silhouette' ? '<rect x="268" y="136" width="424" height="280" rx="24" fill="#0b111b" opacity="0.24"/>' : ''}
+    </svg>
+  `);
+
+  return sharp(Buffer.from(svg))
+    .composite([icon, { input: overlay, left: 0, top: 0 }])
+    .png()
+    .toBuffer();
 }
 
 export async function recordPictionaryGame(
