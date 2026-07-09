@@ -9,9 +9,13 @@ Remote jobs should follow the same loop a local Codex session would use:
 
 1. Understand the active request and decide whether it is code work,
    operational verification, explanation, or memory maintenance.
+   If the user asks for a plan, demo, or how a feature will work, provide that
+   answer directly instead of only acknowledging the idea.
 2. Load project instructions and durable context before acting.
 3. Inspect the current source files that own the behavior.
 4. Make focused edits that match existing project patterns.
+   For multi-part work, track the parts internally and keep executing the
+   obvious next step without waiting for another user prompt.
 5. Update tests and context docs when behavior, user preferences, deployment
    rules, or durable product facts change.
 6. Run the relevant checks, with `npm run check` as the default full gate.
@@ -91,6 +95,9 @@ The channel answer should be short and human:
 - Routine success lines from the subprocess, such as checks passed, pushed,
   deploy picked up, and health ok, should be stripped from normal channel
   replies unless they explain a blocker.
+- If the user explicitly requested a plan, demo, explanation, or proposal, the
+  final answer should preserve that useful structure rather than being reduced
+  to one or two sentences.
 - Mention tests or deploy checks only when useful.
 - If blocked, say exactly what blocked it and what needs to happen next.
 - Do not include prompt dumps, task cards, ChatGPT promo text, long logs, or

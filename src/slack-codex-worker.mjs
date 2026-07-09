@@ -184,6 +184,56 @@ function takeLeadSentences(text, { maxSentences = 2, maxChars = 420 } = {}) {
   return truncate(result.trim(), maxChars).replace(/\s+$/, '');
 }
 
+export function activeRequestNeedsDetailedAnswer(job = {}) {
+  const contextText = Array.isArray(job?.contextMessages)
+    ? job.contextMessages.map((row) => row?.text || '').join('\n')
+    : '';
+  const text = `${job?.text || ''}\n${contextText}`.toLowerCase();
+  return [
+    /\bplan\b/,
+    /\bdemo\b/,
+    /\bhow(?:'|’)s this (?:gonna|going to) work\b/,
+    /\bhow (?:would|will|should|could) (?:it|this|that)\b/,
+    /\btell me how\b/,
+    /\bexplain\b/,
+    /\bproposal\b/,
+    /\bdesign\b/
+  ].some((pattern) => pattern.test(text));
+}
+
+function stripRoutineReportSections(text) {
+  const lines = String(text || '').split('\n');
+  const kept = [];
+  let skipping = false;
+  for (const line of lines) {
+    if (/^\s*(?:Checks|Verification|Tests|Files changed|Committed locally|PR metadata)\s*:/i.test(line)) {
+      skipping = true;
+      continue;
+    }
+    if (skipping && !line.trim()) {
+      skipping = false;
+      continue;
+    }
+    if (!skipping) {
+      kept.push(line);
+    }
+  }
+  return kept.join('\n').trim();
+}
+
+export function detailedWorkerChannelMessage(text, { maxChars = 1500 } = {}) {
+  const cleaned = stripRoutineReportSections(stripSlackLinks(text));
+  if (!cleaned) {
+    return '';
+  }
+
+  const paragraphs = cleaned
+    .split(/\n{3,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  return truncate(paragraphs.join('\n\n'), maxChars);
+}
+
 export function humanizeWorkerChannelMessage(text) {
   const cleaned = stripSlackLinks(text);
   if (!cleaned) {
@@ -880,6 +930,7 @@ async function readSlackMemoryTail(limit = 20) {
 
 function promptHeader(job) {
   const source = job.source === 'discord' ? 'Discord' : 'Slack';
+  const needsDetailedAnswer = activeRequestNeedsDetailedAnswer(job);
   return [
     'You are the server-side mavebot Codex runner.',
     '',
@@ -916,8 +967,16 @@ function promptHeader(job) {
     '- Durable JSON state under /shared must have an explicit env path and deploy initialization/chown rule.',
     '- Keep mavebot isolated from Chatwoot, Bookkeeper, nginx, and unrelated apps.',
     '- Final answer should be plain, short, and suitable to post directly as mavebot. Talk like a helpful person, not a deployment log.',
+    '- Answer every explicit question in the active request before ending. If the user asks for a plan, demo, or how something works, include that plan/demo in the final answer instead of only saying work was done.',
+    '- For multi-part requests, track each part yourself and continue through the sequence without waiting for another prompt when the next action is clear.',
+    '- Use available parallel tools or subagents for independent investigation when the environment provides them; otherwise run the same loop sequentially and state any actual blocker.',
     '- Do not include commit hashes, test counts, or health-check details in the final answer unless something failed or needs user action.',
     '- Do not say the work is ready for the worker to commit, push, deploy, or verify. The worker adds live status after verification.',
+    '',
+    'Active request response mode:',
+    needsDetailedAnswer
+      ? '- The active request asks for a plan/demo/how-it-works answer. Preserve useful structure in the final answer: a compact plan, a concrete demo/example, and what will happen next.'
+      : '- The active request does not explicitly ask for a plan/demo. Keep the final answer compact after handling the work.',
     ''
   ].join('\n');
 }
@@ -1222,9 +1281,11 @@ async function runCodex(job, contextSnapshot) {
   return stripSlackLinks(await readOptional(codexOutputPath));
 }
 
-export function finalSlackMessage({ codexMessage, checkOk, pushResult, deployResult, runtime }) {
+export function finalSlackMessage({ codexMessage, checkOk, pushResult, deployResult, runtime, job = {} }) {
   const lines = [];
-  const cleaned = humanizeWorkerChannelMessage(codexMessage);
+  const cleaned = activeRequestNeedsDetailedAnswer(job)
+    ? detailedWorkerChannelMessage(codexMessage)
+    : humanizeWorkerChannelMessage(codexMessage);
   if (cleaned) {
     lines.push(cleaned);
   }
@@ -1288,7 +1349,8 @@ async function handleJob(claimed) {
       checkOk: true,
       pushResult,
       deployResult,
-      runtime
+      runtime,
+      job
     });
 
     await appendTurn({

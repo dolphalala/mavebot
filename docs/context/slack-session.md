@@ -46,6 +46,12 @@ future tasks should know.
 - Keep replies in the main channel whenever possible so users do not have to
   open Slack thread replies to follow the session.
 - Keep Discord replies in `#codex` as normal channel messages.
+- When Allen asks for a plan, demo, proposal, or "how this works," the remote
+  runner should answer that directly with a compact plan and example instead of
+  compressing the reply into a generic done/acknowledgement.
+- For broad multi-part requests, the remote runner should keep its own
+  checklist, use parallel tools or subagents when available, and continue
+  through clear next steps without requiring repeated prompts.
 - Do not tell Allen a code change is live just because a Codex cloud task
   changed files in its workspace. The server deploy path follows GitHub
   `origin/main`; if a task only creates a PR or branch, say it is not deployed.

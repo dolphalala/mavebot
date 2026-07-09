@@ -6,6 +6,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  activeRequestNeedsDetailedAnswer,
   buildCodexExecArgs,
   buildCodexWorkerPrompt,
   buildMovedJobRecord,
@@ -14,6 +15,7 @@ import {
   codexImagePathsForJob,
   compactTranscriptRows,
   commitMessageForJob,
+  detailedWorkerChannelMessage,
   finalSlackMessage,
   humanizeWorkerChannelMessage,
   isCodexImageFile,
@@ -352,6 +354,9 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /Be as capable as a local Codex Desktop session/);
   assert.match(prompt, /local-codex-parity\.md/);
   assert.match(prompt, /Do not say the work is ready for the worker to commit, push, deploy, or verify/);
+  assert.match(prompt, /Answer every explicit question in the active request/);
+  assert.match(prompt, /For multi-part requests, track each part yourself/);
+  assert.match(prompt, /active request does not explicitly ask for a plan\/demo/i);
   assert.match(prompt, /docs\/context\/remote-codex-session\.md/);
   assert.match(prompt, /Discord command changes must update both src\/commands\.mjs and src\/index\.mjs/);
   assert.match(prompt, /# Extra Repo Context Files/);
@@ -359,6 +364,33 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /screen\.png/);
   assert.match(prompt, /\/shared\/codex-worker\/context\/slack-files\/CBOT\/1782400000\/01-screen\.png/);
   assert.match(prompt, /extra setup context/);
+});
+
+test('buildCodexWorkerPrompt marks plan and demo requests for detailed answers', () => {
+  const prompt = buildCodexWorkerPrompt({
+    job: {
+      source: 'discord',
+      user: 'UACTIVE',
+      username: 'Allen',
+      channel: '1523893930993778698',
+      ts: '2026-07-09T07:07:42.060Z',
+      text: 'tell me the plan. is there a demo? hows this gonna work?'
+    },
+    summary: '',
+    recent: '',
+    repoInstructions: '',
+    contextIndex: '',
+    runtimeSnapshot: '',
+    operatingMemory: '',
+    slackSession: '',
+    repoContextBundle: '',
+    slackMemoryTail: ''
+  });
+
+  assert.equal(activeRequestNeedsDetailedAnswer({ text: 'is there a demo?' }), true);
+  assert.match(prompt, /Active request response mode:/);
+  assert.match(prompt, /asks for a plan\/demo\/how-it-works answer/);
+  assert.match(prompt, /compact plan, a concrete demo\/example/);
 });
 
 test('buildCodexWorkerPrompt puts active Discord screenshots before memory', () => {
@@ -542,6 +574,58 @@ test('humanizeWorkerChannelMessage keeps channel replies short and conversationa
   );
 
   assert.equal(message, 'Found and fixed another remote-runner parity gap.');
+});
+
+test('detailedWorkerChannelMessage preserves requested plan and demo structure', () => {
+  const message = detailedWorkerChannelMessage(
+    [
+      'Plan:',
+      '- Enroll a clan with `/roster enroll clan:#JY99CJC8`.',
+      '- Track members over time.',
+      '',
+      'Demo:',
+      'A sample roster would show TH16 anchors, reliable two-star attackers, and bench candidates.',
+      '',
+      'Checks:',
+      '- npm run check',
+      '',
+      'Verification:',
+      '- health ok'
+    ].join('\n')
+  );
+
+  assert.match(message, /Plan:/);
+  assert.match(message, /\/roster enroll/);
+  assert.match(message, /Demo:/);
+  assert.doesNotMatch(message, /npm run check|health ok/);
+});
+
+test('finalSlackMessage preserves longer plan answers when requested', () => {
+  assert.equal(
+    finalSlackMessage({
+      codexMessage: [
+        'Plan:',
+        '- `/roster enroll clan:#JY99CJC8` saves the clan and starts snapshots.',
+        '- `/signup player:#PLAYER` lets members opt into CWL.',
+        '',
+        'Demo:',
+        'For Crystal CWL, the bot would rank top accounts by TH, heroes, war stars, donations, activity, and tracked hit reliability.'
+      ].join('\n'),
+      checkOk: true,
+      pushResult: { pushed: false },
+      deployResult: { matched: false, reason: 'no push needed' },
+      runtime: { botOk: true, bridgeOk: true },
+      job: { text: 'first plan and tell me how itd work and make some demo' }
+    }),
+    [
+      'Plan:',
+      '- `/roster enroll clan:#JY99CJC8` saves the clan and starts snapshots.',
+      '- `/signup player:#PLAYER` lets members opt into CWL.',
+      '',
+      'Demo:',
+      'For Crystal CWL, the bot would rank top accounts by TH, heroes, war stars, donations, activity, and tracked hit reliability.'
+    ].join('\n')
+  );
 });
 
 test('finalSlackMessage condenses long implementation reports for channels', () => {

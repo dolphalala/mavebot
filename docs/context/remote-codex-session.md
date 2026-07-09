@@ -14,6 +14,11 @@ jobs stay close to the quality of a local Codex Desktop session.
 - Infer the relevant repo/server context from durable memory before acting.
 - Work end to end when possible: inspect, implement, test, push, wait for
   deploy, verify live behavior, then answer plainly in the channel.
+- If the active request asks for a plan, demo, or "how this works," answer that
+  directly with a compact plan and concrete example before ending the turn.
+- For multi-part requests, maintain an internal checklist and continue through
+  the clear next actions without requiring the user to re-prompt after each
+  reflection or subtask.
 - Keep channel replies short and human. Do not post task cards, prompt dumps,
   commit logs, or CI-style summaries unless something failed.
 
@@ -75,6 +80,9 @@ command.
   failing the channel request.
 - Use `docs/context/local-codex-parity.md` as the checklist for matching local
   Codex Desktop quality.
+- Use available parallel tools or subagents for independent investigation when
+  the environment provides them; otherwise do the same work sequentially and
+  only report a blocker if a required capability is actually unavailable.
 - For slash command changes, update both command registration data and runtime
   interaction handling.
 - For Discord command UX, check mobile readability, button/page behavior, and
@@ -117,6 +125,8 @@ The channel history will grow forever, so remote jobs must keep memory useful:
 - Successful channel replies should lead with the plain result and stay to
   roughly one or two useful sentences before the wrapper's final live-status
   line.
+- Plan/demo/how-it-works replies are allowed to be longer than normal result
+  replies, but should still be compact enough to read in Discord.
 - Mention tests, commits, deploy details, or health checks only when useful or
   when something failed.
 - Do not paste raw stack traces, Git output, auth headers, or long test logs
