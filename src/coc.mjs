@@ -36,6 +36,58 @@ function apiToken() {
   return process.env.COC_API_TOKEN || '';
 }
 
+async function fetchCocJson(
+  path,
+  {
+    fetchImpl = fetch,
+    timeoutMs = DEFAULT_COC_API_TIMEOUT_MS,
+    notFoundMessage = 'I could not find that Clash of Clans resource.'
+  } = {}
+) {
+  const token = apiToken();
+  if (!token) {
+    throw new CocApiError('The Clash API token is not configured on the server yet.');
+  }
+
+  const controller = typeof AbortController === 'undefined' ? null : new AbortController();
+  const timer =
+    controller && Number.isFinite(timeoutMs) && timeoutMs > 0
+      ? setTimeout(() => controller.abort(), timeoutMs)
+      : null;
+
+  let response;
+  try {
+    response = await fetchImpl(`${apiBaseUrl()}${path}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json'
+      },
+      ...(controller ? { signal: controller.signal } : {})
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new CocApiError('The Clash API did not respond quickly enough. Try again in a minute.');
+    }
+    throw error;
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+
+  try {
+    return await parseCocResponse(response);
+  } catch (error) {
+    if (error instanceof CocApiError && error.status === 404) {
+      throw new CocApiError(notFoundMessage, {
+        status: error.status,
+        reason: error.reason
+      });
+    }
+    throw error;
+  }
+}
+
 async function parseCocResponse(response) {
   let body = null;
   try {
@@ -73,38 +125,75 @@ export async function fetchPlayer(
   tag,
   { fetchImpl = fetch, timeoutMs = DEFAULT_COC_API_TIMEOUT_MS } = {}
 ) {
-  const token = apiToken();
-  if (!token) {
-    throw new CocApiError('The Clash API token is not configured on the server yet.');
+  return fetchCocJson(`/players/${encodeCocTag(tag)}`, {
+    fetchImpl,
+    timeoutMs,
+    notFoundMessage: 'I could not find that player tag.'
+  });
+}
+
+export function normalizeClanTag(value) {
+  return normalizePlayerTag(value);
+}
+
+export async function fetchClan(
+  tag,
+  { fetchImpl = fetch, timeoutMs = DEFAULT_COC_API_TIMEOUT_MS } = {}
+) {
+  return fetchCocJson(`/clans/${encodeCocTag(tag)}`, {
+    fetchImpl,
+    timeoutMs,
+    notFoundMessage: 'I could not find that clan tag.'
+  });
+}
+
+export async function fetchCurrentWar(
+  clanTag,
+  { fetchImpl = fetch, timeoutMs = DEFAULT_COC_API_TIMEOUT_MS } = {}
+) {
+  return fetchCocJson(`/clans/${encodeCocTag(clanTag)}/currentwar`, {
+    fetchImpl,
+    timeoutMs,
+    notFoundMessage: 'I could not find current war data for that clan.'
+  });
+}
+
+export async function fetchClanWarLog(
+  clanTag,
+  { fetchImpl = fetch, timeoutMs = DEFAULT_COC_API_TIMEOUT_MS, limit = 10 } = {}
+) {
+  const params = new URLSearchParams();
+  if (Number.isFinite(limit) && limit > 0) {
+    params.set('limit', String(Math.min(Math.floor(limit), 50)));
   }
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  return fetchCocJson(`/clans/${encodeCocTag(clanTag)}/warlog${suffix}`, {
+    fetchImpl,
+    timeoutMs,
+    notFoundMessage: 'I could not find war log data for that clan.'
+  });
+}
 
-  const controller = typeof AbortController === 'undefined' ? null : new AbortController();
-  const timer =
-    controller && Number.isFinite(timeoutMs) && timeoutMs > 0
-      ? setTimeout(() => controller.abort(), timeoutMs)
-      : null;
+export async function fetchCurrentCwlGroup(
+  clanTag,
+  { fetchImpl = fetch, timeoutMs = DEFAULT_COC_API_TIMEOUT_MS } = {}
+) {
+  return fetchCocJson(`/clans/${encodeCocTag(clanTag)}/currentwar/leaguegroup`, {
+    fetchImpl,
+    timeoutMs,
+    notFoundMessage: 'I could not find current CWL group data for that clan.'
+  });
+}
 
-  let response;
-  try {
-    response = await fetchImpl(`${apiBaseUrl()}/players/${encodeCocTag(tag)}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json'
-      },
-      ...(controller ? { signal: controller.signal } : {})
-    });
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      throw new CocApiError('The Clash API did not respond quickly enough. Try again in a minute.');
-    }
-    throw error;
-  } finally {
-    if (timer) {
-      clearTimeout(timer);
-    }
-  }
-
-  return parseCocResponse(response);
+export async function fetchCwlWar(
+  warTag,
+  { fetchImpl = fetch, timeoutMs = DEFAULT_COC_API_TIMEOUT_MS } = {}
+) {
+  return fetchCocJson(`/clanwarleagues/wars/${encodeCocTag(warTag)}`, {
+    fetchImpl,
+    timeoutMs,
+    notFoundMessage: 'I could not find that CWL war tag.'
+  });
 }
 
 function numberText(value) {

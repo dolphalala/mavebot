@@ -26,9 +26,20 @@ import {
   DEFAULT_LEGENDS_INTERVAL_MS,
   buildLegendsPages,
   ensureLegendsTracked,
+  readLegendsStore,
   legendsStorePath,
   startLegendsTracker
 } from './legends-store.mjs';
+import {
+  DEFAULT_CLASH_HISTORY_CLAN_INTERVAL_MS,
+  DEFAULT_CLASH_HISTORY_INTERVAL_MS,
+  DEFAULT_CLASH_HISTORY_PLAYER_INTERVAL_MS,
+  DEFAULT_CLASH_HISTORY_WAR_INTERVAL_MS,
+  clashHistoryStorePath,
+  readClashHistoryStore,
+  recordClashPlayerSnapshot,
+  startClashHistoryCollector
+} from './clash-history-store.mjs';
 import {
   BENCHED_ROLE_COLOR,
   BENCHED_ROLE_NAME,
@@ -117,6 +128,22 @@ const legendsIntervalMs =
   Number.isFinite(configuredLegendsIntervalMs) && configuredLegendsIntervalMs > 0
     ? configuredLegendsIntervalMs
     : DEFAULT_LEGENDS_INTERVAL_MS;
+const clashHistoryIntervalMs = Number.parseInt(
+  process.env.CLASH_HISTORY_INTERVAL_MS || String(DEFAULT_CLASH_HISTORY_INTERVAL_MS),
+  10
+);
+const clashHistoryPlayerIntervalMs = Number.parseInt(
+  process.env.CLASH_HISTORY_PLAYER_INTERVAL_MS || String(DEFAULT_CLASH_HISTORY_PLAYER_INTERVAL_MS),
+  10
+);
+const clashHistoryClanIntervalMs = Number.parseInt(
+  process.env.CLASH_HISTORY_CLAN_INTERVAL_MS || String(DEFAULT_CLASH_HISTORY_CLAN_INTERVAL_MS),
+  10
+);
+const clashHistoryWarIntervalMs = Number.parseInt(
+  process.env.CLASH_HISTORY_WAR_INTERVAL_MS || String(DEFAULT_CLASH_HISTORY_WAR_INTERVAL_MS),
+  10
+);
 
 if (!token) {
   throw new Error('DISCORD_TOKEN is required.');
@@ -163,7 +190,12 @@ const discordCodexSetupMessage = discordCodexSetupBlocker({
 const activePictionaryGames = new Map();
 
 const app = express();
-app.get('/healthz', (_req, res) => {
+app.get('/healthz', async (_req, res) => {
+  let clashHistoryScheduler = null;
+  try {
+    const clashHistoryStore = await readClashHistoryStore(clashHistoryStorePath());
+    clashHistoryScheduler = clashHistoryStore.scheduler || null;
+  } catch {}
   res.status(ready ? 200 : 503).json({
     ok: ready,
     botUser: readyUser,
@@ -185,6 +217,12 @@ app.get('/healthz', (_req, res) => {
     discordCodexLastError,
     pictionaryStorePath: pictionaryStorePath(),
     pictionaryActiveGames: activePictionaryGames.size,
+    clashHistoryStorePath: clashHistoryStorePath(),
+    clashHistoryIntervalMs,
+    clashHistoryPlayerIntervalMs,
+    clashHistoryClanIntervalMs,
+    clashHistoryWarIntervalMs,
+    clashHistoryScheduler,
     uptimeSec: Math.floor(process.uptime())
   });
 });
@@ -204,6 +242,7 @@ const playerViews = new Map();
 const legendsViews = new Map();
 const playerViewTtlMs = 15 * 60 * 1000;
 let stopLegendsTracker = null;
+let stopClashHistoryCollector = null;
 
 function summarizeRuntimeError(error) {
   return String(error?.message || error || 'unknown error')
@@ -954,6 +993,17 @@ async function hydratePlayerArmyCard(view, player, tag) {
   }
 }
 
+async function rememberClashPlayer(player, source) {
+  try {
+    await recordClashPlayerSnapshot(player, {
+      storePath: clashHistoryStorePath(),
+      source
+    });
+  } catch (error) {
+    console.warn('Could not record Clash player history snapshot:', error);
+  }
+}
+
 function storeLegendsView(view, message) {
   view.message = message;
   legendsViews.set(view.id, view);
@@ -1313,6 +1363,33 @@ client.once(Events.ClientReady, (readyClient) => {
     storePath: legendsStorePath(),
     intervalMs: legendsIntervalMs
   });
+  stopClashHistoryCollector = startClashHistoryCollector({
+    storePath: clashHistoryStorePath(),
+    intervalMs:
+      Number.isFinite(clashHistoryIntervalMs) && clashHistoryIntervalMs > 0
+        ? clashHistoryIntervalMs
+        : DEFAULT_CLASH_HISTORY_INTERVAL_MS,
+    playerIntervalMs:
+      Number.isFinite(clashHistoryPlayerIntervalMs) && clashHistoryPlayerIntervalMs > 0
+        ? clashHistoryPlayerIntervalMs
+        : DEFAULT_CLASH_HISTORY_PLAYER_INTERVAL_MS,
+    clanIntervalMs:
+      Number.isFinite(clashHistoryClanIntervalMs) && clashHistoryClanIntervalMs > 0
+        ? clashHistoryClanIntervalMs
+        : DEFAULT_CLASH_HISTORY_CLAN_INTERVAL_MS,
+    warIntervalMs:
+      Number.isFinite(clashHistoryWarIntervalMs) && clashHistoryWarIntervalMs > 0
+        ? clashHistoryWarIntervalMs
+        : DEFAULT_CLASH_HISTORY_WAR_INTERVAL_MS,
+    extraPlayerTagsProvider: async () => {
+      const legendsStore = await readLegendsStore(legendsStorePath());
+      const historyStore = await readClashHistoryStore(clashHistoryStorePath());
+      return [
+        ...Object.keys(legendsStore.players || {}),
+        ...Object.keys(historyStore.players || {})
+      ];
+    }
+  });
   catchUpDiscordCodexChannel();
 });
 
@@ -1458,6 +1535,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return;
       }
       const player = await fetchPlayer(normalizePlayerTag(tag));
+      void rememberClashPlayer(player, 'lookup');
       const profile = buildPlayerProfilePages(player, {
         armyImageLoading: true
       });
@@ -1495,6 +1573,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         storePath: legendsStorePath(),
         intervalMs: legendsIntervalMs
       });
+      void rememberClashPlayer(result.player, 'legends');
       const trackedCount = Object.keys(result.store.players || {}).length;
       const profile = buildLegendsPages(result.record, {
         trackedCount,
@@ -1546,6 +1625,7 @@ async function shutdown(signal) {
   console.log(`Received ${signal}; shutting down.`);
   ready = false;
   stopLegendsTracker?.();
+  stopClashHistoryCollector?.();
   client.destroy();
   healthServer.close(() => process.exit(0));
 }

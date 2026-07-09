@@ -12,6 +12,7 @@ CODEX_WORKER_DIR="${CODEX_WORKER_DIR:-/opt/urba-apps/discord-bot/shared/codex-wo
 CODEX_WORKER_RESTART="${CODEX_WORKER_RESTART:-auto}"
 CODEX_WORKER_STALE_SECONDS="${CODEX_WORKER_STALE_SECONDS:-900}"
 LEGENDS_STORE_FILE="${LEGENDS_STORE_FILE:-/opt/urba-apps/discord-bot/shared/legends-tracking.json}"
+CLASH_HISTORY_STORE_FILE="${CLASH_HISTORY_STORE_FILE:-/opt/urba-apps/discord-bot/shared/clash-history.json}"
 ELDER_STORE_FILE="${ELDER_STORE_FILE:-/opt/urba-apps/discord-bot/shared/elder-votes.json}"
 PICTIONARY_STORE_FILE="${PICTIONARY_STORE_FILE:-/opt/urba-apps/discord-bot/shared/pictionary-leaderboard.json}"
 LOG_DIR="${LOG_DIR:-/opt/urba-apps/discord-bot/shared/logs}"
@@ -63,6 +64,11 @@ if [ ! -s "$LEGENDS_STORE_FILE" ]; then
 fi
 chmod 600 "$LEGENDS_STORE_FILE"
 chown 1000:1000 "$LEGENDS_STORE_FILE" 2>/dev/null || true
+if [ ! -s "$CLASH_HISTORY_STORE_FILE" ]; then
+  printf '{"version":1,"tracked":{"players":{},"clans":{},"wars":{}},"players":{},"clans":{},"wars":{},"cwlGroups":{},"scheduler":{"cursor":0,"lastRunAt":null,"lastAction":null,"lastError":null}}\n' >"$CLASH_HISTORY_STORE_FILE"
+fi
+chmod 600 "$CLASH_HISTORY_STORE_FILE"
+chown 1000:1000 "$CLASH_HISTORY_STORE_FILE" 2>/dev/null || true
 if [ ! -s "$ELDER_STORE_FILE" ]; then
   printf '{"version":1,"guilds":{}}\n' >"$ELDER_STORE_FILE"
 fi

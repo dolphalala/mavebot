@@ -47,6 +47,13 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Health endpoint: `http://127.0.0.1:4188/healthz`.
 - Legend tracking store:
   `/opt/urba-apps/discord-bot/shared/legends-tracking.json`.
+- Clash history collector store:
+  `/opt/urba-apps/discord-bot/shared/clash-history.json`.
+  Deploy initializes and chowns it as `/shared/clash-history.json`.
+  Runtime preserves malformed JSON as a `.corrupt-*` backup before starting a
+  clean store. The store tracks enrolled players, clans, CWL war tags, player
+  snapshots, clan snapshots, CWL groups, full current/CWL war rows when the API
+  exposes them, and summary-only public war-log rows.
 - Elder/vote moderation store:
   `/opt/urba-apps/discord-bot/shared/elder-votes.json`.
   Deploy initializes and chowns it as `/shared/elder-votes.json`; if malformed
@@ -63,6 +70,16 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   Discord server role settings.
 - `/legends` uses fixed MST for day boundaries: the Legend day starts at
   23:00 MST, which is 06:00 UTC.
+- Clash history collection follows the ClashKing/ClashPerk-style polling model:
+  the official Clash API has no webhooks, so mavebot rotates through due
+  tracked subjects on a schedule. Env knobs are
+  `CLASH_HISTORY_STORE_PATH`, `CLASH_HISTORY_CLAN_TAGS`,
+  `CLASH_HISTORY_PLAYER_TAGS`, `CLASH_HISTORY_INTERVAL_MS`,
+  `CLASH_HISTORY_PLAYER_INTERVAL_MS`, `CLASH_HISTORY_CLAN_INTERVAL_MS`, and
+  `CLASH_HISTORY_WAR_INTERVAL_MS`. `/player` and `/legends` lookups also seed
+  player tracking. Past war/CWL player attack history can only be collected
+  from now forward unless the official API still exposes the active war or CWL
+  war tags; public war logs only provide summary rows.
 - GitHub deploys should use the server-local
   `urba-discord-poll-deploy.timer`, not a public webhook.
 - The server poll deploy only follows `origin/main`. A Codex cloud task that

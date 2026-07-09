@@ -19,6 +19,13 @@ Every Slack/Codex worker task that touches Clash commands should read it after
 ## Clash Data And Icon Sources
 
 - Use the official Clash of Clans API for player/clan/game data.
+- ClashKing and ClashPerk-style history is polling-based, not event-based. The
+  official API has no push stream, so mavebot must snapshot player/clan state
+  on a schedule and store deltas. Trophy changes that happen between polls
+  cannot be reconstructed exactly.
+- War/CWL player attack history is only reliable when mavebot sees the war from
+  the active current-war/CWL endpoints. Public war logs are useful as summary
+  backfill, but they do not provide full player attack rows.
 - The official player API does not provide troop, spell, hero equipment, or pet
   sprite URLs. Do not invent URLs from the player payload.
 - For item icons, prefer the Clash of Clans Wiki on Fandom through the

@@ -6,6 +6,11 @@ import {
   buildPlayerProfilePages,
   buildPlayerProfileUrl,
   encodeCocTag,
+  fetchClan,
+  fetchClanWarLog,
+  fetchCurrentCwlGroup,
+  fetchCurrentWar,
+  fetchCwlWar,
   fetchPlayer,
   normalizePlayerTag
 } from '../src/coc.mjs';
@@ -99,6 +104,35 @@ test('fetchPlayer sends an encoded tag and bearer token', async () => {
 
   assert.equal(player.name, 'Lana');
   assert.equal(calls[0].url, 'https://api.example.test/v1/players/%23ABC123');
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer test-token');
+
+  delete process.env.COC_API_TOKEN;
+  delete process.env.COC_API_BASE_URL;
+});
+
+test('clan and war API helpers use official Clash endpoints', async () => {
+  process.env.COC_API_TOKEN = 'test-token';
+  process.env.COC_API_BASE_URL = 'https://api.example.test/v1/';
+
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    return Response.json({ ok: true });
+  };
+
+  await fetchClan('#CLAN1', { fetchImpl });
+  await fetchCurrentWar('#CLAN1', { fetchImpl });
+  await fetchClanWarLog('#CLAN1', { fetchImpl, limit: 5 });
+  await fetchCurrentCwlGroup('#CLAN1', { fetchImpl });
+  await fetchCwlWar('#WAR1', { fetchImpl });
+
+  assert.deepEqual(calls.map((call) => call.url), [
+    'https://api.example.test/v1/clans/%23CLAN1',
+    'https://api.example.test/v1/clans/%23CLAN1/currentwar',
+    'https://api.example.test/v1/clans/%23CLAN1/warlog?limit=5',
+    'https://api.example.test/v1/clans/%23CLAN1/currentwar/leaguegroup',
+    'https://api.example.test/v1/clanwarleagues/wars/%23WAR1'
+  ]);
   assert.equal(calls[0].options.headers.Authorization, 'Bearer test-token');
 
   delete process.env.COC_API_TOKEN;
