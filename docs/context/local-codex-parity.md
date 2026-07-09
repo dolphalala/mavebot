@@ -37,8 +37,8 @@ Use context in layers instead of dumping the full channel history:
 - Worker `summary.md` and `recent.md` provide bounded channel memory.
 - `operating-memory.md` owns server, deploy, command registration, and safety
   facts.
-- `slack-session.md` owns user preferences, current goals, and open work; the
-  filename is legacy, but Discord `#codex` is the primary session.
+- `discord-session.md` owns user preferences, current goals, and open work.
+  `slack-session.md` is only a legacy compatibility pointer.
 - `remote-codex-session.md` owns remote-channel behavior.
 - This file owns local-session parity expectations.
 - `code-map.md` points to source ownership.
@@ -64,8 +64,8 @@ After each meaningful job, decide whether a durable context update is needed:
 
 - Update `operating-memory.md` for deployment, env, server path, command
   registration, state-store, or safety-boundary changes.
-- Update `slack-session.md` for user preferences, active goals, open work, and
-  cross-job decisions.
+- Update `discord-session.md` for user preferences, active goals, open work,
+  and cross-job decisions.
 - Update `remote-codex-session.md` for Discord session behavior changes.
 - Update `code-map.md` when source ownership or feature recipes change.
 - Update a focused domain file for reusable product/domain guidance.

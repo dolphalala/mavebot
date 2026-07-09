@@ -13,11 +13,11 @@ export const DISCORD_GATEWAY_MESSAGE_CONTENT_FLAGS = {
 };
 
 export const DISCORD_CODEX_WORKING_MESSAGES = [
-  "Got it. I'll take a look.",
-  "I'm on it.",
-  "I'll check that now.",
-  "Got you. I'll work on it.",
-  "mavebot's taking a look."
+  "Got it, checking now.",
+  "On it. I'll take a look.",
+  "One sec, I'm looking.",
+  "I got you. Working through it now.",
+  "I'll dig into that now."
 ];
 export const DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE =
   'Enable Message Content Intent in the Discord Developer Portal for mavebot, save it, then restart the bot so I can read normal messages in #codex.';

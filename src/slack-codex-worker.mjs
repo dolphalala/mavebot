@@ -19,80 +19,126 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const repoUrl =
+  process.env.CODEX_WORKER_REPOSITORY_URL ||
   process.env.SLACK_WORKER_REPOSITORY_URL ||
   process.env.SLACK_CODEX_REPOSITORY_URL ||
   'https://github.com/dolphalala/mavebot.git';
-const branch = process.env.SLACK_WORKER_BRANCH || 'main';
-const sharedDir = process.env.SLACK_WORKER_SHARED_DIR || '/shared/codex-worker';
-const jobDir = process.env.SLACK_WORKER_JOB_DIR || path.join(sharedDir, 'jobs');
+const branch = process.env.CODEX_WORKER_BRANCH || process.env.SLACK_WORKER_BRANCH || 'main';
+const sharedDir =
+  process.env.CODEX_WORKER_SHARED_DIR ||
+  process.env.SLACK_WORKER_SHARED_DIR ||
+  '/shared/codex-worker';
+const jobDir =
+  process.env.CODEX_WORKER_JOB_DIR || process.env.SLACK_WORKER_JOB_DIR || path.join(sharedDir, 'jobs');
 const processingDir =
-  process.env.SLACK_WORKER_PROCESSING_DIR || path.join(sharedDir, 'processing');
-const doneDir = process.env.SLACK_WORKER_DONE_DIR || path.join(sharedDir, 'done');
-const failedDir = process.env.SLACK_WORKER_FAILED_DIR || path.join(sharedDir, 'failed');
+  process.env.CODEX_WORKER_PROCESSING_DIR ||
+  process.env.SLACK_WORKER_PROCESSING_DIR ||
+  path.join(sharedDir, 'processing');
+const doneDir =
+  process.env.CODEX_WORKER_DONE_DIR || process.env.SLACK_WORKER_DONE_DIR || path.join(sharedDir, 'done');
+const failedDir =
+  process.env.CODEX_WORKER_FAILED_DIR ||
+  process.env.SLACK_WORKER_FAILED_DIR ||
+  path.join(sharedDir, 'failed');
 const contextDir =
-  process.env.SLACK_WORKER_CONTEXT_DIR || path.join(sharedDir, 'context');
-const repoDir = process.env.SLACK_WORKER_REPO_DIR || path.join(sharedDir, 'repo');
-const liveAppDir = process.env.SLACK_WORKER_LIVE_APP_DIR || '/live-app';
+  process.env.CODEX_WORKER_CONTEXT_DIR ||
+  process.env.SLACK_WORKER_CONTEXT_DIR ||
+  path.join(sharedDir, 'context');
+const repoDir =
+  process.env.CODEX_WORKER_REPO_DIR || process.env.SLACK_WORKER_REPO_DIR || path.join(sharedDir, 'repo');
+const liveAppDir =
+  process.env.CODEX_WORKER_LIVE_APP_DIR || process.env.SLACK_WORKER_LIVE_APP_DIR || '/live-app';
 const slackMemoryPath =
   process.env.SLACK_MEMORY_PATH || '/shared/slack-memory.jsonl';
 const slackBotToken = process.env.SLACK_BOT_TOKEN || '';
 const slackChannelId = process.env.SLACK_CHANNEL_ID || '';
 const discordBotToken = process.env.DISCORD_TOKEN || '';
 const discordCodexChannelId = process.env.DISCORD_CODEX_CHANNEL_ID || '';
-const workerName = process.env.SLACK_WORKER_NAME || 'mavebot';
+const workerName = process.env.CODEX_WORKER_NAME || process.env.SLACK_WORKER_NAME || 'mavebot';
 const codexBin = process.env.CODEX_BIN || 'codex';
-const codexModel = process.env.CODEX_MODEL || process.env.SLACK_WORKER_CODEX_MODEL || '';
-const gitAuthorName = process.env.SLACK_WORKER_GIT_AUTHOR_NAME || 'mavebot worker';
+const codexModel =
+  process.env.CODEX_MODEL || process.env.CODEX_WORKER_MODEL || process.env.SLACK_WORKER_CODEX_MODEL || '';
+const gitAuthorName =
+  process.env.CODEX_WORKER_GIT_AUTHOR_NAME || process.env.SLACK_WORKER_GIT_AUTHOR_NAME || 'mavebot worker';
 const gitAuthorEmail =
-  process.env.SLACK_WORKER_GIT_AUTHOR_EMAIL || 'mavebot-worker@users.noreply.github.com';
+  process.env.CODEX_WORKER_GIT_AUTHOR_EMAIL ||
+  process.env.SLACK_WORKER_GIT_AUTHOR_EMAIL ||
+  'mavebot-worker@users.noreply.github.com';
 const botHealthUrl =
-  process.env.SLACK_WORKER_BOT_HEALTH_URL || 'http://discord-bot:4188/healthz';
+  process.env.CODEX_WORKER_BOT_HEALTH_URL ||
+  process.env.SLACK_WORKER_BOT_HEALTH_URL ||
+  'http://discord-bot:4188/healthz';
 const bridgeHealthUrl =
-  process.env.SLACK_WORKER_BRIDGE_HEALTH_URL || '';
-const requireBridgeHealth = parseBoolean(process.env.SLACK_WORKER_REQUIRE_BRIDGE_HEALTH, false);
+  process.env.CODEX_WORKER_BRIDGE_HEALTH_URL || process.env.SLACK_WORKER_BRIDGE_HEALTH_URL || '';
+const requireBridgeHealth = parseBoolean(
+  process.env.CODEX_WORKER_REQUIRE_BRIDGE_HEALTH ?? process.env.SLACK_WORKER_REQUIRE_BRIDGE_HEALTH,
+  false
+);
 
-const pollIntervalMs = parsePositiveInt(process.env.SLACK_WORKER_POLL_INTERVAL_MS, 3000);
+const pollIntervalMs = parsePositiveInt(
+  process.env.CODEX_WORKER_POLL_INTERVAL_MS || process.env.SLACK_WORKER_POLL_INTERVAL_MS,
+  3000
+);
 const processingStaleMs = parsePositiveInt(
-  process.env.SLACK_WORKER_PROCESSING_STALE_MS,
+  process.env.CODEX_WORKER_PROCESSING_STALE_MS || process.env.SLACK_WORKER_PROCESSING_STALE_MS,
   15 * 60 * 1000
 );
 const jobTimeoutMs = parsePositiveInt(
-  process.env.SLACK_WORKER_CODEX_TIMEOUT_MS,
+  process.env.CODEX_WORKER_CODEX_TIMEOUT_MS || process.env.SLACK_WORKER_CODEX_TIMEOUT_MS,
   20 * 60 * 1000
 );
 const commandTimeoutMs = parsePositiveInt(
-  process.env.SLACK_WORKER_COMMAND_TIMEOUT_MS,
+  process.env.CODEX_WORKER_COMMAND_TIMEOUT_MS || process.env.SLACK_WORKER_COMMAND_TIMEOUT_MS,
   5 * 60 * 1000
 );
 const deployTimeoutMs = parsePositiveInt(
-  process.env.SLACK_WORKER_DEPLOY_TIMEOUT_MS,
+  process.env.CODEX_WORKER_DEPLOY_TIMEOUT_MS || process.env.SLACK_WORKER_DEPLOY_TIMEOUT_MS,
   5 * 60 * 1000
 );
 const fetchTimeoutMs = parsePositiveInt(
-  process.env.SLACK_WORKER_FETCH_TIMEOUT_MS,
+  process.env.CODEX_WORKER_FETCH_TIMEOUT_MS || process.env.SLACK_WORKER_FETCH_TIMEOUT_MS,
   15000
 );
 const runtimeHealthTimeoutMs = parsePositiveInt(
-  process.env.SLACK_WORKER_RUNTIME_HEALTH_TIMEOUT_MS,
+  process.env.CODEX_WORKER_RUNTIME_HEALTH_TIMEOUT_MS ||
+    process.env.SLACK_WORKER_RUNTIME_HEALTH_TIMEOUT_MS,
   60000
 );
-const recentTurnLimit = parsePositiveInt(process.env.SLACK_WORKER_RECENT_TURNS, 40);
-const summaryTurnLimit = parsePositiveInt(process.env.SLACK_WORKER_SUMMARY_TURNS, 120);
-const maxOutputChars = parsePositiveInt(process.env.SLACK_WORKER_MAX_OUTPUT_CHARS, 20000);
-const maxCodexImages = parsePositiveInt(process.env.SLACK_WORKER_MAX_CODEX_IMAGES, 6);
+const recentTurnLimit = parsePositiveInt(
+  process.env.CODEX_WORKER_RECENT_TURNS || process.env.SLACK_WORKER_RECENT_TURNS,
+  40
+);
+const summaryTurnLimit = parsePositiveInt(
+  process.env.CODEX_WORKER_SUMMARY_TURNS || process.env.SLACK_WORKER_SUMMARY_TURNS,
+  120
+);
+const maxOutputChars = parsePositiveInt(
+  process.env.CODEX_WORKER_MAX_OUTPUT_CHARS || process.env.SLACK_WORKER_MAX_OUTPUT_CHARS,
+  20000
+);
+const maxCodexImages = parsePositiveInt(
+  process.env.CODEX_WORKER_MAX_CODEX_IMAGES || process.env.SLACK_WORKER_MAX_CODEX_IMAGES,
+  6
+);
 
 const transcriptPath = path.join(contextDir, 'transcript.jsonl');
 const summaryPath = path.join(contextDir, 'summary.md');
 const recentPath = path.join(contextDir, 'recent.md');
 const sessionPath = path.join(contextDir, 'session.md');
 const codexOutputPath =
-  process.env.SLACK_WORKER_CODEX_OUTPUT_PATH || path.join(sharedDir, 'last-codex-message.md');
-const repoContextDir = process.env.SLACK_WORKER_REPO_CONTEXT_DIR || path.join(repoDir, 'docs/context');
+  process.env.CODEX_WORKER_CODEX_OUTPUT_PATH ||
+  process.env.SLACK_WORKER_CODEX_OUTPUT_PATH ||
+  path.join(sharedDir, 'last-codex-message.md');
+const repoContextDir =
+  process.env.CODEX_WORKER_REPO_CONTEXT_DIR ||
+  process.env.SLACK_WORKER_REPO_CONTEXT_DIR ||
+  path.join(repoDir, 'docs/context');
 const repoContextMaxChars = parsePositiveInt(
-  process.env.SLACK_WORKER_REPO_CONTEXT_MAX_CHARS,
+  process.env.CODEX_WORKER_REPO_CONTEXT_MAX_CHARS || process.env.SLACK_WORKER_REPO_CONTEXT_MAX_CHARS,
   24000
 );
 const repoContextPriority = [
+  'discord-session.md',
   'remote-codex-session.md',
   'local-codex-parity.md',
   'code-map.md',
@@ -166,6 +212,7 @@ function stripSlackLinks(text) {
     .replace(/\bView task\b/gi, '')
     .replace(/^Codex:\s*/gim, '')
     .replace(/^\s*(?:Done and live|Done|Live)\.?\s*$/gim, '')
+    .replace(/\s*(?:Done and live|The change is live|This is live)\.?\s*$/gim, '')
     .replace(/^\s*Checks passed:?.*$/gim, '')
     .replace(/^\s*Pushed to main:?.*$/gim, '')
     .replace(/^\s*Server deploy picked it up:?.*$/gim, '')
@@ -192,6 +239,9 @@ function takeLeadSentences(text, { maxSentences = 2, maxChars = 420 } = {}) {
   const sentences = normalized.match(sentencePattern) || [normalized];
   let result = '';
   for (const sentence of sentences) {
+    if (isMalformedLeadSentence(sentence)) {
+      continue;
+    }
     const next = `${result}${sentence}`.trimStart();
     if (result && next.length > maxChars) {
       break;
@@ -205,6 +255,18 @@ function takeLeadSentences(text, { maxSentences = 2, maxChars = 420 } = {}) {
   return truncate(result.trim(), maxChars).replace(/\s+$/, '');
 }
 
+function isMalformedLeadSentence(sentence) {
+  const text = String(sentence || '').trim();
+  if (!text) {
+    return false;
+  }
+  const backticks = (text.match(/`/g) || []).length;
+  if (backticks % 2 === 1) {
+    return true;
+  }
+  return /^[\w.-]+`\s+\w/i.test(text);
+}
+
 export function activeRequestNeedsDetailedAnswer(job = {}) {
   const contextText = Array.isArray(job?.contextMessages)
     ? job.contextMessages.map((row) => row?.text || '').join('\n')
@@ -216,9 +278,14 @@ export function activeRequestNeedsDetailedAnswer(job = {}) {
     /\bsummary\b/,
     /\bstrategy\b/,
     /\barchitecture\b/,
+    /\bscreenshot\b/,
+    /\bimage\b/,
     /\bcompare\b/,
     /\breview\b/,
+    /\bwhat (?:are|were) you doing\b/,
     /\bwhat (?:did|changed|happened|went wrong)\b/,
+    /\bdid (?:you|u) read\b/,
+    /\bare (?:you|u) done talking\b/,
     /\bwhy\b/,
     /\bhow(?:'|’)s this (?:gonna|going to) work\b/,
     /\bhow (?:would|will|should|could) (?:it|this|that)\b/,
@@ -840,8 +907,8 @@ export function compactTranscriptRows(rows, options = {}) {
     '## Current Session Shape',
     '',
     '- Discord #codex is the user-facing control surface for the mavebot coding session.',
-    '- docs/context/slack-session.md is legacy-named remote session memory and still stores durable user preferences until renamed with compatibility kept.',
-    '- Worker jobs should read repo docs/context/operating-memory.md, docs/context/slack-session.md, docs/context/remote-codex-session.md, docs/context/local-codex-parity.md, docs/context/clash-database-guidance.md, and relevant docs/context/*.md before acting.',
+    '- docs/context/discord-session.md is the canonical remote session memory file. docs/context/slack-session.md is only a compatibility pointer for older prompts.',
+    '- Worker jobs should read repo docs/context/operating-memory.md, docs/context/discord-session.md, docs/context/remote-codex-session.md, docs/context/local-codex-parity.md, docs/context/clash-database-guidance.md, and relevant docs/context/*.md before acting.',
     '- Code changes should be tested, committed, pushed to main, then verified on the server.',
     '- Final answers should read like normal mavebot chat, not CI logs.',
     '',
@@ -934,7 +1001,7 @@ async function readOptional(filePath) {
 export async function readRepoContextBundle({
   dir = repoContextDir,
   maxChars = repoContextMaxChars,
-  exclude = ['README.md', 'operating-memory.md', 'slack-session.md'],
+  exclude = ['README.md', 'operating-memory.md', 'discord-session.md', 'slack-session.md'],
   priority = repoContextPriority
 } = {}) {
   const excludeSet = new Set(exclude);
@@ -1067,7 +1134,7 @@ function promptHeader(job) {
     '- Do not commit or push. The worker will run checks, commit, push main, and verify deploy after you finish.',
     '- If the request is conversational and needs no code, answer normally.',
     '- If the request changes durable behavior, project facts, user preferences, or operating decisions, update the right docs/context/*.md file.',
-    '- Before code changes, read docs/context/operating-memory.md, docs/context/slack-session.md (legacy-named remote session memory), docs/context/remote-codex-session.md, and relevant docs/context/*.md.',
+    '- Before code changes, read docs/context/operating-memory.md, docs/context/discord-session.md, docs/context/remote-codex-session.md, and relevant docs/context/*.md.',
     '- Keep context docs useful: compact stale details, restructure bloated sections, and delete obsolete duplicated notes when the durable facts are captured elsewhere.',
     '- If context docs are getting noisy, improve their structure as part of the task instead of appending another vague bullet.',
     '- Discord command changes must update both src/commands.mjs and src/index.mjs.',
@@ -1098,10 +1165,12 @@ export function buildCodexWorkerPrompt({
   contextIndex = '',
   runtimeSnapshot = '',
   operatingMemory = '',
+  remoteSession = '',
   slackSession = '',
   repoContextBundle = '',
   slackMemoryTail = ''
 }) {
+  const remoteSessionMemory = remoteSession || slackSession;
   return [
     promptHeader(job),
     '# Project AGENTS.md',
@@ -1123,13 +1192,17 @@ export function buildCodexWorkerPrompt({
     operatingMemory || 'docs/context/operating-memory.md was not readable.',
     '',
     '# Repo Remote Session Memory',
-    slackSession || 'docs/context/slack-session.md was not readable.',
+    remoteSessionMemory || 'docs/context/discord-session.md was not readable.',
     '',
     '# Extra Repo Context Files',
     repoContextBundle || 'No extra docs/context/*.md files were readable.',
-    '',
-    '# Legacy Raw Slack Memory Tail',
-    slackMemoryTail || 'No legacy raw Slack memory tail available.',
+    ...(slackMemoryTail
+      ? [
+          '',
+          '# Legacy Raw Slack Memory Tail',
+          slackMemoryTail
+        ]
+      : []),
     ''
   ].join('\n');
 }
@@ -1359,9 +1432,11 @@ async function runCodex(job, contextSnapshot) {
   const repoInstructions = await readOptional(path.join(repoDir, 'AGENTS.md'));
   const contextIndex = await readOptional(path.join(repoDir, 'docs/context/README.md'));
   const operatingMemory = await readOptional(path.join(repoDir, 'docs/context/operating-memory.md'));
-  const slackSession = await readOptional(path.join(repoDir, 'docs/context/slack-session.md'));
+  const remoteSession =
+    (await readOptional(path.join(repoDir, 'docs/context/discord-session.md'))) ||
+    (await readOptional(path.join(repoDir, 'docs/context/slack-session.md')));
   const repoContextBundle = await readRepoContextBundle();
-  const slackMemoryTail = await readSlackMemoryTail();
+  const slackMemoryTail = job.source === 'slack' ? await readSlackMemoryTail() : '';
   const prompt = buildCodexWorkerPrompt({
     job,
     summary: contextSnapshot.summary,
@@ -1370,7 +1445,7 @@ async function runCodex(job, contextSnapshot) {
     contextIndex,
     runtimeSnapshot: buildWorkerRuntimeSnapshot(job),
     operatingMemory,
-    slackSession,
+    remoteSession,
     repoContextBundle,
     slackMemoryTail
   });

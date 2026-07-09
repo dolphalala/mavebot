@@ -415,10 +415,10 @@ test('enqueueDiscordCodexWorkerJob writes one private worker job', async (t) => 
 });
 
 test('randomWorkingMessage can be deterministic for tests', () => {
-  assert.equal(randomWorkingMessage(() => 0), "Got it. I'll take a look.");
+  assert.equal(randomWorkingMessage(() => 0), 'Got it, checking now.');
   assert.equal(
     randomWorkingMessage(() => DISCORD_CODEX_WORKING_MESSAGES.length - 1),
-    "mavebot's taking a look."
+    "I'll dig into that now."
   );
 });
 

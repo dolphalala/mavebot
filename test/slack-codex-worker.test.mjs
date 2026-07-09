@@ -392,10 +392,37 @@ test('buildCodexWorkerPrompt marks plan and demo requests for detailed answers',
   assert.equal(activeRequestNeedsDetailedAnswer({ text: 'is there a demo?' }), true);
   assert.equal(activeRequestNeedsDetailedAnswer({ text: 'what did it change and why?' }), true);
   assert.equal(activeRequestNeedsDetailedAnswer({ text: 'design a database collector like clashking' }), true);
+  assert.equal(activeRequestNeedsDetailedAnswer({ text: 'did u read everything i said?' }), true);
+  assert.equal(activeRequestNeedsDetailedAnswer({ text: 'can u see this screenshot and explain?' }), true);
   assert.match(prompt, /Active request response mode:/);
   assert.match(prompt, /asks for a plan\/demo\/how-it-works answer/);
   assert.match(prompt, /Do not answer with only an acknowledgement/);
   assert.match(prompt, /compact plan, a concrete demo\/example/);
+});
+
+test('buildCodexWorkerPrompt uses Discord session memory without Slack tail noise by default', () => {
+  const prompt = buildCodexWorkerPrompt({
+    job: {
+      source: 'discord',
+      user: 'UACTIVE',
+      username: 'Allen',
+      channel: '1523893930993778698',
+      ts: '2026-07-09T10:00:00.000Z',
+      text: 'fix the discord worker'
+    },
+    summary: 'summary memory',
+    recent: 'recent memory',
+    repoInstructions: 'AGENTS instructions',
+    contextIndex: 'context map',
+    runtimeSnapshot: 'runtime snapshot',
+    operatingMemory: 'operating memory',
+    remoteSession: 'discord session memory',
+    repoContextBundle: 'remote session contract'
+  });
+
+  assert.match(prompt, /discord session memory/);
+  assert.doesNotMatch(prompt, /Legacy Raw Slack Memory Tail/);
+  assert.doesNotMatch(prompt, /No legacy raw Slack memory tail available/);
 });
 
 test('buildCodexWorkerPrompt puts active Discord screenshots before memory', () => {
@@ -588,6 +615,19 @@ test('finalSlackMessage strips routine deploy/check chatter from Codex replies',
   );
 });
 
+test('finalSlackMessage strips inline premature live claims before wrapper status', () => {
+  assert.equal(
+    finalSlackMessage({
+      codexMessage: 'Updated `/pictionary` to use real asset cards. Done and live.',
+      checkOk: true,
+      pushResult: { pushed: true },
+      deployResult: { matched: true },
+      runtime: { botOk: true, bridgeOk: true }
+    }),
+    "Updated `/pictionary` to use real asset cards.\n\nIt's live now."
+  );
+});
+
 test('humanizeWorkerChannelMessage keeps channel replies short and conversational', () => {
   const message = humanizeWorkerChannelMessage(
     [
@@ -603,6 +643,13 @@ test('humanizeWorkerChannelMessage keeps channel replies short and conversationa
   );
 
   assert.equal(message, 'Found and fixed another remote-runner parity gap.');
+});
+
+test('humanizeWorkerChannelMessage drops malformed lead fragments', () => {
+  assert.equal(
+    humanizeWorkerChannelMessage('Yes, I can see it. png` lookup. The real fix is in the asset fallback.'),
+    'Yes, I can see it. The real fix is in the asset fallback.'
+  );
 });
 
 test('detailedWorkerChannelMessage preserves requested plan and demo structure', () => {
@@ -808,6 +855,7 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   t.after(() => rm(dir, { recursive: true, force: true }));
 
   await writeFile(path.join(dir, 'operating-memory.md'), 'do not include this copy');
+  await writeFile(path.join(dir, 'discord-session.md'), 'do not include canonical session copy');
   await writeFile(path.join(dir, 'slack-session.md'), 'do not include this copy either');
   await writeFile(path.join(dir, 'README.md'), 'do not include context map copy');
   await writeFile(path.join(dir, 'clash-ui-guidance.md'), '# Clash UI\nUse icon cards.');
@@ -843,6 +891,7 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   assert.match(bundle, /Use icon cards/);
   assert.match(bundle, /Use polling snapshots/);
   assert.doesNotMatch(bundle, /do not include this copy/);
+  assert.doesNotMatch(bundle, /canonical session copy/);
   assert.doesNotMatch(bundle, /do not include context map copy/);
 });
 

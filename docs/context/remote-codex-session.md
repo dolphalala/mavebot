@@ -36,8 +36,8 @@ Every worker job should reconstruct context in this order:
 5. Worker `summary.md` for compact older conversation memory.
 6. Worker `recent.md` for the latest bounded conversation turns.
 7. `docs/context/operating-memory.md` for app, deploy, server, and safety facts.
-8. `docs/context/slack-session.md` for legacy-named remote session memory,
-   user preferences, and current open work.
+8. `docs/context/discord-session.md` for remote session memory, user
+   preferences, and current open work.
 9. This file for remote-session behavior.
 10. `docs/context/local-codex-parity.md` for local-session-equivalent
     standards.
@@ -112,8 +112,8 @@ command.
 
 The channel history will grow forever, so remote jobs must keep memory useful:
 
-- Keep `docs/context/slack-session.md` focused on user preferences, durable
-  decisions, current goals, and open work even though the filename is legacy.
+- Keep `docs/context/discord-session.md` focused on user preferences, durable
+  decisions, current goals, and open work.
 - Worker `recent.md` and `summary.md` intentionally suppress setup smoke tests
   and verification chatter so future jobs do not waste prompt space on old
   infrastructure checks.

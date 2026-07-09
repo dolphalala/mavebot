@@ -154,11 +154,11 @@ SLACK_USER_SCOPES=chat:write
 SLACK_USER_TOKEN_PATH=/shared/slack-user-tokens.json
 SLACK_BRIDGE_AUTOREPLY=0
 GITHUB_TOKEN=
-SLACK_WORKER_BRANCH=main
-SLACK_WORKER_REPOSITORY_URL=https://github.com/dolphalala/mavebot.git
-SLACK_WORKER_SHARED_DIR=/shared/codex-worker
-SLACK_WORKER_RECENT_TURNS=40
-SLACK_WORKER_SUMMARY_TURNS=120
+CODEX_WORKER_BRANCH=main
+CODEX_WORKER_REPOSITORY_URL=https://github.com/dolphalala/mavebot.git
+CODEX_WORKER_SHARED_DIR=/shared/codex-worker
+CODEX_WORKER_RECENT_TURNS=40
+CODEX_WORKER_SUMMARY_TURNS=120
 ```
 
 The bridge saves messages from `#bot` to
@@ -188,8 +188,7 @@ includes those local paths in the worker job.
 
 For Socket Mode, do not enter a Request URL.
 
-When `SLACK_CODEX_FORWARD=1` and `SLACK_CODEX_FORWARD_MODE=worker`, normal
-human messages in `#bot` are saved as jobs under
+Normal human messages in Discord `#codex` are saved as jobs under
 `/opt/urba-apps/discord-bot/shared/codex-worker/jobs`. The worker container
 uses Codex CLI auth from `/opt/urba-apps/discord-bot/codex-home`, not an
 OpenAI API key. It works in its own checkout, runs checks, commits, pushes
@@ -208,7 +207,7 @@ The worker keeps durable context in:
 pruned after verification. `summary.md` and `recent.md` are regenerated after
 each turn so prompts stay bounded while the channel still has memory.
 Repo-side durable guidance starts at `docs/context/README.md`, then
-`docs/context/operating-memory.md`, `docs/context/slack-session.md`,
+`docs/context/operating-memory.md`, `docs/context/discord-session.md`,
 `docs/context/remote-codex-session.md`, `docs/context/code-map.md`, and focused
 domain files such as `docs/context/clash-ui-guidance.md`.
 
@@ -236,10 +235,10 @@ only the cleaned useful answer back into `#bot`. If no trigger channel is set,
 the bridge falls back to `#bot`, hides the long prompt behind a short visible
 message, and deletes that trigger quickly.
 
-Codex cloud still creates task-style runs, so durable Slack session memory lives
-in `docs/context/slack-session.md`. Forwarded prompts tell Codex to read and
-update that file, while the bridge mirrors useful Codex replies back into `#bot`
-as mavebot messages.
+Codex cloud still creates task-style runs. The server-side worker path is the
+preferred flow because it can push `origin/main`, wait for deploy, and post a
+plain Discord channel answer. `docs/context/slack-session.md` is kept only as a
+legacy pointer for old Slack-era prompts.
 
 To enable per-user forwarding, add an HTTPS redirect URL that Allen owns in
 Slack `OAuth & Permissions -> Redirect URLs`, and add a User Token Scope that

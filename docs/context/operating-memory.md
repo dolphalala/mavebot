@@ -259,8 +259,8 @@ remote work.
 - Forwarded Codex prompts should include recent saved `#bot` messages from
   bridge memory so Slack feels like a running session. The default prompt memory
   window is controlled by `SLACK_CODEX_MEMORY_LIMIT`.
-- Remote worker tasks should treat `docs/context/slack-session.md` as
-  legacy-named durable user preference and open-work memory, and
+- Remote worker tasks should treat `docs/context/discord-session.md` as
+  durable user preference and open-work memory, and
   `docs/context/remote-codex-session.md` as the behavior contract for making
   Discord `#codex` feel like this local Codex session. Each task should update
   the right context doc when a turn adds facts, decisions, open work,
@@ -269,7 +269,7 @@ remote work.
   `docs/context/code-map.md` is the source orientation map for remote coding
   jobs.
 - If Allen or Lana asks to reset/start a new session, create a new dated section
-  in `docs/context/slack-session.md` instead of deleting older memory.
+  in `docs/context/discord-session.md` instead of deleting older memory.
 - Per-user Slack user tokens are stored server-side at
   `/opt/urba-apps/discord-bot/shared/slack-user-tokens.json`. Do not commit or
   print this file.
@@ -286,7 +286,7 @@ remote work.
   `dolphalala/mavebot` as the target repo.
 - When Codex cloud or the server-side worker works on this repo, it should read
   `docs/context/README.md` first, then this file, then
-  `docs/context/slack-session.md`, then `docs/context/remote-codex-session.md`,
+  `docs/context/discord-session.md`, then `docs/context/remote-codex-session.md`,
   then `docs/context/code-map.md`, then any relevant focused context file such
   as `docs/context/clash-database-guidance.md` or
   `docs/context/clash-ui-guidance.md`, then inspect the current code before
