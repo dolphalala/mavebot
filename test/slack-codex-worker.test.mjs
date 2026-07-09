@@ -749,6 +749,10 @@ test('changedFilesFromGitStatus parses normal, renamed, and quoted paths', () =>
       'docs/context/slack removal.md'
     ]
   );
+  assert.deepEqual(
+    changedFilesFromGitStatus('M docs/context/discord-session.md'),
+    ['docs/context/discord-session.md']
+  );
 });
 
 test('shouldRunChecksForChangedFiles skips pure memory docs but checks app files', () => {

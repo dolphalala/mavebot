@@ -1943,7 +1943,11 @@ export function changedFilesFromGitStatus(status = '') {
     .map((line) => line.trimEnd())
     .filter(Boolean)
     .map((line) => {
-      const rawPath = line.length > 3 ? line.slice(3).trim() : line.trim();
+      const rawPath = /^..\s/.test(line)
+        ? line.slice(3).trim()
+        : /^.\s/.test(line)
+          ? line.slice(2).trim()
+          : line.trim();
       const renamedPath = rawPath.includes(' -> ') ? rawPath.split(' -> ').at(-1) : rawPath;
       return renamedPath.replace(/^"|"$/g, '').replace(/\\/g, '/');
     })
@@ -1951,7 +1955,8 @@ export function changedFilesFromGitStatus(status = '') {
 }
 
 async function gitChangedFiles() {
-  return changedFilesFromGitStatus(await gitStdout(['status', '--porcelain']));
+  const result = await git(['status', '--porcelain']);
+  return changedFilesFromGitStatus(result.stdout);
 }
 
 export function shouldRunChecksForChangedFiles(files = []) {
