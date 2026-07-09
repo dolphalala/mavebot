@@ -118,9 +118,10 @@ remote work.
   `MessageContent`. If the intent is disabled, the bot remains online and posts
   a one-time setup note in `#codex` instead of crashing.
 - Discord `#codex` is the preferred replacement for Slack as the normal remote
-  Codex session surface. Adjacent Discord messages are debounced into one
-  worker job so users can send multiple text messages and screenshots as one
-  prompt. Discord attachments are downloaded immediately into
+  Codex session surface. Live adjacent Discord messages are debounced by
+  channel and author, so one user can send multiple text messages and
+  screenshots as one prompt without merging simultaneous prompts from other
+  users. Discord attachments are downloaded immediately into
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/discord-files/` and
   passed to Codex as local files.
 - Discord restart catch-up groups still-unhandled adjacent messages into the
@@ -189,6 +190,9 @@ remote work.
   `ENABLE_SLACK_BRIDGE=1`, but normal Discord worker success must not depend on
   Slack bridge health, Slack OAuth, official Codex Slack, or Slack-specific
   task cards.
+- Slack removal should follow `docs/context/slack-removal-plan.md`. Keep Slack
+  compatibility code until Discord-only text/image intake, auth, deploy, and
+  final replies are verified through real jobs.
 
 - Official Codex Slack requires `@Codex`, replies in threads, and chooses a
   cloud environment automatically. It cannot turn `#bot` into a normal channel
@@ -217,6 +221,9 @@ remote work.
 - Worker prompts put the active Discord request before compacted memory.
   Older memory is background context only and must not override the current
   request.
+- Worker prompts tell Codex that multiple Discord `contextMessages` are one
+  bundled session turn; it should preserve speaker names, attached files, and
+  every explicit ask instead of only answering the last short message.
 - Worker prompts explicitly include project `AGENTS.md`, the
   `docs/context/README.md` context map, and a runtime/deploy snapshot before
   compacted conversation memory.

@@ -268,11 +268,20 @@ function isMalformedLeadSentence(sentence) {
 }
 
 export function activeRequestNeedsDetailedAnswer(job = {}) {
+  const contextMessages = Array.isArray(job?.contextMessages) ? job.contextMessages : [];
+  if (job?.source === 'discord' && contextMessages.length > 1) {
+    return true;
+  }
   const contextText = Array.isArray(job?.contextMessages)
     ? job.contextMessages.map((row) => row?.text || '').join('\n')
     : '';
-  const text = `${job?.text || ''}\n${contextText}`.toLowerCase();
-  return [
+  const activeText = String(job?.text || '').toLowerCase();
+  const text = `${activeText}\n${contextText}`.toLowerCase();
+  const questionCount = (text.match(/\?/g) || []).length;
+  if (questionCount > 1) {
+    return true;
+  }
+  const detailedPatterns = [
     /\bplan\b/,
     /\bdemo\b/,
     /\bsummary\b/,
@@ -297,7 +306,21 @@ export function activeRequestNeedsDetailedAnswer(job = {}) {
     /\bdatabase\b/,
     /\bcollector\b/,
     /\broster\b/
-  ].some((pattern) => pattern.test(text));
+  ];
+  const activeOnlyPatterns = [
+    /\bmultiple\b/,
+    /\bback to back\b/,
+    /\balso\b/,
+    /\beverything\b/,
+    /\bcontext\b/,
+    /\bmemory\b/,
+    /\bmd files?\b/,
+    /\bskipp?ed\b/,
+    /\bnot respond\b/,
+    /\brespond to\b/
+  ];
+  return detailedPatterns.some((pattern) => pattern.test(text)) ||
+    activeOnlyPatterns.some((pattern) => pattern.test(activeText));
 }
 
 function stripRoutineReportSections(text) {
@@ -1144,6 +1167,9 @@ function promptHeader(job) {
     '- Keep mavebot isolated from Chatwoot, Bookkeeper, nginx, and unrelated apps.',
     '- Final answer should be plain, short, and suitable to post directly as mavebot. Talk like a helpful person, not a deployment log.',
     '- Answer every explicit question in the active request before ending. If the user asks for a plan, demo, or how something works, include that plan/demo in the final answer instead of only saying work was done.',
+    '- If the active request includes multiple contextMessages, treat them as one bundled turn. Preserve speaker names, files, and every explicit ask in order.',
+    '- If multiple users are bundled, use the newest message to resolve conflicts, but do not silently drop earlier asks.',
+    '- If a bundled turn contains unrelated independent requests that cannot safely fit one run, complete the clear in-scope work and say exactly what remains separate.',
     '- For multi-part requests, track each part yourself and continue through the sequence without waiting for another prompt when the next action is clear.',
     '- Use available parallel tools or subagents for independent investigation when the environment provides them; otherwise run the same loop sequentially and state any actual blocker.',
     '- Do not include commit hashes, test counts, or health-check details in the final answer unless something failed or needs user action.',

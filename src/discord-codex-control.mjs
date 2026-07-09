@@ -41,6 +41,12 @@ export function randomWorkingMessage(randomInt = crypto.randomInt) {
   return DISCORD_CODEX_WORKING_MESSAGES[randomInt(DISCORD_CODEX_WORKING_MESSAGES.length)];
 }
 
+export function discordLiveBurstKey(message, fallbackChannelId = 'discord') {
+  const channel = safeIdPart(message?.channelId || fallbackChannelId || 'discord');
+  const author = safeIdPart(message?.author?.id || message?.user || 'unknown-user');
+  return `${channel}:${author}`;
+}
+
 export function hasDiscordMessageContentIntentFlag(flags) {
   const value = Number(flags || 0);
   return Boolean(

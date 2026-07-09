@@ -32,6 +32,8 @@ authority when docs are stale.
   decisions, current goals, and open work from the long-running Discord
   `#codex` session.
 - `slack-session.md`: legacy compatibility pointer for old Slack-era prompts.
+- `slack-removal-plan.md`: staged plan for deleting Slack support after
+  Discord-only operation has been verified.
 - `remote-codex-session.md`: behavior contract for making Discord `#codex`
   act like a persistent Codex session.
 - `local-codex-parity.md`: checklist for making remote jobs match the quality

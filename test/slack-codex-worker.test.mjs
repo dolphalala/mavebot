@@ -357,6 +357,10 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /Slack #bot is legacy-only/);
   assert.match(prompt, /Do not say the work is ready for the worker to commit, push, deploy, or verify/);
   assert.match(prompt, /Answer every explicit question in the active request/);
+  assert.match(prompt, /multiple contextMessages/);
+  assert.match(prompt, /Preserve speaker names, files, and every explicit ask/);
+  assert.match(prompt, /multiple users are bundled/);
+  assert.match(prompt, /unrelated independent requests/);
   assert.match(prompt, /For multi-part requests, track each part yourself/);
   assert.match(prompt, /active request does not explicitly ask for a plan\/demo/i);
   assert.match(prompt, /docs\/context\/remote-codex-session\.md/);
@@ -394,6 +398,18 @@ test('buildCodexWorkerPrompt marks plan and demo requests for detailed answers',
   assert.equal(activeRequestNeedsDetailedAnswer({ text: 'design a database collector like clashking' }), true);
   assert.equal(activeRequestNeedsDetailedAnswer({ text: 'did u read everything i said?' }), true);
   assert.equal(activeRequestNeedsDetailedAnswer({ text: 'can u see this screenshot and explain?' }), true);
+  assert.equal(activeRequestNeedsDetailedAnswer({ text: 'can u do this? also what about that?' }), true);
+  assert.equal(
+    activeRequestNeedsDetailedAnswer({
+      source: 'discord',
+      text: '[2026-07-09T10:00:00.000Z] Allen: make /roster\n[2026-07-09T10:00:02.000Z] Lana: also add screenshot support',
+      contextMessages: [
+        { user: 'allen', username: 'Allen', text: 'make /roster' },
+        { user: 'lana', username: 'Lana', text: 'also add screenshot support' }
+      ]
+    }),
+    true
+  );
   assert.match(prompt, /Active request response mode:/);
   assert.match(prompt, /asks for a plan\/demo\/how-it-works answer/);
   assert.match(prompt, /Do not answer with only an acknowledgement/);

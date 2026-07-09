@@ -13,6 +13,8 @@ long-lived server state.
   without tagging mavebot.
 - Adjacent text messages and uploads should be treated as one working turn when
   they are sent close together.
+- Live Discord intake should keep one user's quick follow-up messages together
+  but avoid merging different users' simultaneous prompts into one job.
 - mavebot should post normal channel replies, not thread-only replies, task
   cards, prompt dumps, or deployment logs.
 - The server-side `codex-worker` container is the normal backend for repo
@@ -27,6 +29,9 @@ long-lived server state.
   enough structure in the final answer to actually answer it.
 - For broad multi-part asks, keep an internal checklist and continue through
   obvious next steps. Do not make the user repeat the same instruction.
+- If a worker job contains multiple Discord `contextMessages`, answer every
+  explicit ask in order, preserve relevant speaker/file context, and use the
+  newest message only to resolve conflicts.
 - Keep final answers readable for non-technical Discord users. Say the result
   first, mention blockers plainly, and avoid commit/test/deploy details unless
   they explain a failure.
@@ -92,3 +97,6 @@ long-lived server state.
 - Keep memory efficient as Discord channel history grows: summarize durable
   facts, move domain guidance into focused files, and delete duplicated stale
   notes once the facts are preserved.
+- Slack removal should follow `docs/context/slack-removal-plan.md`. Do not
+  delete Slack compatibility code or docs until Discord-only auth, text/image
+  intake, deploy, and final replies have been verified through real jobs.

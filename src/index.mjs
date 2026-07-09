@@ -79,6 +79,7 @@ import {
   buildDiscordCodexWorkerJob,
   buildDiscordMessageRow,
   discordJobContainsMessage,
+  discordLiveBurstKey,
   discordCodexSetupBlocker,
   enqueueDiscordCodexWorkerJob,
   hasDiscordMessageContentIntentFlag,
@@ -264,7 +265,7 @@ function createViewId() {
 }
 
 function pendingDiscordJobKey(message) {
-  return message?.channelId || discordCodexChannelId || 'discord';
+  return discordLiveBurstKey(message, discordCodexChannelId || 'discord');
 }
 
 async function discordCodexJobRecordExists(jobId) {

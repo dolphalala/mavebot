@@ -13,6 +13,10 @@ local Codex Desktop session.
 - Accept normal human messages from any user in the configured channel.
 - Treat Discord uploads and nearby consecutive Discord messages as part of the
   same working context whenever the runtime includes them in the worker job.
+- For live intake, bundle quick follow-ups from the same user, but do not merge
+  different users' simultaneous prompts into one live debounce job. Restart
+  catch-up may preserve mixed-user bursts as context so missed screenshots and
+  follow-up text are not split from the prompt that made them meaningful.
 - Infer the relevant repo/server context from durable memory before acting.
 - Work end to end when possible: inspect, implement, test, push, wait for
   deploy, verify live behavior, then answer plainly in the channel.
@@ -21,6 +25,10 @@ local Codex Desktop session.
 - For multi-part requests, maintain an internal checklist and continue through
   the clear next actions without requiring the user to re-prompt after each
   reflection or subtask.
+- When a job includes multiple `contextMessages`, treat them as one active
+  session turn. Preserve speaker names, attached files, and every explicit ask
+  in order. If several users are included, use the newest message to resolve
+  conflicts, but do not silently drop earlier asks.
 - Keep channel replies short and human. Do not post task cards, prompt dumps,
   commit logs, or CI-style summaries unless something failed.
 
@@ -65,9 +73,10 @@ command.
   explicitly re-enabled. Discord screenshot/file intake is the primary path.
 - Discord image/file intake should download attachments immediately because CDN
   URLs can expire. Adjacent text and screenshot messages in `#codex` should be
-  grouped into one active request before creating the worker job. Worker jobs
-  should preserve the Discord message IDs for every bundled row so restart
-  catch-up can detect already-handled messages.
+  grouped into one active request before creating the worker job when they come
+  from the same live author. Worker jobs should preserve the Discord message
+  IDs for every bundled row so restart catch-up can detect already-handled
+  messages.
 - On startup, Discord `#codex` should catch up recent human messages that do
   not already have a job record in `jobs`, `processing`, `done`, or `failed`;
   it should check bundled message IDs, not just the final job filename, and
@@ -92,6 +101,10 @@ command.
 - Use available parallel tools or subagents for independent investigation when
   the environment provides them; otherwise do the same work sequentially and
   only report a blocker if a required capability is actually unavailable.
+- The worker queue is intentionally serial for repo writes and deploys to avoid
+  Git races. A Codex subprocess can still use internal parallel reads/tools
+  when available, but two separate channel requests should not write the repo at
+  the same time.
 - For slash command changes, update both command registration data and runtime
   interaction handling.
 - For Discord command UX, check mobile readability, button/page behavior, and

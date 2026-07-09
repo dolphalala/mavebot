@@ -13,6 +13,7 @@ import {
   discordFilesToWorkerLines,
   groupDiscordCodexMessageBursts,
   discordJobContainsMessage,
+  discordLiveBurstKey,
   discordMessageToWorkerText,
   discordRowsToWorkerText,
   enqueueDiscordCodexWorkerJob,
@@ -419,6 +420,40 @@ test('randomWorkingMessage can be deterministic for tests', () => {
   assert.equal(
     randomWorkingMessage(() => DISCORD_CODEX_WORKING_MESSAGES.length - 1),
     "I'll dig into that now."
+  );
+});
+
+test('discordLiveBurstKey bundles one user but separates simultaneous users', () => {
+  const first = {
+    channelId: '1523893930993778698',
+    author: { id: 'user-1' }
+  };
+  const followUp = {
+    channelId: '1523893930993778698',
+    author: { id: 'user-1' }
+  };
+  const otherUser = {
+    channelId: '1523893930993778698',
+    author: { id: 'user-2' }
+  };
+
+  assert.equal(
+    discordLiveBurstKey(first),
+    discordLiveBurstKey(followUp),
+    'same author in the same channel should stay in one live burst'
+  );
+  assert.notEqual(
+    discordLiveBurstKey(first),
+    discordLiveBurstKey(otherUser),
+    'different users should not be merged into one live burst'
+  );
+  assert.equal(
+    discordLiveBurstKey({ author: { id: 'user-1' } }, 'fallback-channel'),
+    'fallback-channel:user-1'
+  );
+  assert.equal(
+    discordLiveBurstKey({ channelId: 'channel-only' }),
+    'channel-only:unknown-user'
   );
 });
 
