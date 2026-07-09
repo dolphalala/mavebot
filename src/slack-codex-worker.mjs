@@ -2389,6 +2389,7 @@ async function handleJob(claimed) {
       initialDependencyResult,
       postCodexDependencyResult,
       pushResult,
+      deployTriggerResult,
       deployResult,
       runtime,
       workerTiming: finishJobTiming(timing, job, finishedAt),
