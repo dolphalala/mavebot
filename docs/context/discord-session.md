@@ -92,6 +92,7 @@ long-lived server state.
   replies and stage diagnostics. Current no-change worker smokes are around
   7-8 seconds; changed-file jobs should now use the private deploy webhook
   before relying on the poll timer.
+- 2026-07-09 live verification: private deploy webhook triggered from the worker and the poll timer remained fallback.
 
 ## Persistent Product Context
 
