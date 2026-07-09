@@ -124,12 +124,19 @@ remote work.
   users. Discord attachments are downloaded immediately into
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/discord-files/` and
   passed to Codex as local files.
-- Discord `#codex` also keeps a small in-memory nearby-channel context buffer.
-  When a job is queued, recent same-channel human messages that are not part of
-  the active burst are included as `nearbyText`, `nearbyContextMessages`, and
-  `nearbyFiles`. This helps follow-ups like "what did you do?", "that
-  screenshot above", and multi-user collaboration without marking those nearby
-  messages as handled worker jobs.
+- Discord `#codex` keeps a bounded durable nearby-channel context log at
+  `/opt/urba-apps/discord-bot/shared/codex-worker/context/discord-channel-context.jsonl`
+  by default. `DISCORD_CODEX_CONTEXT_LOG_PATH` can override the path and
+  `DISCORD_CODEX_CONTEXT_LOG_MAX_ROWS` controls the retained tail. The bot also
+  keeps a small in-memory cache for the current process, but the disk log is
+  the source that survives deploys and restarts.
+- When a job is queued, recent same-channel rows from the durable log and live
+  cache that are not part of the active burst are included as `nearbyText`,
+  `nearbyContextMessages`, and `nearbyFiles`. This helps follow-ups like "what
+  did you do?", "that screenshot above", and multi-user collaboration without
+  marking those nearby messages as handled worker jobs. Useful mavebot channel
+  replies are preserved too, while short working acknowledgements are filtered
+  out as noise.
 - Discord restart catch-up groups still-unhandled adjacent messages into the
   same worker job instead of replaying each recent message separately. This
   keeps post-restart behavior closer to Codex Desktop, where context,
@@ -142,9 +149,11 @@ remote work.
   the server without guessing whether the fault was message intent, attachment
   download, catch-up, enqueue, or worker queue state.
 - The Discord bot `/healthz` response also includes
-  `discordCodexRecentContextWindowMs`, `discordCodexRecentContextLimit`, and
-  `discordCodexRecentContextRows` so the nearby-context layer can be checked
-  without reading process memory.
+  `discordCodexRecentContextWindowMs`, `discordCodexRecentContextLimit`,
+  `discordCodexRecentContextRows`, `discordCodexContextLogPath`,
+  `discordCodexContextLogMaxRows`, and
+  `discordCodexPersistentContextRows` so the nearby-context layer can be
+  checked without reading process memory or opening the JSONL log directly.
 - The deploy script normally builds `discord-bot` and `codex-worker`, then
   stops/removes the legacy Slack bridge. It only builds/starts `slack-bridge`
   when `ENABLE_SLACK_BRIDGE=1`. It recreates `codex-worker` only when no worker

@@ -13,6 +13,10 @@ local Codex Desktop session.
 - Accept normal human messages from any user in the configured channel.
 - Treat Discord uploads and nearby consecutive Discord messages as part of the
   same working context whenever the runtime includes them in the worker job.
+  Nearby channel context comes from a bounded durable JSONL tail plus the live
+  process cache, so deploys and restarts should not erase the short-term
+  session memory needed for "above", "that screenshot", or "what did you do?"
+  follow-ups.
 - For live intake, bundle quick follow-ups from the same user, but do not merge
   different users' simultaneous prompts into one live debounce job. Restart
   catch-up may preserve mixed-user bursts as context so missed screenshots and
@@ -87,14 +91,19 @@ command.
   from the same live author. Worker jobs should preserve the Discord message
   IDs for every bundled row so restart catch-up can detect already-handled
   messages.
+- Discord `#codex` should persist useful human messages, uploads, and non-noisy
+  mavebot replies into the bounded durable context log before jobs are queued.
+  Short working acknowledgements such as "I'm on it" should not be preserved as
+  durable context.
 - On startup, Discord `#codex` should catch up recent human messages that do
   not already have a job record in `jobs`, `processing`, `done`, or `failed`;
-  it should check bundled message IDs, not just the final job filename, and
-  group remaining adjacent messages before enqueueing. This prevents
-  restart-window messages from being silently missed or replayed as stale
-  standalone jobs. If a burst is only partially recorded, preserve the whole
-  burst as context for the catch-up job so screenshots and follow-up text are
-  not separated from the prompt that made them meaningful.
+  it should first backfill the durable context log from recent channel history,
+  check bundled message IDs rather than just the final job filename, and group
+  remaining adjacent messages before enqueueing. This prevents restart-window
+  messages from being silently missed or replayed as stale standalone jobs. If
+  a burst is only partially recorded, preserve the whole burst as context for
+  the catch-up job so screenshots and follow-up text are not separated from the
+  prompt that made them meaningful.
 - When Discord `#codex` intake misbehaves, check `/healthz` for
   `discordCodexSetupReady`, `discordCodexLastCatchup`,
   `discordCodexRecentContextRows`, and

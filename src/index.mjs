@@ -75,7 +75,11 @@ import {
   DEFAULT_DISCORD_CODEX_BURST_GAP_MS,
   DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS,
   DEFAULT_DISCORD_CODEX_JOB_DIR,
+  DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS,
+  DEFAULT_DISCORD_CONTEXT_LOG_PATH,
   DEFAULT_DISCORD_FILE_CONTEXT_DIR,
+  DISCORD_CODEX_WORKING_MESSAGES,
+  appendDiscordContextRows,
   buildDiscordCodexWorkerJob,
   buildDiscordMessageRow,
   discordJobContainsMessage,
@@ -86,6 +90,8 @@ import {
   materializeDiscordAttachments,
   planDiscordCodexCatchupBursts,
   randomWorkingMessage,
+  readDiscordContextLog,
+  selectNearbyDiscordContextRows,
   shouldHandleDiscordCodexMessage
 } from './discord-codex-control.mjs';
 
@@ -100,6 +106,12 @@ const discordCodexWorkerJobDir =
   DEFAULT_DISCORD_CODEX_JOB_DIR;
 const discordFileContextDir =
   process.env.DISCORD_FILE_CONTEXT_DIR || DEFAULT_DISCORD_FILE_CONTEXT_DIR;
+const discordCodexContextLogPath =
+  process.env.DISCORD_CODEX_CONTEXT_LOG_PATH || DEFAULT_DISCORD_CONTEXT_LOG_PATH;
+const discordCodexContextLogMaxRows = Number.parseInt(
+  process.env.DISCORD_CODEX_CONTEXT_LOG_MAX_ROWS || String(DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS),
+  10
+);
 const discordAttachmentDownloadMaxBytes = Number.parseInt(
   process.env.DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES ||
     String(DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES),
@@ -167,6 +179,7 @@ let discordCodexLastError = null;
 let discordCodexLastCatchup = null;
 const pendingDiscordCodexJobs = new Map();
 const recentDiscordCodexRows = [];
+let discordContextLogWriteQueue = Promise.resolve([]);
 
 async function detectMessageContentIntentAvailable() {
   if (discordMessageContentIntentPreference === '0') {
@@ -202,9 +215,18 @@ const activePictionaryGames = new Map();
 const app = express();
 app.get('/healthz', async (_req, res) => {
   let clashHistoryScheduler = null;
+  let discordCodexPersistentContextRows = 0;
   try {
     const clashHistoryStore = await readClashHistoryStore(clashHistoryStorePath());
     clashHistoryScheduler = clashHistoryStore.scheduler || null;
+  } catch {}
+  try {
+    discordCodexPersistentContextRows = (
+      await readDiscordContextLog(discordCodexContextLogPath, {
+        channelId: discordCodexChannelId,
+        limit: normalizedDiscordContextLogMaxRows()
+      })
+    ).length;
   } catch {}
   res.status(ready ? 200 : 503).json({
     ok: ready,
@@ -216,6 +238,9 @@ app.get('/healthz', async (_req, res) => {
     discordCodexSetupMessage,
     discordCodexWorkerJobDir,
     discordFileContextDir,
+    discordCodexContextLogPath,
+    discordCodexContextLogMaxRows: normalizedDiscordContextLogMaxRows(),
+    discordCodexPersistentContextRows,
     discordAttachmentDownloadMaxBytes,
     discordCodexWorkerDebounceMs,
     discordCodexCatchupLimit,
@@ -292,6 +317,12 @@ function normalizedDiscordRecentContextLimit() {
     : 12;
 }
 
+function normalizedDiscordContextLogMaxRows() {
+  return Number.isFinite(discordCodexContextLogMaxRows) && discordCodexContextLogMaxRows > 0
+    ? discordCodexContextLogMaxRows
+    : DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS;
+}
+
 function discordRowTime(row) {
   const parsed = Date.parse(row?.receivedAt || '');
   return Number.isFinite(parsed) ? parsed : 0;
@@ -325,7 +356,88 @@ function rememberDiscordCodexRow(row) {
   pruneRecentDiscordCodexRows(discordRowTime(row) || Date.now());
 }
 
-function recentDiscordCodexContextRows(message, activeRows = []) {
+async function persistDiscordCodexRows(rows = []) {
+  const filtered = (rows || []).filter((row) => row?.id);
+  if (!filtered.length) {
+    return [];
+  }
+  filtered.forEach(rememberDiscordCodexRow);
+  try {
+    const write = () =>
+      appendDiscordContextRows(discordCodexContextLogPath, filtered, {
+        maxRows: normalizedDiscordContextLogMaxRows()
+      });
+    discordContextLogWriteQueue = discordContextLogWriteQueue.then(write, write);
+    return await discordContextLogWriteQueue;
+  } catch (error) {
+    rememberDiscordCodexError('context-log', error);
+    console.error('Discord Codex context log update failed:', error);
+    return [];
+  }
+}
+
+function discordContextMessageIsUseful(message) {
+  if (!discordCodexChannelId || message?.channelId !== discordCodexChannelId) {
+    return false;
+  }
+  if (message?.system || message?.webhookId) {
+    return false;
+  }
+  const text = String(message?.content || '').trim();
+  const attachments = message?.attachments;
+  const hasAttachments = Boolean(attachments?.size || attachments?.length);
+  if (!message?.author?.bot) {
+    return Boolean(text || hasAttachments);
+  }
+  if (!text) {
+    return false;
+  }
+  return !DISCORD_CODEX_WORKING_MESSAGES.includes(text);
+}
+
+async function buildDiscordContextRowForMessage(message, { downloadAttachments = false } = {}) {
+  let files = [];
+  if (downloadAttachments && !message?.author?.bot) {
+    files = await materializeDiscordAttachments(message, {
+      contextDir: discordFileContextDir,
+      maxBytes: discordAttachmentDownloadMaxBytes
+    });
+  }
+  return buildDiscordMessageRow(message, { files });
+}
+
+async function rememberDiscordCodexMessageContext(message, { downloadAttachments = false } = {}) {
+  if (!discordContextMessageIsUseful(message)) {
+    return null;
+  }
+  const row = await buildDiscordContextRowForMessage(message, { downloadAttachments });
+  await persistDiscordCodexRows([row]);
+  return row;
+}
+
+async function rememberDiscordCodexFetchedContext(messages = []) {
+  const rows = [];
+  const values = Array.isArray(messages) ? messages : [...(messages?.values?.() || [])];
+  for (const message of values) {
+    if (!discordContextMessageIsUseful(message)) {
+      continue;
+    }
+    try {
+      rows.push(await buildDiscordContextRowForMessage(message, {
+        downloadAttachments: !message?.author?.bot
+      }));
+    } catch (error) {
+      rememberDiscordCodexError('context-fetch', error);
+      rows.push(buildDiscordMessageRow(message));
+    }
+  }
+  if (rows.length) {
+    await persistDiscordCodexRows(rows);
+  }
+  return rows;
+}
+
+async function recentDiscordCodexContextRows(message, activeRows = []) {
   pruneRecentDiscordCodexRows();
 
   const activeIds = new Set((activeRows || []).map((row) => row?.id).filter(Boolean));
@@ -336,15 +448,18 @@ function recentDiscordCodexContextRows(message, activeRows = []) {
     Date.now();
   const windowMs = normalizedDiscordRecentContextWindowMs();
   const limit = normalizedDiscordRecentContextLimit();
+  const persistentRows = await readDiscordContextLog(discordCodexContextLogPath, {
+    channelId,
+    limit: normalizedDiscordContextLogMaxRows()
+  });
 
-  return recentDiscordCodexRows
-    .filter((row) => row?.channel === channelId)
-    .filter((row) => row?.id && !activeIds.has(row.id))
-    .filter((row) => {
-      const rowTime = discordRowTime(row);
-      return rowTime && Math.abs(anchorTime - rowTime) <= windowMs;
-    })
-    .slice(-limit);
+  return selectNearbyDiscordContextRows([...persistentRows, ...recentDiscordCodexRows], {
+    channelId,
+    anchorTime,
+    windowMs,
+    limit,
+    excludeIds: [...activeIds]
+  });
 }
 
 async function discordCodexJobRecordExists(jobId) {
@@ -423,11 +538,12 @@ async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup
     throw error;
   }
   const row = buildDiscordMessageRow(message, { files });
-  rememberDiscordCodexRow(row);
+  await persistDiscordCodexRows([row]);
 
   if (catchup) {
     const job = buildDiscordCodexWorkerJob(message, {
-      messageRows: [row]
+      messageRows: [row],
+      nearbyRows: await recentDiscordCodexContextRows(message, [row])
     });
     if (await discordCodexMessageRecordExists(message)) {
       return { queued: false, duplicate: true };
@@ -480,11 +596,13 @@ async function enqueueDiscordCodexMessageBurst(
     rows.push(buildDiscordMessageRow(message, { files }));
   }
   rows.forEach(rememberDiscordCodexRow);
+  await persistDiscordCodexRows(rows);
 
   const sourceMessage = messages.at(-1);
   const job = buildDiscordCodexWorkerJob(sourceMessage, {
     messageRows: rows,
-    sourceMessageId
+    sourceMessageId,
+    nearbyRows: await recentDiscordCodexContextRows(sourceMessage, rows)
   });
   const result = await enqueueDiscordCodexWorkerJob(discordCodexWorkerJobDir, job);
   if (result.queued) {
@@ -524,6 +642,7 @@ async function catchUpDiscordCodexChannel() {
         ? discordCodexCatchupLimit
         : 12
     });
+    await rememberDiscordCodexFetchedContext(messages);
     const plan = await planDiscordCodexCatchupBursts(messages, {
       channelId: discordCodexChannelId,
       windowMs: catchupWindowMs,
@@ -556,15 +675,17 @@ function scheduleDiscordCodexWorkerJob(message, row) {
       ? discordCodexWorkerDebounceMs
       : 0;
   if (delayMs <= 0) {
-    return {
-      first: true,
-      promise: enqueueDiscordCodexWorkerJob(
+    const promise = (async () =>
+      enqueueDiscordCodexWorkerJob(
         discordCodexWorkerJobDir,
         buildDiscordCodexWorkerJob(message, {
           messageRows: row ? [row] : [],
-          nearbyRows: recentDiscordCodexContextRows(message, row ? [row] : [])
+          nearbyRows: await recentDiscordCodexContextRows(message, row ? [row] : [])
         })
-      )
+      ))();
+    return {
+      first: true,
+      promise
     };
   }
 
@@ -575,8 +696,15 @@ function scheduleDiscordCodexWorkerJob(message, row) {
     pending = {
       message,
       rows: [],
-      timer: null
+      timer: null,
+      resolve: null,
+      reject: null,
+      promise: null
     };
+    pending.promise = new Promise((resolve, reject) => {
+      pending.resolve = resolve;
+      pending.reject = reject;
+    });
     pendingDiscordCodexJobs.set(key, pending);
   }
 
@@ -591,14 +719,16 @@ function scheduleDiscordCodexWorkerJob(message, row) {
   pending.timer = setTimeout(() => {
     pendingDiscordCodexJobs.delete(key);
     (async () => {
-      await enqueueDiscordCodexWorkerJob(
+      const result = await enqueueDiscordCodexWorkerJob(
         discordCodexWorkerJobDir,
         buildDiscordCodexWorkerJob(pending.message, {
           messageRows: pending.rows,
-          nearbyRows: recentDiscordCodexContextRows(pending.message, pending.rows)
+          nearbyRows: await recentDiscordCodexContextRows(pending.message, pending.rows)
         })
       );
+      pending.resolve?.(result);
     })().catch((error) => {
+      pending.reject?.(error);
       rememberDiscordCodexError('enqueue', error);
       console.error('Discord Codex channel enqueue failed:', error);
       pending.message?.channel?.send?.({
@@ -609,7 +739,7 @@ function scheduleDiscordCodexWorkerJob(message, row) {
   }, delayMs);
   pending.timer.unref?.();
 
-  return { first, promise: Promise.resolve({ queued: true }) };
+  return { first, promise: pending.promise };
 }
 
 function buildEmbed(page, footer) {
@@ -1478,6 +1608,12 @@ client.once(Events.ClientReady, (readyClient) => {
 });
 
 client.on(Events.MessageCreate, async (message) => {
+  if (message?.author?.bot && message?.channelId === discordCodexChannelId) {
+    await rememberDiscordCodexMessageContext(message).catch((error) => {
+      rememberDiscordCodexError('context-message', error);
+    });
+  }
+
   const isConfiguredCodexChannel =
     Boolean(discordCodexChannelId) &&
     message?.channelId === discordCodexChannelId &&

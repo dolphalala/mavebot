@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  appendDiscordContextRows,
   buildDiscordCodexWorkerJob,
   buildDiscordMessageRow,
   DISCORD_CODEX_WORKING_MESSAGES,
@@ -21,7 +22,9 @@ import {
   materializeDiscordAttachments,
   planDiscordCodexCatchupBursts,
   randomWorkingMessage,
+  readDiscordContextLog,
   recentDiscordCodexMessagesForCatchup,
+  selectNearbyDiscordContextRows,
   shouldHandleDiscordCodexMessage
 } from '../src/discord-codex-control.mjs';
 
@@ -245,6 +248,73 @@ test('buildDiscordCodexWorkerJob keeps nearby channel context out of handled ids
   assert.equal(job.nearbyFiles.length, 1);
   assert.equal(discordJobContainsMessage(job, 'active-1'), true);
   assert.equal(discordJobContainsMessage(job, 'nearby-1'), false);
+});
+
+test('Discord context log persists bounded nearby channel context', async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'mavebot-discord-context-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const contextPath = path.join(dir, 'discord-channel-context.jsonl');
+
+  await appendDiscordContextRows(
+    contextPath,
+    [
+      {
+        id: 'old',
+        channel: '1523893930993778698',
+        receivedAt: '2026-07-09T10:00:00.000Z',
+        username: 'Allen',
+        text: 'older context'
+      },
+      {
+        id: 'nearby-user',
+        channel: '1523893930993778698',
+        receivedAt: '2026-07-09T10:09:30.000Z',
+        username: 'Lana',
+        text: 'the screenshot above matters',
+        files: [
+          {
+            name: 'screen.png',
+            mimetype: 'image/png',
+            localPath: '/shared/codex-worker/context/discord-files/C/nearby/01-screen.png'
+          }
+        ]
+      },
+      {
+        id: 'nearby-bot',
+        channel: '1523893930993778698',
+        receivedAt: '2026-07-09T10:09:45.000Z',
+        username: 'mavebot',
+        bot: true,
+        text: 'I changed the pictionary image fallback.'
+      },
+      {
+        id: 'active',
+        channel: '1523893930993778698',
+        receivedAt: '2026-07-09T10:10:00.000Z',
+        username: 'Allen',
+        text: 'what did you do?'
+      }
+    ],
+    { maxRows: 3 }
+  );
+
+  const stored = await readDiscordContextLog(contextPath, {
+    channelId: '1523893930993778698',
+    limit: 10
+  });
+  assert.deepEqual(stored.map((row) => row.id), ['nearby-user', 'nearby-bot', 'active']);
+  assert.equal(stored[1].bot, true);
+
+  const nearby = selectNearbyDiscordContextRows(stored, {
+    channelId: '1523893930993778698',
+    anchorTime: Date.parse('2026-07-09T10:10:00.000Z'),
+    windowMs: 10 * 60 * 1000,
+    limit: 5,
+    excludeIds: ['active']
+  });
+
+  assert.deepEqual(nearby.map((row) => row.id), ['nearby-user', 'nearby-bot']);
+  assert.equal(nearby[0].files[0].localPath.endsWith('01-screen.png'), true);
 });
 
 test('buildDiscordCodexWorkerJob can anchor bundled context to a specific source row', () => {

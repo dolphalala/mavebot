@@ -18,6 +18,8 @@ long-lived server state.
 - Nearby Discord channel messages from any user should be available as
   background context for follow-ups, screenshots, and collaboration without
   becoming extra hidden tasks.
+- Nearby context should survive deploys and restarts through the bounded
+  Discord context log, not only through live process memory.
 - mavebot should post normal channel replies, not thread-only replies, task
   cards, prompt dumps, or deployment logs.
 - The server-side `codex-worker` container is the normal backend for repo
@@ -48,6 +50,9 @@ long-lived server state.
 
 - Worker memory lives under
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/`.
+- `discord-channel-context.jsonl` is the bounded recent Discord `#codex`
+  channel tail used for short-term references like "above", "that screenshot",
+  and "what did you do?" It is not the long-term brain.
 - `transcript.jsonl` is normalized history.
 - `summary.md`, `recent.md`, and `session.md` are regenerated bounded context
   files for future prompts.

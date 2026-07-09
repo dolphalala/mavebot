@@ -1,12 +1,14 @@
 import crypto from 'node:crypto';
-import { chmod, mkdir, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 export const DEFAULT_DISCORD_CODEX_JOB_DIR = '/shared/codex-worker/jobs';
 export const DEFAULT_DISCORD_FILE_CONTEXT_DIR = '/shared/codex-worker/context/discord-files';
+export const DEFAULT_DISCORD_CONTEXT_LOG_PATH = '/shared/codex-worker/context/discord-channel-context.jsonl';
 export const DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES = 25 * 1024 * 1024;
 export const DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS = 30 * 60 * 1000;
 export const DEFAULT_DISCORD_CODEX_BURST_GAP_MS = 15000;
+export const DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS = 1000;
 export const DISCORD_GATEWAY_MESSAGE_CONTENT_FLAGS = {
   full: 262144,
   limited: 524288
@@ -239,9 +241,151 @@ export function buildDiscordMessageRow(message, { files = [] } = {}) {
     channel: message?.channelId || '',
     user: message?.author?.id || '',
     username: message?.author?.tag || message?.author?.username || '',
+    bot: Boolean(message?.author?.bot),
     text: String(message?.content || '').trim(),
     ...(files.length ? { files } : {})
   };
+}
+
+function safeContextFile(file = {}) {
+  return {
+    id: file.id || '',
+    name: safeFileName(file.name || file.filename || file.id || 'attachment'),
+    mimetype: file.mimetype || file.contentType || file.content_type || '',
+    size: Number.parseInt(file.size || '0', 10) || 0,
+    url: file.url || '',
+    proxyUrl: file.proxyUrl || file.proxyURL || file.proxy_url || '',
+    localPath: file.localPath || '',
+    bytes: Number.parseInt(file.bytes || '0', 10) || 0,
+    downloadError: file.downloadError || ''
+  };
+}
+
+export function normalizeDiscordContextRow(row = {}) {
+  const receivedAt = row.receivedAt || new Date().toISOString();
+  const files = Array.isArray(row.files) ? row.files.map(safeContextFile) : [];
+  return {
+    receivedAt,
+    id: row.id || `${receivedAt}-${crypto.randomUUID()}`,
+    guildId: row.guildId || '',
+    channel: row.channel || '',
+    user: row.user || '',
+    username: row.username || '',
+    bot: Boolean(row.bot),
+    text: String(row.text || '').trim(),
+    ...(files.length ? { files } : {})
+  };
+}
+
+export function normalizeDiscordContextRows(rows = []) {
+  const byId = new Map();
+  for (const row of rows || []) {
+    if (!row) {
+      continue;
+    }
+    const normalized = normalizeDiscordContextRow(row);
+    byId.set(normalized.id, normalized);
+  }
+
+  return [...byId.values()].sort((left, right) => {
+    const leftTime = Date.parse(left.receivedAt || '') || 0;
+    const rightTime = Date.parse(right.receivedAt || '') || 0;
+    if (leftTime !== rightTime) {
+      return leftTime - rightTime;
+    }
+    return String(left.id || '').localeCompare(String(right.id || ''));
+  });
+}
+
+export function selectNearbyDiscordContextRows(
+  rows = [],
+  {
+    channelId = '',
+    anchorTime = Date.now(),
+    windowMs = 10 * 60 * 1000,
+    limit = 12,
+    excludeIds = []
+  } = {}
+) {
+  const excludeSet = new Set((excludeIds || []).filter(Boolean));
+  const normalizedLimit = Number.isFinite(limit) && limit > 0 ? limit : 12;
+  const normalizedWindowMs = Number.isFinite(windowMs) && windowMs > 0 ? windowMs : 10 * 60 * 1000;
+  const normalizedAnchor = Number.isFinite(Number(anchorTime)) ? Number(anchorTime) : Date.now();
+
+  return normalizeDiscordContextRows(rows)
+    .filter((row) => !channelId || row.channel === channelId)
+    .filter((row) => row.id && !excludeSet.has(row.id))
+    .filter((row) => {
+      const rowTime = Date.parse(row.receivedAt || '');
+      return Number.isFinite(rowTime) && Math.abs(normalizedAnchor - rowTime) <= normalizedWindowMs;
+    })
+    .slice(-normalizedLimit);
+}
+
+export async function readDiscordContextLog(
+  contextPath = DEFAULT_DISCORD_CONTEXT_LOG_PATH,
+  { channelId = '', limit = DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS } = {}
+) {
+  try {
+    const content = await readFile(contextPath, 'utf8');
+    const rows = [];
+    for (const line of content.split('\n')) {
+      if (!line.trim()) {
+        continue;
+      }
+      try {
+        rows.push(JSON.parse(line));
+      } catch {}
+    }
+    const normalized = normalizeDiscordContextRows(rows)
+      .filter((row) => !channelId || row.channel === channelId);
+    const normalizedLimit = Number.isFinite(limit) && limit > 0 ? limit : DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS;
+    return normalized.slice(-normalizedLimit);
+  } catch {
+    return [];
+  }
+}
+
+export async function writeDiscordContextLog(
+  contextPath = DEFAULT_DISCORD_CONTEXT_LOG_PATH,
+  rows = [],
+  { maxRows = DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS } = {}
+) {
+  const normalizedMaxRows = Number.isFinite(maxRows) && maxRows > 0
+    ? maxRows
+    : DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS;
+  const normalized = normalizeDiscordContextRows(rows).slice(-normalizedMaxRows);
+  const dir = path.dirname(contextPath);
+  await mkdir(dir, { recursive: true });
+  const tempPath = path.join(
+    dir,
+    `.${path.basename(contextPath)}.${process.pid}.${Date.now()}.tmp`
+  );
+  await writeFile(
+    tempPath,
+    `${normalized.map((row) => JSON.stringify(row)).join('\n')}${normalized.length ? '\n' : ''}`,
+    {
+      encoding: 'utf8',
+      mode: 0o600
+    }
+  );
+  await chmod(tempPath, 0o600).catch(() => {});
+  await rename(tempPath, contextPath);
+  await chmod(contextPath, 0o600).catch(() => {});
+  return normalized;
+}
+
+export async function appendDiscordContextRows(
+  contextPath = DEFAULT_DISCORD_CONTEXT_LOG_PATH,
+  rows = [],
+  { maxRows = DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS } = {}
+) {
+  const incoming = Array.isArray(rows) ? rows : [rows];
+  if (!incoming.filter(Boolean).length) {
+    return readDiscordContextLog(contextPath, { limit: maxRows });
+  }
+  const existing = await readDiscordContextLog(contextPath, { limit: Math.max(maxRows * 2, maxRows) });
+  return writeDiscordContextLog(contextPath, [...existing, ...incoming], { maxRows });
 }
 
 export function recentDiscordCodexMessagesForCatchup(
@@ -405,6 +549,7 @@ export function discordRowsToContextMessages(rows = []) {
     channel: row.channel || '',
     user: row.user || '',
     username: row.username || '',
+    bot: Boolean(row.bot),
     text: row.text || '',
     ...(row.files?.length ? { files: row.files } : {})
   }));

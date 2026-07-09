@@ -17,7 +17,9 @@ It is a map, not a replacement for reading the current source.
   bundled Discord message IDs for restart de-duplication, and downloads
   Discord attachments into shared local context. It also separates active
   `contextMessages` from nearby background context so follow-ups can refer to
-  prior channel messages without marking those messages as handled jobs.
+  prior channel messages without marking those messages as handled jobs. The
+  bounded durable Discord context log helpers live here too; they keep recent
+  channel rows available after deploys and restarts.
 
 ## Feature Modules
 
@@ -93,13 +95,16 @@ Registering a command without a matching runtime handler causes Discord's
 3. Keep active message IDs separate from nearby background context. Nearby
    rows can help resolve "above" and "that screenshot", but they must not count
    as handled worker messages unless they are part of the active burst.
-4. For Slack files/screenshots, preserve file metadata and local shared-volume
+4. If changing Discord nearby context, preserve the durable JSONL tail behavior:
+   useful user messages, uploads, and non-noisy mavebot replies survive
+   restarts, but short working acknowledgements do not bloat context.
+5. For Slack files/screenshots, preserve file metadata and local shared-volume
    paths so the worker can inspect uploads from
    `/shared/codex-worker/context/slack-files/`.
-5. Add tests around prompt shape, memory compaction, queue behavior, file
+6. Add tests around prompt shape, memory compaction, queue behavior, file
    context, message de-duplication, verified live wording, or message cleaning.
-6. Update `remote-codex-session.md` and this file when behavior or context
+7. Update `remote-codex-session.md` and this file when behavior or context
    loading changes.
-7. Update `local-codex-parity.md` if the standard for matching local Codex
+8. Update `local-codex-parity.md` if the standard for matching local Codex
    Desktop behavior changes.
-8. Verify the worker queue, generated memory files, and live channel response.
+9. Verify the worker queue, generated memory files, and live channel response.
