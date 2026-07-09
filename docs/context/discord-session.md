@@ -20,6 +20,9 @@ long-lived server state.
   becoming extra hidden tasks.
 - Nearby context should survive deploys and restarts through the bounded
   Discord context log, not only through live process memory.
+- Restart context backfill should be broader than the catch-up queue tail:
+  the bot can refresh a larger recent channel history for memory while only
+  queuing the smaller configured tail of unhandled messages.
 - mavebot should post normal channel replies, not thread-only replies, task
   cards, prompt dumps, or deployment logs.
 - The server-side `codex-worker` container is the normal backend for repo
@@ -53,9 +56,14 @@ long-lived server state.
 - `discord-channel-context.jsonl` is the bounded recent Discord `#codex`
   channel tail used for short-term references like "above", "that screenshot",
   and "what did you do?" It is not the long-term brain.
+- The context log should prune low-signal smoke tests and working
+  acknowledgements so future prompts do not inherit old verification chatter.
 - `transcript.jsonl` is normalized history.
 - `summary.md`, `recent.md`, and `session.md` are regenerated bounded context
   files for future prompts.
+- Recent worker job JSON records in `done/`, `failed/`, and `auth-blocked/`
+  are included in prompts as a bounded audit trail for follow-up questions
+  such as "what did you do?" and "why didn't that work?"
 - Durable product, deployment, and user-preference facts belong in
   `docs/context/*.md`, not in raw channel history.
 - Keep context docs compact. Move domain rules into focused files and rewrite

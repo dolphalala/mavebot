@@ -129,6 +129,10 @@ const maxCodexImages = parsePositiveInt(
   process.env.CODEX_WORKER_MAX_CODEX_IMAGES || process.env.SLACK_WORKER_MAX_CODEX_IMAGES,
   6
 );
+const workerJobHistoryLimit = parsePositiveInt(
+  process.env.CODEX_WORKER_JOB_HISTORY_LIMIT || process.env.SLACK_WORKER_JOB_HISTORY_LIMIT,
+  8
+);
 
 const transcriptPath = path.join(contextDir, 'transcript.jsonl');
 const summaryPath = path.join(contextDir, 'summary.md');
@@ -324,17 +328,52 @@ export function activeRequestNeedsDetailedAnswer(job = {}) {
     /\bdesign\b/,
     /\bdatabase\b/,
     /\bcollector\b/,
-    /\broster\b/
+    /\broster\b/,
+    /\binvestigate\b/,
+    /\banaly[sz]e\b/,
+    /\bassess\b/,
+    /\bwhat (?:it|that|this) did\b/,
+    /\bwhat (?:it|that|this) changed\b/,
+    /\bwhat(?:g)? are you talking about\b/,
+    /\bwhere(?:'|’)?s\b/,
+    /\bwhere is\b/,
+    /\bwhich\b/,
+    /\bwhen\b/,
+    /\bwho\b/,
+    /\bcan (?:you|u) (?:see|read|tell|explain)\b/
   ];
   const activeOnlyPatterns = [
     /\bmultiple\b/,
+    /\bmulti[- ]?(?:session|agent|user|people|message)s?\b/,
     /\bback to back\b/,
     /\balso\b/,
     /\beverything\b/,
     /\bcontext\b/,
     /\bmemory\b/,
     /\bmd files?\b/,
+    /\bdocs?\b/,
     /\bskipp?ed\b/,
+    /\bmissing\b/,
+    /\bmissed\b/,
+    /\bdidn['’]?t\b/,
+    /\bdoesn['’]?t\b/,
+    /\bnot working\b/,
+    /\bnot work\b/,
+    /\bwont work\b/,
+    /\bwon['’]?t work\b/,
+    /\bfix why\b/,
+    /\bfix it\b/,
+    /\bfigure out\b/,
+    /\bread into\b/,
+    /\blook into\b/,
+    /\bpast\b/,
+    /\bhistory\b/,
+    /\bflawless\b/,
+    /\bperfect\b/,
+    /\bcodex desktop\b/,
+    /\blocal codex\b/,
+    /\bjust like (?:this|a )?codex\b/,
+    /\blike (?:a )?(?:real )?codex\b/,
     /\bnot respond\b/,
     /\brespond to\b/
   ];
@@ -1212,6 +1251,95 @@ export async function readRepoContextBundle({
   return sections.join('\n').trim();
 }
 
+function workerJobRecordTime(record = {}, fallbackMs = 0) {
+  const candidates = [
+    record.completedAt,
+    record.failedAt,
+    record.authBlockedAt,
+    record.startedAt,
+    record.createdAt,
+    record.ts
+  ];
+  for (const candidate of candidates) {
+    const parsed = Date.parse(candidate || '');
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallbackMs;
+}
+
+function summarizeWorkerJobRecord(record = {}, status = 'unknown') {
+  const activeText = truncate(stripSlackLinks(record.text || ''), 700);
+  const finalText = truncate(stripSlackLinks(record.finalMessage || ''), 700);
+  const codexText = truncate(stripSlackLinks(record.codexMessage || ''), 900);
+  const errorText = truncate(errorDiagnosticText(record.error || record.reason || '', 700), 700);
+  const lines = [
+    `- ${record.completedAt || record.failedAt || record.authBlockedAt || record.createdAt || 'unknown'} [${status}] ${record.id || 'unknown job'}`,
+    record.username || record.user ? `  user: ${record.username || record.user}` : '',
+    activeText ? `  active: ${activeText.replace(/\n+/g, ' / ')}` : '',
+    finalText ? `  final: ${finalText.replace(/\n+/g, ' / ')}` : '',
+    codexText ? `  inner: ${codexText.replace(/\n+/g, ' / ')}` : '',
+    errorText ? `  blocker: ${errorText.replace(/\n+/g, ' / ')}` : '',
+    record.pushResult?.pushed === false ? '  push: no code changes or no push needed' : '',
+    record.deployResult?.matched === false && record.deployResult?.reason
+      ? `  deploy: ${truncate(record.deployResult.reason, 300)}`
+      : ''
+  ].filter(Boolean);
+  return lines.join('\n');
+}
+
+export async function readRecentWorkerJobHistory({
+  dirs = [
+    { dir: doneDir, status: 'done' },
+    { dir: failedDir, status: 'failed' },
+    { dir: authBlockedDir, status: 'auth-blocked' }
+  ],
+  limit = workerJobHistoryLimit,
+  maxChars = 6000
+} = {}) {
+  const candidates = [];
+  for (const entry of dirs) {
+    const names = await listJsonFiles(entry.dir);
+    for (const name of names) {
+      const filePath = path.join(entry.dir, name);
+      const info = await stat(filePath).catch(() => null);
+      try {
+        const record = await readJsonFile(filePath);
+        if (
+          isLowSignalTranscriptRow({
+            jobId: record.id || path.basename(name, '.json'),
+            text: [record.text, record.finalMessage, record.codexMessage].filter(Boolean).join('\n')
+          })
+        ) {
+          continue;
+        }
+        candidates.push({
+          status: entry.status,
+          record,
+          time: workerJobRecordTime(record, info?.mtimeMs || 0)
+        });
+      } catch {}
+    }
+  }
+
+  const selected = candidates
+    .sort((left, right) => right.time - left.time)
+    .slice(0, Math.max(0, limit));
+  if (!selected.length) {
+    return '';
+  }
+
+  return truncate(
+    [
+      'Recent worker job records, newest first. Use these only for audits, follow-ups, and "what happened" questions; the active request still wins.',
+      '',
+      ...selected.map((entry) => summarizeWorkerJobRecord(entry.record, entry.status))
+    ].join('\n'),
+    maxChars
+  );
+}
+
 export function buildWorkerRuntimeSnapshot(job = {}) {
   return JSON.stringify({
     repository: repoUrl,
@@ -1319,6 +1447,8 @@ function promptHeader(job) {
     '- Keep mavebot isolated from Chatwoot, Bookkeeper, nginx, and unrelated apps.',
     '- Final answer should be plain, short, and suitable to post directly as mavebot. Talk like a helpful person, not a deployment log.',
     '- Answer every explicit question in the active request before ending. If the user asks for a plan, demo, or how something works, include that plan/demo in the final answer instead of only saying work was done.',
+    '- If the user says a prior answer missed something, asks what happened, asks what you did, says it does not work, or tells you to read everything, audit nearby Discord context plus recent worker job records before changing code or replying.',
+    '- For those audit/follow-up requests, explain the actual gap in plain language and then fix the relevant code/docs/tests when there is a repo-side fix.',
     '- If the active request includes multiple contextMessages, treat them as one bundled turn. Preserve speaker names, files, and every explicit ask in order.',
     '- nearbyContextMessages and nearbyText are background channel context only. Use them to resolve references like "that", "above", "the screenshot", "what did you do", or multi-user collaboration, but do not treat them as additional tasks unless the active request refers to them.',
     '- If nearbyFiles are relevant to the active request, inspect them the same way you inspect active files.',
@@ -1349,6 +1479,7 @@ export function buildCodexWorkerPrompt({
   remoteSession = '',
   slackSession = '',
   repoContextBundle = '',
+  workerJobHistory = '',
   slackMemoryTail = ''
 }) {
   const remoteSessionMemory = remoteSession || slackSession;
@@ -1377,6 +1508,9 @@ export function buildCodexWorkerPrompt({
     '',
     '# Extra Repo Context Files',
     repoContextBundle || 'No extra docs/context/*.md files were readable.',
+    '',
+    '# Recent Worker Job Records',
+    workerJobHistory || 'No recent worker job records were readable.',
     ...(slackMemoryTail
       ? [
           '',
@@ -1617,6 +1751,7 @@ async function runCodex(job, contextSnapshot) {
     (await readOptional(path.join(repoDir, 'docs/context/discord-session.md'))) ||
     (await readOptional(path.join(repoDir, 'docs/context/slack-session.md')));
   const repoContextBundle = await readRepoContextBundle();
+  const workerJobHistory = await readRecentWorkerJobHistory();
   const slackMemoryTail = job.source === 'slack' ? await readSlackMemoryTail() : '';
   const prompt = buildCodexWorkerPrompt({
     job,
@@ -1628,6 +1763,7 @@ async function runCodex(job, contextSnapshot) {
     operatingMemory,
     remoteSession,
     repoContextBundle,
+    workerJobHistory,
     slackMemoryTail
   });
   const imagePaths = [];

@@ -19,6 +19,7 @@ import {
   discordRowsToWorkerText,
   enqueueDiscordCodexWorkerJob,
   hasDiscordMessageContentIntentFlag,
+  isLowSignalDiscordContextRow,
   materializeDiscordAttachments,
   planDiscordCodexCatchupBursts,
   randomWorkingMessage,
@@ -315,6 +316,54 @@ test('Discord context log persists bounded nearby channel context', async (t) =>
 
   assert.deepEqual(nearby.map((row) => row.id), ['nearby-user', 'nearby-bot']);
   assert.equal(nearby[0].files[0].localPath.endsWith('01-screen.png'), true);
+});
+
+test('Discord context log prunes worker smoke and working acknowledgements', async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'mavebot-discord-context-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const contextPath = path.join(dir, 'discord-channel-context.jsonl');
+
+  await appendDiscordContextRows(
+    contextPath,
+    [
+      {
+        id: 'smoke',
+        channel: '1523893930993778698',
+        receivedAt: '2026-07-09T10:00:00.000Z',
+        username: 'Codex desktop',
+        text: 'Auth-blocked queue smoke test. Do not change files.'
+      },
+      {
+        id: 'working',
+        channel: '1523893930993778698',
+        receivedAt: '2026-07-09T10:00:01.000Z',
+        username: 'mavebot',
+        bot: true,
+        text: 'Got it, checking now.'
+      },
+      {
+        id: 'real',
+        channel: '1523893930993778698',
+        receivedAt: '2026-07-09T10:00:02.000Z',
+        username: 'Allen',
+        text: 'make the roster command explain what it did'
+      }
+    ],
+    { maxRows: 10 }
+  );
+
+  assert.equal(
+    isLowSignalDiscordContextRow({
+      text: 'remote Discord worker verification only',
+      username: 'Codex desktop'
+    }),
+    true
+  );
+  const stored = await readDiscordContextLog(contextPath, {
+    channelId: '1523893930993778698',
+    limit: 10
+  });
+  assert.deepEqual(stored.map((row) => row.id), ['real']);
 });
 
 test('buildDiscordCodexWorkerJob can anchor bundled context to a specific source row', () => {

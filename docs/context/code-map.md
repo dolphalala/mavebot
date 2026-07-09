@@ -49,7 +49,8 @@ It is a map, not a replacement for reading the current source.
   `codex exec` with `--image` and owns the final verified live/not-live channel
   wording after checks and deploy verification. Completed job records keep
   sanitized copies of the inner Codex response and final channel message for
-  later response-quality audits.
+  later response-quality audits; the prompt also includes a bounded recent job
+  record summary for "what happened" follow-ups.
 
 ## Change Recipes
 
@@ -97,7 +98,9 @@ Registering a command without a matching runtime handler causes Discord's
    as handled worker messages unless they are part of the active burst.
 4. If changing Discord nearby context, preserve the durable JSONL tail behavior:
    useful user messages, uploads, and non-noisy mavebot replies survive
-   restarts, but short working acknowledgements do not bloat context.
+   restarts, but short working acknowledgements and smoke tests do not bloat
+   context. Keep broad context backfill separate from the smaller missed-work
+   catch-up limit.
 5. For Slack files/screenshots, preserve file metadata and local shared-volume
    paths so the worker can inspect uploads from
    `/shared/codex-worker/context/slack-files/`.

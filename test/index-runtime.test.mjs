@@ -53,6 +53,7 @@ test('Discord Codex runtime exposes intake diagnostics in health output', async 
   assert.match(source, /discordCodexLastCatchup/);
   assert.match(source, /discordCodexLastError/);
   assert.match(source, /discordCodexCatchupLimit/);
+  assert.match(source, /discordCodexContextBackfillLimit/);
   assert.match(source, /discordCodexCatchupWindowMs/);
   assert.match(source, /discordCodexRecentContextWindowMs/);
   assert.match(source, /DISCORD_CODEX_RECENT_CONTEXT_WINDOW_MS \|\| String\(DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS\)/);

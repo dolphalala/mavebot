@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -26,6 +26,7 @@ import {
   isLowSignalTranscriptRow,
   isNonFastForwardPushError,
   pruneTranscriptRowsForStorage,
+  readRecentWorkerJobHistory,
   readRepoContextBundle,
   workerFailureMessage
 } from '../src/slack-codex-worker.mjs';
@@ -417,6 +418,83 @@ test('buildCodexWorkerPrompt marks plan and demo requests for detailed answers',
   assert.match(prompt, /asks for a plan\/demo\/how-it-works answer/);
   assert.match(prompt, /Do not answer with only an acknowledgement/);
   assert.match(prompt, /compact plan, a concrete demo\/example/);
+});
+
+test('buildCodexWorkerPrompt includes recent worker job history for follow-up audits', () => {
+  const prompt = buildCodexWorkerPrompt({
+    job: {
+      source: 'discord',
+      user: 'UACTIVE',
+      username: 'Allen',
+      channel: '1523893930993778698',
+      ts: '2026-07-09T10:00:00.000Z',
+      text: 'that didnt work, what did you do?'
+    },
+    summary: '',
+    recent: '',
+    repoInstructions: '',
+    contextIndex: '',
+    runtimeSnapshot: '',
+    operatingMemory: '',
+    slackSession: '',
+    repoContextBundle: '',
+    workerJobHistory: 'Recent worker job records, newest first.\n- fixed /roster but did not answer the plan'
+  });
+
+  assert.equal(activeRequestNeedsDetailedAnswer({ text: 'that didnt work, what did you do?' }), true);
+  assert.match(prompt, /# Recent Worker Job Records/);
+  assert.match(prompt, /fixed \/roster but did not answer the plan/);
+  assert.match(prompt, /audit nearby Discord context plus recent worker job records/);
+});
+
+test('readRecentWorkerJobHistory summarizes real jobs and skips smoke jobs', async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'mavebot-job-history-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const done = path.join(dir, 'done');
+  const failed = path.join(dir, 'failed');
+  const authBlocked = path.join(dir, 'auth-blocked');
+  await mkdir(done);
+  await mkdir(failed);
+  await mkdir(authBlocked);
+
+  await writeFile(
+    path.join(done, 'real.json'),
+    JSON.stringify({
+      id: 'discord-real',
+      completedAt: '2026-07-09T10:00:00.000Z',
+      source: 'discord',
+      username: 'Allen',
+      text: 'make /roster and explain the plan',
+      finalMessage: 'I added the roster command and explained the signup flow.',
+      codexMessage: 'Plan:\n- Add storage\n- Add command pages',
+      pushResult: { pushed: true },
+      deployResult: { matched: true }
+    })
+  );
+  await writeFile(
+    path.join(done, 'smoke.json'),
+    JSON.stringify({
+      id: 'discord-live-verify-1',
+      completedAt: '2026-07-09T10:01:00.000Z',
+      text: 'Smoke test from the local Codex app. Do not change files.',
+      finalMessage: 'Discord worker path is live.'
+    })
+  );
+
+  const history = await readRecentWorkerJobHistory({
+    dirs: [
+      { dir: done, status: 'done' },
+      { dir: failed, status: 'failed' },
+      { dir: authBlocked, status: 'auth-blocked' }
+    ],
+    limit: 5,
+    maxChars: 3000
+  });
+
+  assert.match(history, /discord-real/);
+  assert.match(history, /make \/roster and explain the plan/);
+  assert.match(history, /I added the roster command/);
+  assert.doesNotMatch(history, /Smoke test|discord-live-verify/);
 });
 
 test('buildCodexWorkerPrompt includes nearby Discord context as background only', () => {

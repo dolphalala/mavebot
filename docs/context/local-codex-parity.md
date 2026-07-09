@@ -41,6 +41,8 @@ Use context in layers instead of dumping the full channel history:
   not erase the short-term session tail.
 - `AGENTS.md` and `docs/context/README.md` decide how to load the repo.
 - Worker `summary.md` and `recent.md` provide bounded channel memory.
+- Recent worker job records provide a bounded audit trail for follow-up
+  questions about what actually happened in previous jobs.
 - `operating-memory.md` owns server, deploy, command registration, and safety
   facts.
 - `discord-session.md` owns user preferences, current goals, and open work.
@@ -108,6 +110,8 @@ The channel answer should be short and human:
 - If the user explicitly requested a plan, demo, explanation, or proposal, the
   final answer should preserve that useful structure rather than being reduced
   to one or two sentences.
+- If the user says an earlier reply skipped something or did not work, the
+  final answer should identify the real gap before saying what was fixed.
 - Mention tests or deploy checks only when useful.
 - If blocked, say exactly what blocked it and what needs to happen next.
 - Do not include prompt dumps, task cards, ChatGPT promo text, long logs, or

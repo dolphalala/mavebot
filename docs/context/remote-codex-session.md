@@ -116,6 +116,14 @@ command.
   `refresh_token_invalidated` means the mounted server `CODEX_HOME` needs a
   fresh ChatGPT/Codex device login; this is independent of Slack and cannot be
   fixed by code changes.
+- If the user asks what happened, says the previous answer missed something,
+  or says a change did not work, inspect nearby Discord context and the recent
+  worker job-record audit section before replying. Explain the actual gap and
+  then fix code/docs/tests when the repo can correct it.
+- Startup context backfill should fetch a broader Discord channel tail for
+  memory than the small catch-up queue tail used to enqueue unhandled work.
+  This keeps "above", screenshots, and multi-message history available without
+  replaying lots of old messages as new jobs.
 - If a worker push is rejected because `origin/main` advanced during a job, the
   worker should fetch, rebase, rerun checks, and retry the push instead of
   failing the channel request.
@@ -153,6 +161,8 @@ The channel history will grow forever, so remote jobs must keep memory useful:
 - Worker `recent.md` and `summary.md` intentionally suppress setup smoke tests
   and verification chatter so future jobs do not waste prompt space on old
   infrastructure checks.
+- The durable Discord channel context log should also suppress smoke tests and
+  short working acknowledgements before writing the bounded tail.
 - Worker `transcript.jsonl` is normalized history, not permanent raw chat
   storage. Low-signal smoke/status rows should be pruned from the worker's
   private memory after they have served their verification purpose.

@@ -130,6 +130,10 @@ remote work.
   `DISCORD_CODEX_CONTEXT_LOG_MAX_ROWS` controls the retained tail. The bot also
   keeps a small in-memory cache for the current process, but the disk log is
   the source that survives deploys and restarts.
+- `DISCORD_CODEX_CONTEXT_BACKFILL_LIMIT` controls how many recent Discord
+  messages are fetched on startup to refresh the durable context log. This can
+  be larger than `DISCORD_CODEX_CATCHUP_LIMIT`, which controls how many recent
+  messages are eligible to enqueue as missed work.
 - When a job is queued, recent same-channel rows from the durable log and live
   cache that are not part of the active burst are included as `nearbyText`,
   `nearbyContextMessages`, and `nearbyFiles`. This helps follow-ups like "what
@@ -242,6 +246,10 @@ remote work.
 - Completed worker job JSON records in `done/` include sanitized `codexMessage`
   and `finalMessage` fields. Use these for later audits of what the inner
   Codex subprocess answered versus what mavebot posted to the channel.
+- Worker prompts include a bounded summary of recent `done/`, `failed/`, and
+  `auth-blocked/` job records. This helps the remote agent answer "what did
+  you do?", "why didn't that work?", and "did you read everything?" without
+  rereading every old JSON file.
 - Slack uploads from `#bot` are downloaded by the bridge into
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/slack-files/` and
   referenced by local path in worker jobs. The bridge handles both

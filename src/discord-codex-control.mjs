@@ -8,6 +8,7 @@ export const DEFAULT_DISCORD_CONTEXT_LOG_PATH = '/shared/codex-worker/context/di
 export const DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES = 25 * 1024 * 1024;
 export const DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS = 30 * 60 * 1000;
 export const DEFAULT_DISCORD_CODEX_BURST_GAP_MS = 15000;
+export const DEFAULT_DISCORD_CODEX_CONTEXT_BACKFILL_LIMIT = 100;
 export const DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS = 1000;
 export const DISCORD_GATEWAY_MESSAGE_CONTENT_FLAGS = {
   full: 262144,
@@ -41,6 +42,56 @@ function safeFileName(value, fallback = 'discord-file') {
 
 export function randomWorkingMessage(randomInt = crypto.randomInt) {
   return DISCORD_CODEX_WORKING_MESSAGES[randomInt(DISCORD_CODEX_WORKING_MESSAGES.length)];
+}
+
+export function isDiscordCodexWorkingAckText(text) {
+  const normalized = String(text || '').trim();
+  if (!normalized) {
+    return false;
+  }
+  if (DISCORD_CODEX_WORKING_MESSAGES.includes(normalized)) {
+    return true;
+  }
+  return [
+    /^(?:got it|got you|i got you|okay|ok)[.! ]*(?:i['’]?ll|i will)?\s*(?:check|take a look|work|dig|look)/i,
+    /^(?:i['’]?ll|i will)\s+(?:check|take a look|work on|dig into|look into)/i,
+    /^(?:i['’]?m|i am)\s+on it\.?$/i,
+    /^one sec\b/i,
+    /^working on it\b/i,
+    /^i caught th(?:is|ese) after restart\b/i
+  ].some((pattern) => pattern.test(normalized));
+}
+
+export function isLowSignalDiscordContextRow(row = {}) {
+  const text = String(row?.text || '').replace(/\s+/g, ' ').trim();
+  const lower = text.toLowerCase();
+  const hasFiles = Boolean(row?.files?.length);
+  if (!text && !hasFiles) {
+    return true;
+  }
+  if (row?.bot && isDiscordCodexWorkingAckText(text)) {
+    return true;
+  }
+  return [
+    /auth-blocked queue smoke test/,
+    /worker auth(?:-| )?blocked smoke/,
+    /codex desktop smoke/,
+    /worker verification task/,
+    /server-worker-verification/,
+    /remote discord worker verification/,
+    /remote discord worker path is working/,
+    /remote discord worker path is live/,
+    /discord worker path is live/,
+    /discord codex channel worker path is live/,
+    /smoke test from the local codex app/,
+    /smoke test the remote-session memory contract/,
+    /worker smoke test/,
+    /live verification only/,
+    /memory compaction is clean/,
+    /can read the attached image file and post a normal discord channel reply/,
+    /mavebot vision \d+/,
+    /final vision \d+/
+  ].some((pattern) => pattern.test(lower));
 }
 
 export function discordLiveBurstKey(message, fallbackChannelId = 'discord') {
@@ -354,7 +405,9 @@ export async function writeDiscordContextLog(
   const normalizedMaxRows = Number.isFinite(maxRows) && maxRows > 0
     ? maxRows
     : DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS;
-  const normalized = normalizeDiscordContextRows(rows).slice(-normalizedMaxRows);
+  const normalized = normalizeDiscordContextRows(rows)
+    .filter((row) => !isLowSignalDiscordContextRow(row))
+    .slice(-normalizedMaxRows);
   const dir = path.dirname(contextPath);
   await mkdir(dir, { recursive: true });
   const tempPath = path.join(
@@ -380,7 +433,8 @@ export async function appendDiscordContextRows(
   rows = [],
   { maxRows = DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS } = {}
 ) {
-  const incoming = Array.isArray(rows) ? rows : [rows];
+  const incoming = (Array.isArray(rows) ? rows : [rows])
+    .filter((row) => row && !isLowSignalDiscordContextRow(row));
   if (!incoming.filter(Boolean).length) {
     return readDiscordContextLog(contextPath, { limit: maxRows });
   }

@@ -73,12 +73,12 @@ import { playerArmyAssetNames, renderPlayerArmyCard } from './player-card.mjs';
 import {
   DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
   DEFAULT_DISCORD_CODEX_BURST_GAP_MS,
+  DEFAULT_DISCORD_CODEX_CONTEXT_BACKFILL_LIMIT,
   DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS,
   DEFAULT_DISCORD_CODEX_JOB_DIR,
   DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS,
   DEFAULT_DISCORD_CONTEXT_LOG_PATH,
   DEFAULT_DISCORD_FILE_CONTEXT_DIR,
-  DISCORD_CODEX_WORKING_MESSAGES,
   appendDiscordContextRows,
   buildDiscordCodexWorkerJob,
   buildDiscordMessageRow,
@@ -87,6 +87,7 @@ import {
   discordCodexSetupBlocker,
   enqueueDiscordCodexWorkerJob,
   hasDiscordMessageContentIntentFlag,
+  isDiscordCodexWorkingAckText,
   materializeDiscordAttachments,
   planDiscordCodexCatchupBursts,
   randomWorkingMessage,
@@ -125,6 +126,11 @@ const discordCodexWorkerDebounceMs = Number.parseInt(
 );
 const discordCodexCatchupLimit = Number.parseInt(
   process.env.DISCORD_CODEX_CATCHUP_LIMIT || '12',
+  10
+);
+const discordCodexContextBackfillLimit = Number.parseInt(
+  process.env.DISCORD_CODEX_CONTEXT_BACKFILL_LIMIT ||
+    String(DEFAULT_DISCORD_CODEX_CONTEXT_BACKFILL_LIMIT),
   10
 );
 const discordCodexCatchupWindowMs = Number.parseInt(
@@ -244,6 +250,7 @@ app.get('/healthz', async (_req, res) => {
     discordAttachmentDownloadMaxBytes,
     discordCodexWorkerDebounceMs,
     discordCodexCatchupLimit,
+    discordCodexContextBackfillLimit: normalizedDiscordContextBackfillLimit(),
     discordCodexCatchupWindowMs,
     discordCodexRecentContextWindowMs,
     discordCodexRecentContextLimit,
@@ -323,6 +330,18 @@ function normalizedDiscordContextLogMaxRows() {
     : DEFAULT_DISCORD_CONTEXT_LOG_MAX_ROWS;
 }
 
+function normalizedDiscordCatchupLimit() {
+  return Number.isFinite(discordCodexCatchupLimit) && discordCodexCatchupLimit > 0
+    ? Math.min(discordCodexCatchupLimit, 100)
+    : 12;
+}
+
+function normalizedDiscordContextBackfillLimit() {
+  return Number.isFinite(discordCodexContextBackfillLimit) && discordCodexContextBackfillLimit > 0
+    ? Math.min(discordCodexContextBackfillLimit, 100)
+    : DEFAULT_DISCORD_CODEX_CONTEXT_BACKFILL_LIMIT;
+}
+
 function discordRowTime(row) {
   const parsed = Date.parse(row?.receivedAt || '');
   return Number.isFinite(parsed) ? parsed : 0;
@@ -396,20 +415,7 @@ function discordContextMessageIsUseful(message) {
 }
 
 function isDiscordWorkingAckText(text) {
-  const normalized = String(text || '').trim();
-  if (!normalized) {
-    return false;
-  }
-  if (DISCORD_CODEX_WORKING_MESSAGES.includes(normalized)) {
-    return true;
-  }
-  return [
-    /^(?:got it|got you|i got you|okay|ok)[.! ]*(?:i['’]?ll|i will)?\s*(?:check|take a look|work|dig|look)/i,
-    /^(?:i['’]?ll|i will)\s+(?:check|take a look|work on|dig into|look into)/i,
-    /^(?:i['’]?m|i am)\s+on it\.?$/i,
-    /^one sec\b/i,
-    /^working on it\b/i
-  ].some((pattern) => pattern.test(normalized));
+  return isDiscordCodexWorkingAckText(text);
 }
 
 function discordContextRowIsUseful(row) {
@@ -662,13 +668,16 @@ async function catchUpDiscordCodexChannel() {
     if (!channel?.messages?.fetch) {
       return;
     }
+    const catchupLimit = normalizedDiscordCatchupLimit();
+    const backfillLimit = normalizedDiscordContextBackfillLimit();
     const messages = await channel.messages.fetch({
-      limit: Number.isFinite(discordCodexCatchupLimit) && discordCodexCatchupLimit > 0
-        ? discordCodexCatchupLimit
-        : 12
+      limit: Math.max(catchupLimit, backfillLimit)
     });
     await rememberDiscordCodexFetchedContext(messages);
-    const plan = await planDiscordCodexCatchupBursts(messages, {
+    const catchupMessages = [...(messages?.values?.() || [])]
+      .sort((left, right) => Number(left?.createdTimestamp || 0) - Number(right?.createdTimestamp || 0))
+      .slice(-catchupLimit);
+    const plan = await planDiscordCodexCatchupBursts(catchupMessages, {
       channelId: discordCodexChannelId,
       windowMs: catchupWindowMs,
       gapMs: catchupBurstGapMs,
@@ -680,7 +689,9 @@ async function catchUpDiscordCodexChannel() {
       queuedBursts: plan.queuedBursts,
       skippedHandledBursts: plan.skippedHandledBursts,
       partialBursts: plan.partialBursts,
-      handledMessages: plan.handledMessages
+      handledMessages: plan.handledMessages,
+      contextBackfilledMessages: messages.size ?? messages.length ?? 0,
+      catchupMessages: catchupMessages.length
     };
     for (const entry of plan.entries) {
       await enqueueDiscordCodexMessageBurst(entry.messages, {
