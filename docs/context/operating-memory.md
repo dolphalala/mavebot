@@ -269,6 +269,9 @@ remote work.
   files still commit/push, wait for deploy when pushed, and verify runtime.
   `npm install` is cached by package-manifest fingerprint, and `npm run check`
   is skipped only for pure markdown or `docs/context/` memory edits.
+- The worker's default queue poll interval is 1 second. Keep it low unless CPU
+  or filesystem pressure shows up; Discord already has a separate short
+  debounce for bundling adjacent user messages and screenshots.
 - Worker prompts include a bounded summary of recent `done/`, `failed/`, and
   `auth-blocked/` job records. This helps the remote agent answer "what did
   you do?", "why didn't that work?", and "did you read everything?" without

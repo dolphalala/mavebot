@@ -83,7 +83,7 @@ const requireBridgeHealth = parseBoolean(
 
 const pollIntervalMs = parsePositiveInt(
   process.env.CODEX_WORKER_POLL_INTERVAL_MS || process.env.SLACK_WORKER_POLL_INTERVAL_MS,
-  3000
+  1000
 );
 const processingStaleMs = parsePositiveInt(
   process.env.CODEX_WORKER_PROCESSING_STALE_MS || process.env.SLACK_WORKER_PROCESSING_STALE_MS,
