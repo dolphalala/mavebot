@@ -142,11 +142,11 @@ const workerJobHistoryLimit = parsePositiveInt(
 );
 const progressFirstMs = parsePositiveInt(
   process.env.CODEX_WORKER_PROGRESS_FIRST_MS || process.env.SLACK_WORKER_PROGRESS_FIRST_MS,
-  45_000
+  25_000
 );
 const progressIntervalMs = parsePositiveInt(
   process.env.CODEX_WORKER_PROGRESS_INTERVAL_MS || process.env.SLACK_WORKER_PROGRESS_INTERVAL_MS,
-  90_000
+  75_000
 );
 const progressMaxMessages = parsePositiveInt(
   process.env.CODEX_WORKER_PROGRESS_MAX_MESSAGES || process.env.SLACK_WORKER_PROGRESS_MAX_MESSAGES,
