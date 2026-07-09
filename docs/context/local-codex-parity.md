@@ -1,7 +1,7 @@
 # Local Codex Parity Contract
 
 This file defines what "as capable as the local Codex Desktop session" means
-for mavebot's Slack and Discord control channels.
+for mavebot's Discord `#codex` control channel. Slack `#bot` is legacy-only.
 
 ## Standard For Every Job
 
@@ -37,11 +37,13 @@ Use context in layers instead of dumping the full channel history:
 - Worker `summary.md` and `recent.md` provide bounded channel memory.
 - `operating-memory.md` owns server, deploy, command registration, and safety
   facts.
-- `slack-session.md` owns user preferences, current goals, and open work.
+- `slack-session.md` owns user preferences, current goals, and open work; the
+  filename is legacy, but Discord `#codex` is the primary session.
 - `remote-codex-session.md` owns remote-channel behavior.
 - This file owns local-session parity expectations.
 - `code-map.md` points to source ownership.
-- Focused docs such as `clash-ui-guidance.md` own domain rules.
+- Focused docs such as `clash-database-guidance.md` and
+  `clash-ui-guidance.md` own domain rules.
 - Source files and tests are the final authority.
 - Local attachment paths under `/shared/codex-worker/context/discord-files/` or
   `/shared/codex-worker/context/slack-files/` are part of the active prompt when
@@ -64,7 +66,7 @@ After each meaningful job, decide whether a durable context update is needed:
   registration, state-store, or safety-boundary changes.
 - Update `slack-session.md` for user preferences, active goals, open work, and
   cross-job decisions.
-- Update `remote-codex-session.md` for Slack/Discord session behavior changes.
+- Update `remote-codex-session.md` for Discord session behavior changes.
 - Update `code-map.md` when source ownership or feature recipes change.
 - Update a focused domain file for reusable product/domain guidance.
 

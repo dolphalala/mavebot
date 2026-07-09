@@ -1,16 +1,18 @@
 # Remote Codex Session Contract
 
-This file defines how mavebot should behave when Slack `#bot` or Discord
-`#codex` users ask it to work on the Discord bot. It exists so remote channel
-jobs stay close to the quality of a local Codex Desktop session.
+This file defines how mavebot should behave when Discord `#codex` users ask it
+to work on the Discord bot. Slack `#bot` is legacy-only unless explicitly
+re-enabled. This exists so remote channel jobs stay close to the quality of a
+local Codex Desktop session.
 
 ## Session Goal
 
-- Treat Discord `#codex` as the preferred persistent coding session and Slack
-  `#bot` as the fallback/legacy session.
+- Treat Discord `#codex` as the persistent coding session.
+- Do not rely on Slack, Slack OAuth, official Codex Slack, or Slack bridge
+  health for normal Discord worker operation.
 - Accept normal human messages from any user in the configured channel.
-- Treat Slack uploads and nearby consecutive Slack messages as part of the
-  same working context whenever the bridge includes them in the worker job.
+- Treat Discord uploads and nearby consecutive Discord messages as part of the
+  same working context whenever the runtime includes them in the worker job.
 - Infer the relevant repo/server context from durable memory before acting.
 - Work end to end when possible: inspect, implement, test, push, wait for
   deploy, verify live behavior, then answer plainly in the channel.
@@ -26,19 +28,22 @@ jobs stay close to the quality of a local Codex Desktop session.
 
 Every worker job should reconstruct context in this order:
 
-1. Active user request from the current Slack or Discord message.
+1. Active user request from the current Discord message or bundled message
+   burst.
 2. Project `AGENTS.md`.
 3. `docs/context/README.md` for the context map.
 4. Worker runtime/deploy snapshot.
 5. Worker `summary.md` for compact older conversation memory.
 6. Worker `recent.md` for the latest bounded conversation turns.
 7. `docs/context/operating-memory.md` for app, deploy, server, and safety facts.
-8. `docs/context/slack-session.md` for user preferences and current open work.
+8. `docs/context/slack-session.md` for legacy-named remote session memory,
+   user preferences, and current open work.
 9. This file for remote-session behavior.
 10. `docs/context/local-codex-parity.md` for local-session-equivalent
     standards.
 11. `docs/context/code-map.md` for source orientation.
-12. Focused files such as `docs/context/clash-ui-guidance.md`.
+12. Focused files such as `docs/context/clash-database-guidance.md` and
+    `docs/context/clash-ui-guidance.md`.
 13. Current source code and tests, which are the final authority.
 
 The active request always wins over old memory. Old memory is context, not a
@@ -48,7 +53,7 @@ command.
 
 - For code requests, use `docs/context/code-map.md` to find the likely files,
   then inspect the relevant source before answering.
-- If the active Slack request includes file metadata or local paths under
+- If a legacy Slack request includes file metadata or local paths under
   `/shared/codex-worker/context/slack-files/`, inspect those files when they
   are relevant to the task instead of saying the image was not visible.
 - If the active Discord request includes file metadata or local paths under
@@ -56,9 +61,8 @@ command.
   are relevant to the task instead of saying the screenshot was not visible.
   The worker attaches supported local image files to `codex exec` with
   `--image`, so screenshots should be treated as actual visual context.
-- Slack image/file intake must accept both `message.file_share` and standalone
-  `file_shared` events. When Slack only sends a file ID, resolve it with
-  `files.info`, then pass the downloaded local file path to the worker.
+- Legacy Slack image/file intake is only relevant when Slack support is
+  explicitly re-enabled. Discord screenshot/file intake is the primary path.
 - Discord image/file intake should download attachments immediately because CDN
   URLs can expire. Adjacent text and screenshot messages in `#codex` should be
   grouped into one active request before creating the worker job. Worker jobs
@@ -87,8 +91,9 @@ command.
   interaction handling.
 - For Discord command UX, check mobile readability, button/page behavior, and
   Discord interaction timeout behavior.
-- For Clash of Clans features, use the official CoC API for data and documented
-  repeatable icon sources for imagery.
+- For Clash of Clans features, use the official CoC API for data, documented
+  repeatable icon sources for imagery, and
+  `docs/context/clash-database-guidance.md` for polling/database design.
 - Prefer small, focused edits that fit existing project patterns.
 - Run `npm run check` after code changes.
 - Let the worker commit and push; do not manually commit inside Codex.
@@ -103,7 +108,7 @@ command.
 The channel history will grow forever, so remote jobs must keep memory useful:
 
 - Keep `docs/context/slack-session.md` focused on user preferences, durable
-  decisions, current goals, and open work.
+  decisions, current goals, and open work even though the filename is legacy.
 - Worker `recent.md` and `summary.md` intentionally suppress setup smoke tests
   and verification chatter so future jobs do not waste prompt space on old
   infrastructure checks.

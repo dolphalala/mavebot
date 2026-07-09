@@ -1,6 +1,8 @@
 # Mavebot Operating Memory
 
-This repo backs the `mavebot` Discord bot and Codex Slack workflow.
+This repo backs the `mavebot` Discord bot and Discord `#codex` remote Codex
+workflow. Slack support is legacy-only and should not be required for normal
+remote work.
 
 ## Product Context
 
@@ -44,6 +46,9 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - CoC API env keys live in the same server-only env file:
   `COC_API_BASE_URL` and `COC_API_TOKEN`.
 - Docker Compose service/container: `urba-discord-bot`.
+- Remote Codex worker container: `urba-codex-worker`.
+- Legacy Slack bridge container: `urba-slack-bridge`; normal deploys stop and
+  remove it unless `ENABLE_SLACK_BRIDGE=1`.
 - Health endpoint: `http://127.0.0.1:4188/healthz`.
 - Legend tracking store:
   `/opt/urba-apps/discord-bot/shared/legends-tracking.json`.
@@ -84,16 +89,17 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   `urba-discord-poll-deploy.timer`, not a public webhook.
 - The server poll deploy only follows `origin/main`. A Codex cloud task that
   only edits its task workspace, branch, or PR is not deployed and must not be
-  described as live. Code-changing Slack tasks should push/merge to `main` when
-  permitted, or clearly tell the user that a PR/manual merge is still required.
+  described as live. Code-changing Discord `#codex` tasks should push/merge to
+  `main` when permitted, or clearly tell the user that a PR/manual merge is
+  still required.
 - If a mirrored Codex response says it committed locally, opened PR metadata, or
   could not push to `origin/main`, it is not live. Discord will not reflect that
   change until a real GitHub `main` commit deploys and command registration
   runs.
 - Do not add mavebot endpoints to `chat.urba.group`; that domain belongs to
   Chatwoot.
-- The Slack-to-code path should use the server-side `codex-worker` compose
-  profile. Normal #bot messages become JSON jobs in
+- The active code path is Discord `#codex` to the server-side `codex-worker`
+  compose profile. Normal `#codex` messages become JSON jobs in
   `/opt/urba-apps/discord-bot/shared/codex-worker/jobs`; the worker runs Codex
   CLI in `/opt/urba-apps/discord-bot/shared/codex-worker/repo`, commits, pushes
   `origin/main`, and waits for the 30-second poll deploy to pull that commit.
@@ -124,18 +130,27 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   `discordCodexLastError` so remote-runner intake issues can be diagnosed from
   the server without guessing whether the fault was message intent, attachment
   download, catch-up, enqueue, or worker queue state.
-- The deploy script builds `discord-bot`, `slack-bridge`, and `codex-worker`.
-  It recreates `codex-worker` only when no worker job is active; if a job is in
+- The deploy script normally builds `discord-bot` and `codex-worker`, then
+  stops/removes the legacy Slack bridge. It only builds/starts `slack-bridge`
+  when `ENABLE_SLACK_BRIDGE=1`. It recreates `codex-worker` only when no worker
+  job is active; if a job is in
   `processing`, it writes `shared/codex-worker/restart-needed` and the poll
   deploy completes the worker recreate after the queue is clear. This avoids
-  killing the worker mid-Slack request while still keeping worker code current.
+  killing the worker mid-request while still keeping worker code current.
 - Worker jobs are marked with `attempts`, `startedAt`, and `worker` metadata
   after being claimed. If a processing job is stale, the worker and deploy
   script can requeue it; malformed claimed JSON is moved to `failed` instead of
   being left invisible in `processing`.
-- If Slack says the server-side Codex login is expired, Slack is still
-  receiving jobs but `codex-worker` cannot run `codex exec` until its mounted
-  `CODEX_HOME` is re-authenticated.
+- If the channel says the server-side Codex login is expired, Discord intake is
+  still receiving jobs but `codex-worker` cannot run `codex exec` until its
+  mounted `CODEX_HOME` is re-authenticated.
+- The current server Codex auth is stored under
+  `/opt/urba-apps/discord-bot/codex-home` and is independent of Slack. To
+  switch the server worker to a different ChatGPT/Codex account, pause or
+  drain the worker, back up that `codex-home`, run an interactive `codex login`
+  or device-auth flow inside the worker/container using the new account,
+  restart `urba-codex-worker`, then run a no-code Discord #codex smoke job. Do
+  not print, commit, or copy auth files.
 
 ## Discord Command Registration
 
@@ -155,18 +170,28 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - `/ping` was removed as a public test command; use the local HTTP `/healthz`
   endpoint for process health instead.
 
-## Slack Codex Workflow
+## Remote Codex Workflow
+
+- Discord `#codex` channel ID: `1523893930993778698`.
+- Discord `#codex` is the primary control surface. Any non-bot user in that
+  channel can ask for code changes, explanations, screenshot review, command
+  work, deploy verification, or context maintenance.
+- Slack `#bot` is legacy only. It may be re-enabled with
+  `ENABLE_SLACK_BRIDGE=1`, but normal Discord worker success must not depend on
+  Slack bridge health, Slack OAuth, official Codex Slack, or Slack-specific
+  task cards.
 
 - Official Codex Slack requires `@Codex`, replies in threads, and chooses a
   cloud environment automatically. It cannot turn `#bot` into a normal channel
   session by itself.
 - A custom Slack bridge stores channel memory in
   `/opt/urba-apps/discord-bot/shared/slack-memory.jsonl`.
-- The current preferred control mode is the server-side worker queue. Slack
-  uses `SLACK_CODEX_FORWARD_MODE=worker`; Discord uses
-  `DISCORD_CODEX_CHANNEL_ID`. In this mode there is no official `@Codex`
-  forwarding, no per-user Slack OAuth requirement, no task-card mirroring, and
-  any human in the configured control channel can trigger the server runner.
+- The current preferred control mode is the server-side worker queue. Discord
+  uses `DISCORD_CODEX_CHANNEL_ID`. Legacy Slack uses
+  `SLACK_CODEX_FORWARD_MODE=worker` only when the bridge is explicitly enabled.
+  In worker mode there is no official `@Codex` forwarding, no per-user Slack
+  OAuth requirement, no task-card mirroring, and any human in the configured
+  control channel can trigger the server runner.
 - Worker-side durable context is stored under
   `/opt/urba-apps/discord-bot/shared/codex-worker/context/`:
   `transcript.jsonl` is normalized history, while `summary.md`, `recent.md`, and
@@ -180,7 +205,7 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   events are resolved with Slack `files.info`. This requires the Slack bot token
   to have `files:read`; if the scope is missing, jobs still include the Slack
   file metadata plus a download error.
-- Worker prompts put the active Slack/Discord request before compacted memory.
+- Worker prompts put the active Discord request before compacted memory.
   Older memory is background context only and must not override the current
   request.
 - Worker prompts explicitly include project `AGENTS.md`, the
@@ -191,9 +216,10 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   verify live state, and answer plainly when the request needs real work.
 - Worker prompts also include bounded extra files from `docs/context/*.md`, such
   as `docs/context/remote-codex-session.md` and
-  `docs/context/local-codex-parity.md`, `docs/context/code-map.md`, and
+  `docs/context/local-codex-parity.md`, `docs/context/code-map.md`,
+  `docs/context/clash-database-guidance.md`, and
   `docs/context/clash-ui-guidance.md`. Add focused context docs there when the
-  Slack/Discord agent needs durable domain guidance.
+  Discord agent needs durable domain guidance.
 - The bridge should use Slack Socket Mode with `SLACK_APP_TOKEN` so Slack events
   arrive over an outbound WebSocket and no public domain is required.
 - The older fallback bridge mode can forward normal #bot user messages to the official Codex Slack
@@ -224,12 +250,12 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
 - Forwarded Codex prompts should include recent saved `#bot` messages from
   bridge memory so Slack feels like a running session. The default prompt memory
   window is controlled by `SLACK_CODEX_MEMORY_LIMIT`.
-- Remote worker tasks should treat `docs/context/slack-session.md` as durable
-  user preference and open-work memory, and
+- Remote worker tasks should treat `docs/context/slack-session.md` as
+  legacy-named durable user preference and open-work memory, and
   `docs/context/remote-codex-session.md` as the behavior contract for making
-  Slack/Discord feel like this local Codex session. Each task should update the
-  right context doc when a turn adds facts, decisions, open work, deployment
-  changes, or user preferences future tasks should know.
+  Discord `#codex` feel like this local Codex session. Each task should update
+  the right context doc when a turn adds facts, decisions, open work,
+  deployment changes, or user preferences future tasks should know.
 - `docs/context/README.md` is the context map, and
   `docs/context/code-map.md` is the source orientation map for remote coding
   jobs.
@@ -253,7 +279,8 @@ This repo backs the `mavebot` Discord bot and Codex Slack workflow.
   `docs/context/README.md` first, then this file, then
   `docs/context/slack-session.md`, then `docs/context/remote-codex-session.md`,
   then `docs/context/code-map.md`, then any relevant focused context file such
-  as `docs/context/clash-ui-guidance.md`, then inspect the current code before
+  as `docs/context/clash-database-guidance.md` or
+  `docs/context/clash-ui-guidance.md`, then inspect the current code before
   changing behavior.
 - Do not ask Allen for generic setup context already captured here. Ask only for
   missing secrets or external UI actions that cannot be done from the repo or

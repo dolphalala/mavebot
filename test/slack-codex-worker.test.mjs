@@ -53,7 +53,7 @@ test('compactTranscriptRows keeps recent turns bounded and older turns summarize
   assert.match(snapshot.recent, /\[slack\/C0BCG0T838B\]/);
   assert.doesNotMatch(snapshot.recent, /turn 3/);
   assert.match(snapshot.session, /Recent turn count included in prompts: 2/);
-  assert.match(snapshot.session, /Slack and Discord jobs/);
+  assert.match(snapshot.session, /Discord #codex jobs/);
   assert.match(snapshot.session, /local-codex-parity\.md/);
   assert.match(snapshot.session, /Memory Maintenance/);
 });
@@ -353,6 +353,7 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /persistent Codex session/);
   assert.match(prompt, /Be as capable as a local Codex Desktop session/);
   assert.match(prompt, /local-codex-parity\.md/);
+  assert.match(prompt, /Slack #bot is legacy-only/);
   assert.match(prompt, /Do not say the work is ready for the worker to commit, push, deploy, or verify/);
   assert.match(prompt, /Answer every explicit question in the active request/);
   assert.match(prompt, /For multi-part requests, track each part yourself/);
@@ -388,8 +389,11 @@ test('buildCodexWorkerPrompt marks plan and demo requests for detailed answers',
   });
 
   assert.equal(activeRequestNeedsDetailedAnswer({ text: 'is there a demo?' }), true);
+  assert.equal(activeRequestNeedsDetailedAnswer({ text: 'what did it change and why?' }), true);
+  assert.equal(activeRequestNeedsDetailedAnswer({ text: 'design a database collector like clashking' }), true);
   assert.match(prompt, /Active request response mode:/);
   assert.match(prompt, /asks for a plan\/demo\/how-it-works answer/);
+  assert.match(prompt, /Do not answer with only an acknowledgement/);
   assert.match(prompt, /compact plan, a concrete demo\/example/);
 });
 
@@ -519,7 +523,31 @@ test('finalSlackMessage always returns a human success message', () => {
       deployResult: { matched: true },
       runtime: { botOk: true, bridgeOk: true }
     }),
-    'I updated /lana.\n\nDone and live.'
+    "I updated /lana.\n\nIt's live now."
+  );
+});
+
+test('finalSlackMessage does not require legacy Slack bridge health when disabled', () => {
+  assert.equal(
+    finalSlackMessage({
+      codexMessage: 'Updated the Discord worker.',
+      checkOk: true,
+      pushResult: { pushed: true },
+      deployResult: { matched: true },
+      runtime: { botOk: true, bridgeOk: false, bridgeChecked: false }
+    }),
+    "Updated the Discord worker.\n\nIt's live now."
+  );
+
+  assert.equal(
+    finalSlackMessage({
+      codexMessage: 'Updated the Discord worker.',
+      checkOk: true,
+      pushResult: { pushed: true },
+      deployResult: { matched: true },
+      runtime: { botOk: false, bridgeOk: false, bridgeChecked: false }
+    }),
+    'Updated the Discord worker.\n\nHealth check needs attention: Discord not ok.'
   );
 });
 
@@ -536,7 +564,7 @@ test('finalSlackMessage strips worker handoff boilerplate from channel replies',
       deployResult: { matched: true },
       runtime: { botOk: true, bridgeOk: true }
     }),
-    'Updated the Discord #codex working acknowledgements.\n\nDone and live.'
+    "Updated the Discord #codex working acknowledgements.\n\nIt's live now."
   );
 });
 
@@ -548,14 +576,14 @@ test('finalSlackMessage strips routine deploy/check chatter from Codex replies',
         'Checks passed: npm install and npm run check.',
         'Pushed to main: abc123def456.',
         'Server deploy picked it up: abc123def456.',
-        'Runtime health: Discord ok, Slack bridge ok.'
+        'Runtime health: Discord ok.'
       ].join('\n'),
       checkOk: true,
       pushResult: { pushed: true },
       deployResult: { matched: true },
       runtime: { botOk: true, bridgeOk: true }
     }),
-    'Fixed the remote runner behavior.\n\nDone and live.'
+    "Fixed the remote runner behavior.\n\nIt's live now."
   );
 });
 
@@ -646,7 +674,7 @@ test('finalSlackMessage condenses long implementation reports for channels', () 
       deployResult: { matched: true },
       runtime: { botOk: true, bridgeOk: true }
     }),
-    'Found the remote-runner problems and tightened them up. The issues were mostly session-parity gaps, not `/player` or `/loveu` alone.\n\nDone and live.'
+    "Found the remote-runner problems and tightened them up. The issues were mostly session-parity gaps, not `/player` or `/loveu` alone.\n\nIt's live now."
   );
 });
 
@@ -709,6 +737,8 @@ test('buildWorkerRuntimeSnapshot explains deploy and safety boundaries without s
 
   assert.match(snapshot, /origin\/main/);
   assert.match(snapshot, /scripts\/deploy-server\.sh/);
+  assert.match(snapshot, /Discord #codex/);
+  assert.match(snapshot, /requireSlackBridgeHealth/);
   assert.match(snapshot, /npm run check/);
   assert.match(snapshot, /transcript is normalized/);
   assert.match(snapshot, /localSessionParity/);
@@ -756,6 +786,7 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   await writeFile(path.join(dir, 'remote-codex-session.md'), '# Remote Contract\nAct like a session.');
   await writeFile(path.join(dir, 'local-codex-parity.md'), '# Local Parity\nMatch local Codex.');
   await writeFile(path.join(dir, 'code-map.md'), '# Code Map\nUpdate index and commands.');
+  await writeFile(path.join(dir, 'clash-database-guidance.md'), '# Clash DB\nUse polling snapshots.');
   await writeFile(path.join(dir, 'z-extra.md'), '# Extra\nLess important.');
 
   const bundle = await readRepoContextBundle({ dir, maxChars: 1000 });
@@ -769,14 +800,20 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
     'local parity contract should be loaded before source map'
   );
   assert.ok(
-    bundle.indexOf('## code-map.md') < bundle.indexOf('## clash-ui-guidance.md'),
-    'source map should be loaded before domain guidance'
+    bundle.indexOf('## code-map.md') < bundle.indexOf('## clash-database-guidance.md'),
+    'source map should be loaded before database guidance'
+  );
+  assert.ok(
+    bundle.indexOf('## clash-database-guidance.md') < bundle.indexOf('## clash-ui-guidance.md'),
+    'database guidance should be loaded before UI guidance'
   );
   assert.match(bundle, /Act like a session/);
   assert.match(bundle, /Match local Codex/);
   assert.match(bundle, /Update index and commands/);
   assert.match(bundle, /## clash-ui-guidance\.md/);
+  assert.match(bundle, /## clash-database-guidance\.md/);
   assert.match(bundle, /Use icon cards/);
+  assert.match(bundle, /Use polling snapshots/);
   assert.doesNotMatch(bundle, /do not include this copy/);
   assert.doesNotMatch(bundle, /do not include context map copy/);
 });

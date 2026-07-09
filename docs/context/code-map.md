@@ -36,9 +36,12 @@ It is a map, not a replacement for reading the current source.
 - `src/lana-art.mjs`: generated heart images plus `/lana` and `/loveu` love
   copy.
 - `src/slack-bridge.mjs`: Slack Socket Mode bridge and Slack `#bot` intake.
+  Legacy-only; normal Discord `#codex` operation should not require this
+  service to be running.
 - `src/slack-codex-worker.mjs`: remote Codex worker queue, prompt construction,
   compacted memory, checks, commits, pushes, deploy wait, and final replies.
-  It attaches supported local image files from Slack/Discord jobs to
+  It attaches supported local image files from Discord jobs, and from legacy
+  Slack jobs when explicitly enabled, to
   `codex exec` with `--image` and owns the final verified live/not-live channel
   wording after checks and deploy verification.
 
@@ -78,6 +81,8 @@ Registering a command without a matching runtime handler causes Discord's
 
 1. Update `src/slack-codex-worker.mjs`, `src/slack-bridge.mjs`, or
    `src/discord-codex-control.mjs` as appropriate.
+   For normal Discord work, prefer `src/discord-codex-control.mjs` and
+   `src/slack-codex-worker.mjs`; `src/slack-bridge.mjs` is legacy Slack only.
 2. For Discord files/screenshots, preserve file metadata and local shared-volume
    paths so the worker can inspect uploads from
    `/shared/codex-worker/context/discord-files/` and attach images to Codex.

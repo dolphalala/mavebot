@@ -44,6 +44,7 @@ services:
       start_period: 20s
 
   slack-bridge:
+    profiles: ["legacy-slack"]
     build:
       context: .
     container_name: urba-slack-bridge
@@ -101,14 +102,13 @@ services:
       SLACK_WORKER_REPO_DIR: /shared/codex-worker/repo
       SLACK_WORKER_LIVE_APP_DIR: /live-app
       SLACK_WORKER_BOT_HEALTH_URL: http://discord-bot:4188/healthz
-      SLACK_WORKER_BRIDGE_HEALTH_URL: http://slack-bridge:4190/healthz
+      SLACK_WORKER_REQUIRE_BRIDGE_HEALTH: "0"
     volumes:
       - /opt/urba-apps/discord-bot/shared:/shared
       - /opt/urba-apps/discord-bot/codex-home:/codex-home
       - /opt/urba-apps/discord-bot/app:/live-app:ro
     depends_on:
       - discord-bot
-      - slack-bridge
     security_opt:
       - no-new-privileges:true
     init: true

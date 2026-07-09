@@ -1,8 +1,8 @@
 # Clash UI Guidance
 
 This file is durable context for mavebot's Clash of Clans Discord features.
-Every Slack/Codex worker task that touches Clash commands should read it after
-`operating-memory.md` and `slack-session.md`.
+Every Discord #codex worker task that touches Clash commands should read it
+after `operating-memory.md` and `slack-session.md`.
 
 ## Product Target
 
@@ -26,6 +26,8 @@ Every Slack/Codex worker task that touches Clash commands should read it after
 - War/CWL player attack history is only reliable when mavebot sees the war from
   the active current-war/CWL endpoints. Public war logs are useful as summary
   backfill, but they do not provide full player attack rows.
+- For database, polling, roster, and history design, also read
+  `docs/context/clash-database-guidance.md`.
 - The official player API does not provide troop, spell, hero equipment, or pet
   sprite URLs. Do not invent URLs from the player payload.
 - For item icons, prefer the Clash of Clans Wiki on Fandom through the
@@ -90,8 +92,8 @@ Every Slack/Codex worker task that touches Clash commands should read it after
 
 ## Context Hygiene
 
-- Long-lived Slack control will accumulate messages forever. Do not treat old
-  Slack transcript rows as active tasks.
+- Long-lived Discord control will accumulate messages forever. Do not treat old
+  transcript rows as active tasks.
 - Keep `docs/context/slack-session.md` focused on facts, decisions, and open
   work. If it gets noisy, restructure it and delete duplicated stale bullets
   after preserving the durable fact in the right section.

@@ -48,7 +48,8 @@ const gitAuthorEmail =
 const botHealthUrl =
   process.env.SLACK_WORKER_BOT_HEALTH_URL || 'http://discord-bot:4188/healthz';
 const bridgeHealthUrl =
-  process.env.SLACK_WORKER_BRIDGE_HEALTH_URL || 'http://slack-bridge:4190/healthz';
+  process.env.SLACK_WORKER_BRIDGE_HEALTH_URL || '';
+const requireBridgeHealth = parseBoolean(process.env.SLACK_WORKER_REQUIRE_BRIDGE_HEALTH, false);
 
 const pollIntervalMs = parsePositiveInt(process.env.SLACK_WORKER_POLL_INTERVAL_MS, 3000);
 const processingStaleMs = parsePositiveInt(
@@ -95,12 +96,20 @@ const repoContextPriority = [
   'remote-codex-session.md',
   'local-codex-parity.md',
   'code-map.md',
+  'clash-database-guidance.md',
   'clash-ui-guidance.md'
 ];
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value || '', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseBoolean(value, fallback = false) {
+  if (value === undefined || value === null || value === '') {
+    return fallback;
+  }
+  return /^(?:1|true|yes|on)$/i.test(String(value).trim());
 }
 
 function sleep(ms) {
@@ -192,12 +201,23 @@ export function activeRequestNeedsDetailedAnswer(job = {}) {
   return [
     /\bplan\b/,
     /\bdemo\b/,
+    /\bsummary\b/,
+    /\bstrategy\b/,
+    /\barchitecture\b/,
+    /\bcompare\b/,
+    /\breview\b/,
+    /\bwhat (?:did|changed|happened|went wrong)\b/,
+    /\bwhy\b/,
     /\bhow(?:'|’)s this (?:gonna|going to) work\b/,
     /\bhow (?:would|will|should|could) (?:it|this|that)\b/,
+    /\bhow (?:do|does|did|can|could|would|should)\b/,
     /\btell me how\b/,
     /\bexplain\b/,
     /\bproposal\b/,
-    /\bdesign\b/
+    /\bdesign\b/,
+    /\bdatabase\b/,
+    /\bcollector\b/,
+    /\broster\b/
   ].some((pattern) => pattern.test(text));
 }
 
@@ -668,9 +688,23 @@ export function isLowSignalTranscriptRow(row) {
   ].some((pattern) => pattern.test(text));
 }
 
+function shouldPreserveDetailedMemoryText(text) {
+  const cleaned = stripSlackLinks(text);
+  if (!cleaned) {
+    return false;
+  }
+  return (
+    /(?:^|\n)\s*(?:Plan|Demo|Strategy|Architecture|What changed|How it works|Next steps|Database|Collector)\s*:/i.test(cleaned) ||
+    (/\b(?:plan|demo|strategy|architecture|database|collector|roster|legends|clashking|clashperk)\b/i.test(cleaned) &&
+      /\n\s*[-*]\s+/.test(cleaned))
+  );
+}
+
 function normalizeTranscriptText(row) {
   const text = row?.role === 'assistant'
-    ? humanizeWorkerChannelMessage(row?.text)
+    ? shouldPreserveDetailedMemoryText(row?.text)
+      ? detailedWorkerChannelMessage(row?.text, { maxChars: 1200 })
+      : humanizeWorkerChannelMessage(row?.text)
     : stripSlackLinks(row?.text);
   return text.trim();
 }
@@ -699,14 +733,15 @@ export function compactTranscriptRows(rows, options = {}) {
     '',
     `Generated: ${generatedAt}`,
     '',
-    'This is compacted memory for the mavebot remote Codex session. The active Slack or Discord job always has priority over this file.',
+    'This is compacted memory for the mavebot remote Codex session. The active Discord #codex job always has priority over this file.',
     '',
     '## Stable Operating Facts',
     '',
     '- Repo: dolphalala/mavebot.',
     '- Server app path: /opt/urba-apps/discord-bot/app.',
     '- Production deploy follows GitHub origin/main through the server poll deploy timer.',
-    '- Slack #bot and Discord #codex should behave like persistent channel sessions, with mavebot posting normal channel replies.',
+    '- Discord #codex is the primary control surface and should behave like a persistent Codex Desktop-style session, with mavebot posting normal channel replies.',
+    '- Slack #bot is legacy only and must not be required for Discord worker success.',
     '- Repo docs/context/*.md files are durable operating memory. Keep them concise, restructure them when stale, and remove duplicated obsolete notes.',
     '- Do not touch Chatwoot, Bookkeeper, nginx, Docker daemon settings, or unrelated apps unless Allen asks for that exact action.',
     `- Low-signal smoke/verification turns suppressed from prompt memory: ${suppressedCount}.`,
@@ -731,12 +766,13 @@ export function compactTranscriptRows(rows, options = {}) {
     '',
     `Generated: ${generatedAt}`,
     '',
-    'Use this file as the worker-side running memory for Slack and Discord jobs. The normalized source is transcript.jsonl, while summary.md and recent.md keep prompts bounded.',
+    'Use this file as the worker-side running memory for Discord #codex jobs. The normalized source is transcript.jsonl, while summary.md and recent.md keep prompts bounded.',
     '',
     '## Current Session Shape',
     '',
-    '- Slack #bot and Discord #codex are user-facing control surfaces for the same mavebot coding session.',
-    '- Worker jobs should read repo docs/context/operating-memory.md, docs/context/slack-session.md, docs/context/remote-codex-session.md, docs/context/local-codex-parity.md, and relevant docs/context/*.md before acting.',
+    '- Discord #codex is the user-facing control surface for the mavebot coding session.',
+    '- docs/context/slack-session.md is legacy-named remote session memory and still stores durable user preferences until renamed with compatibility kept.',
+    '- Worker jobs should read repo docs/context/operating-memory.md, docs/context/slack-session.md, docs/context/remote-codex-session.md, docs/context/local-codex-parity.md, docs/context/clash-database-guidance.md, and relevant docs/context/*.md before acting.',
     '- Code changes should be tested, committed, pushed to main, then verified on the server.',
     '- Final answers should read like normal mavebot chat, not CI logs.',
     '',
@@ -877,6 +913,8 @@ export function buildWorkerRuntimeSnapshot(job = {}) {
     branch,
     source: job.source || 'slack',
     channel: job.channel || slackChannelId,
+    activeControlSurface: 'Discord #codex',
+    legacySlackActive: false,
     worker: {
       sharedDir,
       jobDir,
@@ -891,7 +929,8 @@ export function buildWorkerRuntimeSnapshot(job = {}) {
       target: `origin/${branch}`,
       mechanism: 'server poll deploy pulls GitHub main and runs scripts/deploy-server.sh',
       botHealthUrl,
-      bridgeHealthUrl
+      optionalSlackBridgeHealthUrl: bridgeHealthUrl || null,
+      requireSlackBridgeHealth: requireBridgeHealth
     },
     sessionMemory: {
       transcriptPath,
@@ -949,7 +988,8 @@ function promptHeader(job) {
     '',
     'Hard rules:',
     '- Work in the current repository checkout only.',
-    '- Treat the Slack or Discord control channel as a persistent Codex session, not a one-off support bot.',
+    '- Treat Discord #codex as a persistent Codex session, not a one-off support bot.',
+    '- Slack #bot is legacy-only. Do not depend on Slack, Slack OAuth, or the Slack bridge unless the active request explicitly asks for legacy Slack support.',
     '- Use the provided compacted memory and repo docs to recover context, then verify against source files before changing behavior.',
     '- Be as capable as a local Codex Desktop session for this repo: inspect code, inspect tests, run commands, change files, update docs, and verify live deploys when the request requires it.',
     '- Follow docs/context/local-codex-parity.md as the standard for intake, implementation, verification, memory updates, and final answers.',
@@ -958,7 +998,7 @@ function promptHeader(job) {
     '- Do not commit or push. The worker will run checks, commit, push main, and verify deploy after you finish.',
     '- If the request is conversational and needs no code, answer normally.',
     '- If the request changes durable behavior, project facts, user preferences, or operating decisions, update the right docs/context/*.md file.',
-    '- Before code changes, read docs/context/operating-memory.md, docs/context/slack-session.md, docs/context/remote-codex-session.md, and relevant docs/context/*.md.',
+    '- Before code changes, read docs/context/operating-memory.md, docs/context/slack-session.md (legacy-named remote session memory), docs/context/remote-codex-session.md, and relevant docs/context/*.md.',
     '- Keep context docs useful: compact stale details, restructure bloated sections, and delete obsolete duplicated notes when the durable facts are captured elsewhere.',
     '- If context docs are getting noisy, improve their structure as part of the task instead of appending another vague bullet.',
     '- Discord command changes must update both src/commands.mjs and src/index.mjs.',
@@ -975,7 +1015,7 @@ function promptHeader(job) {
     '',
     'Active request response mode:',
     needsDetailedAnswer
-      ? '- The active request asks for a plan/demo/how-it-works answer. Preserve useful structure in the final answer: a compact plan, a concrete demo/example, and what will happen next.'
+      ? '- The active request asks for a plan/demo/how-it-works answer. Do not answer with only an acknowledgement. Preserve useful structure in the final answer: a compact plan, a concrete demo/example, and what will happen next.'
       : '- The active request does not explicitly ask for a plan/demo. Keep the final answer compact after handling the work.',
     ''
   ].join('\n');
@@ -1013,14 +1053,14 @@ export function buildCodexWorkerPrompt({
     '# Repo Operating Memory',
     operatingMemory || 'docs/context/operating-memory.md was not readable.',
     '',
-    '# Repo Slack Session Memory',
+    '# Repo Remote Session Memory',
     slackSession || 'docs/context/slack-session.md was not readable.',
     '',
     '# Extra Repo Context Files',
     repoContextBundle || 'No extra docs/context/*.md files were readable.',
     '',
-    '# Raw Slack Memory Tail',
-    slackMemoryTail || 'No raw Slack memory tail available.',
+    '# Legacy Raw Slack Memory Tail',
+    slackMemoryTail || 'No legacy raw Slack memory tail available.',
     ''
   ].join('\n');
 }
@@ -1238,11 +1278,12 @@ async function waitForUrl(url, timeoutMs = runtimeHealthTimeoutMs) {
 }
 
 async function verifyRuntime() {
-  const [botOk, bridgeOk] = await Promise.all([
-    waitForUrl(botHealthUrl),
-    waitForUrl(bridgeHealthUrl)
-  ]);
-  return { botOk, bridgeOk };
+  const botOk = await waitForUrl(botHealthUrl);
+  if (!bridgeHealthUrl || !requireBridgeHealth) {
+    return { botOk, bridgeOk: true, bridgeChecked: false };
+  }
+  const bridgeOk = await waitForUrl(bridgeHealthUrl);
+  return { botOk, bridgeOk, bridgeChecked: true };
 }
 
 async function runCodex(job, contextSnapshot) {
@@ -1291,11 +1332,13 @@ export function finalSlackMessage({ codexMessage, checkOk, pushResult, deployRes
   }
 
   const deployOk = !pushResult.pushed || deployResult.matched;
-  const runtimeOk = runtime.botOk && runtime.bridgeOk;
+  const bridgeWasChecked =
+    runtime?.bridgeChecked ?? Object.prototype.hasOwnProperty.call(runtime || {}, 'bridgeOk');
+  const runtimeOk = Boolean(runtime?.botOk) && (!bridgeWasChecked || Boolean(runtime?.bridgeOk));
 
   if (checkOk && deployOk && runtimeOk) {
     if (pushResult.pushed) {
-      lines.push('Done and live.');
+      lines.push("It's live now.");
     } else if (!lines.length) {
       lines.push('I checked that. No code changes were needed.');
     }
@@ -1313,7 +1356,11 @@ export function finalSlackMessage({ codexMessage, checkOk, pushResult, deployRes
     lines.push('No code changes were needed.');
   }
   if (!runtimeOk) {
-    lines.push(`Health check needs attention: Discord ${runtime.botOk ? 'ok' : 'not ok'}, Slack bridge ${runtime.bridgeOk ? 'ok' : 'not ok'}.`);
+    const healthParts = [`Discord ${runtime?.botOk ? 'ok' : 'not ok'}`];
+    if (bridgeWasChecked) {
+      healthParts.push(`legacy Slack bridge ${runtime?.bridgeOk ? 'ok' : 'not ok'}`);
+    }
+    lines.push(`Health check needs attention: ${healthParts.join(', ')}.`);
   }
 
   return truncate(lines.filter(Boolean).join('\n\n'), 1900);

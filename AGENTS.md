@@ -5,8 +5,9 @@ This project is the Vibe mirror for the Discord bot intended to run on the
 
 Before making changes, read `docs/context/README.md` first, then
 `docs/context/operating-memory.md`, `docs/context/slack-session.md`, and any
-focused context file relevant to the task. Remote Slack/Discord Codex jobs use
-the same context surface, so keep it concise and current.
+focused context file relevant to the task. `slack-session.md` is legacy-named
+remote session memory; Discord `#codex` is the primary remote control channel.
+Remote Codex jobs use the same context surface, so keep it concise and current.
 
 ## Rules
 

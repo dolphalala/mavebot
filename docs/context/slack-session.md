@@ -1,27 +1,24 @@
-# Mavebot Slack Session Memory
+# Mavebot Remote Session Memory
 
-This file is the durable memory for the `#bot` Slack channel. Codex cloud may
-start a fresh task for each Slack mention, so every task should read this file
-after `docs/context/operating-memory.md` and update it when a turn changes what
-future tasks should know.
+This file is legacy-named `slack-session.md` for compatibility, but it is now
+the durable memory for the Discord `#codex` remote channel session. Every
+remote worker task should read this file after `docs/context/operating-memory.md`
+and update it when a turn changes what future tasks should know.
 
 ## Active Session - 2026-06-24
 
 ### Current Goal
 
-- Make Slack `#bot` and Discord `#codex` feel like normal mavebot working
-  sessions.
-- Discord `#codex` is now the preferred daily control channel; Slack `#bot`
-  remains available but should not be the primary path once Discord intake is
-  healthy.
-- Users should be able to speak normally in `#bot` without tagging `@Codex`.
+- Make Discord `#codex` feel like a normal mavebot working session.
+- Discord `#codex` is now the primary daily control channel. Slack `#bot` is
+  legacy only and should not be required for worker success.
 - Discord users should be able to speak normally in `#codex` without tagging
   mavebot.
 - mavebot should post the visible channel replies. The preferred backend for
   repo tasks is now the server-side `codex-worker` container, not the official
   Codex Slack app.
 
-### Slack UX Decisions
+### Remote UX Decisions
 
 - Do not mirror ChatGPT/Codex task-card promo text into `#bot`.
 - Do not mirror task links unless the user asks for them.
@@ -30,6 +27,9 @@ future tasks should know.
 - Use `SLACK_CODEX_FORWARD_MODE=worker` so there is no official Codex trigger
   channel, long hidden prompt, task card, wrong-environment text, or ChatGPT
   promo copy in `#bot`.
+- Normal operation should not start the Slack bridge. The deploy path should
+  stop/remove `urba-slack-bridge` unless `ENABLE_SLACK_BRIDGE=1` is explicitly
+  set for a legacy Slack session.
 - Discord channel `1523893930993778698` is the Discord `#codex` control
   channel. Any non-bot user message there should create a server-side worker
   job and receive the final answer in the same Discord channel. This requires
@@ -44,7 +44,7 @@ future tasks should know.
 - Brief "working" status messages should sound like a short friendly mavebot
   helper note, not technical queue/status text.
 - Keep replies in the main channel whenever possible so users do not have to
-  open Slack thread replies to follow the session.
+  open thread replies to follow the session.
 - Keep Discord replies in `#codex` as normal channel messages.
 - When Allen asks for a plan, demo, proposal, or "how this works," the remote
   runner should answer that directly with a compact plan and example instead of
@@ -70,16 +70,14 @@ future tasks should know.
   missing Message Content Intent, screenshot/file intake gaps, Discord restart
   catch-up replaying messages too separately, and inner Codex replies leaking
   routine check/deploy chatter.
-- Slack `#bot` should treat adjacent text messages and uploaded files as one
-  working context. The bridge accepts `file_share` messages, downloads files to
-  `/shared/codex-worker/context/slack-files/`, includes local file paths in the
-  worker job, and adds recent channel rows as structured context. Slack uploads
-  still need the installed bot token to have `files:read`; without it Slack file
-  downloads return a login/scope error instead of the image bytes.
+- Legacy Slack `#bot` can treat adjacent text messages and uploaded files as
+  one working context when the bridge is explicitly enabled. The primary path
+  is Discord attachment intake under
+  `/shared/codex-worker/context/discord-files/`.
 - `docs/context/remote-codex-session.md` is the durable behavior contract for
-  making Slack `#bot` and Discord `#codex` feel like this local Codex Desktop
-  session. Remote jobs should read it, follow it, and update focused context
-  docs instead of depending on hidden desktop-thread context.
+  making Discord `#codex` feel like this local Codex Desktop session. Remote
+  jobs should read it, follow it, and update focused context docs instead of
+  depending on hidden desktop-thread context.
 - `docs/context/local-codex-parity.md` defines the checklist for matching this
   local Codex Desktop session: inspect, implement, test, push, verify deploy,
   maintain context, and answer plainly.
@@ -92,15 +90,18 @@ future tasks should know.
 ### Persistent Context
 
 - Allen is Korean and Lana is Croatian.
-- Lana will manage this app, so `mavebot.lanawee.com` is the right domain for
-  the Slack bridge.
+- Lana will manage this app. `mavebot.lanawee.com` was used for the legacy
+  Slack bridge, but Discord `#codex` is now the primary remote channel.
 - mavebot is a sweet helper identity for the app; the tone can be warm and
   lightly affectionate when appropriate.
 - The Discord bot is Clash of Clans focused and should use the official Clash
   of Clans API from server-side environment variables.
 - Clash UI and icon-source guidance lives in `docs/context/clash-ui-guidance.md`;
-  Slack worker tasks touching CoC features should read it and update it when
-  durable UI/source rules change.
+  CoC worker tasks should read it and update it when durable UI/source rules
+  change.
+- ClashKing/ClashPerk-style database and collector guidance lives in
+  `docs/context/clash-database-guidance.md`; CoC database/roster/history tasks
+  should read it before designing data models or commands.
 - `/ping` is no longer a public Discord slash command.
 - `/lana` replaced `/iloveyou` and sends a generated PNG heart image with a
   Lana/Allen embed. It should not regress to a text-only love letter.
@@ -144,8 +145,11 @@ future tasks should know.
   safely recreated after active jobs clear. The final worker queue smoke test
   completed with no Slack post error and no stuck jobs.
 - Continue improving Discord commands for Clash of Clans workflows.
-- Keep context docs efficient as Slack/Discord channels grow: summarize durable
-  facts, move domain guidance into focused files, and delete duplicated stale
-  notes once the fact is preserved in the right place.
+- Migrate `GITHUB_TOKEN` out of the legacy `slack-bridge.env` into a neutral
+  worker env file when doing the next secrets/config cleanup, then remove the
+  worker dependency on the legacy env filename.
+- Keep context docs efficient as Discord channel history grows: summarize
+  durable facts, move domain guidance into focused files, and delete duplicated
+  stale notes once the fact is preserved in the right place.
 - If a user asks to reset or start a new session, add a new dated section here
   instead of deleting older notes.

@@ -7,6 +7,7 @@ SLACK_ENV="${SLACK_ENV:-/opt/urba-apps/discord-bot/slack-bridge.env}"
 SLACK_MEMORY_FILE="${SLACK_MEMORY_FILE:-/opt/urba-apps/discord-bot/shared/slack-memory.jsonl}"
 SLACK_CODEX_STATE_FILE="${SLACK_CODEX_STATE_FILE:-/opt/urba-apps/discord-bot/shared/codex-forward-state.json}"
 SLACK_USER_TOKEN_FILE="${SLACK_USER_TOKEN_FILE:-/opt/urba-apps/discord-bot/shared/slack-user-tokens.json}"
+ENABLE_SLACK_BRIDGE="${ENABLE_SLACK_BRIDGE:-0}"
 CODEX_HOME_DIR="${CODEX_HOME_DIR:-/opt/urba-apps/discord-bot/codex-home}"
 CODEX_WORKER_DIR="${CODEX_WORKER_DIR:-/opt/urba-apps/discord-bot/shared/codex-worker}"
 CODEX_WORKER_RESTART="${CODEX_WORKER_RESTART:-auto}"
@@ -44,21 +45,23 @@ if [ ! -f "$SLACK_ENV" ]; then
   install -m 600 /dev/null "$SLACK_ENV"
 fi
 
-mkdir -p "$(dirname "$SLACK_MEMORY_FILE")"
-touch "$SLACK_MEMORY_FILE"
-chmod 755 "$(dirname "$SLACK_MEMORY_FILE")"
-chmod 600 "$SLACK_MEMORY_FILE"
-chown 1000:1000 "$SLACK_MEMORY_FILE" 2>/dev/null || true
-if [ ! -s "$SLACK_CODEX_STATE_FILE" ]; then
-  printf '{"forwarded":{}}\n' >"$SLACK_CODEX_STATE_FILE"
+if [ "$ENABLE_SLACK_BRIDGE" = "1" ]; then
+  mkdir -p "$(dirname "$SLACK_MEMORY_FILE")"
+  touch "$SLACK_MEMORY_FILE"
+  chmod 755 "$(dirname "$SLACK_MEMORY_FILE")"
+  chmod 600 "$SLACK_MEMORY_FILE"
+  chown 1000:1000 "$SLACK_MEMORY_FILE" 2>/dev/null || true
+  if [ ! -s "$SLACK_CODEX_STATE_FILE" ]; then
+    printf '{"forwarded":{}}\n' >"$SLACK_CODEX_STATE_FILE"
+  fi
+  chmod 600 "$SLACK_CODEX_STATE_FILE"
+  chown 1000:1000 "$SLACK_CODEX_STATE_FILE" 2>/dev/null || true
+  if [ ! -s "$SLACK_USER_TOKEN_FILE" ]; then
+    printf '{"users":{}}\n' >"$SLACK_USER_TOKEN_FILE"
+  fi
+  chmod 600 "$SLACK_USER_TOKEN_FILE"
+  chown 1000:1000 "$SLACK_USER_TOKEN_FILE" 2>/dev/null || true
 fi
-chmod 600 "$SLACK_CODEX_STATE_FILE"
-chown 1000:1000 "$SLACK_CODEX_STATE_FILE" 2>/dev/null || true
-if [ ! -s "$SLACK_USER_TOKEN_FILE" ]; then
-  printf '{"users":{}}\n' >"$SLACK_USER_TOKEN_FILE"
-fi
-chmod 600 "$SLACK_USER_TOKEN_FILE"
-chown 1000:1000 "$SLACK_USER_TOKEN_FILE" 2>/dev/null || true
 if [ ! -s "$LEGENDS_STORE_FILE" ]; then
   printf '{"version":1,"players":{},"scheduler":{"cursor":0}}\n' >"$LEGENDS_STORE_FILE"
 fi
@@ -97,7 +100,11 @@ git -C "$APP_ROOT" checkout "$BRANCH"
 git -C "$APP_ROOT" merge --ff-only "origin/$BRANCH"
 
 docker compose -f "$APP_ROOT/docker-compose.yml" config --quiet
-docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker build discord-bot slack-bridge codex-worker
+if [ "$ENABLE_SLACK_BRIDGE" = "1" ]; then
+  docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker --profile legacy-slack build discord-bot slack-bridge codex-worker
+else
+  docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker build discord-bot codex-worker
+fi
 
 has_value() {
   local key="$1"
@@ -125,7 +132,13 @@ else
 fi
 
 docker compose -f "$APP_ROOT/docker-compose.yml" run --rm discord-bot npm run register
-docker compose -f "$APP_ROOT/docker-compose.yml" up -d discord-bot slack-bridge
+if [ "$ENABLE_SLACK_BRIDGE" = "1" ]; then
+  docker compose -f "$APP_ROOT/docker-compose.yml" --profile legacy-slack up -d discord-bot slack-bridge
+else
+  docker compose -f "$APP_ROOT/docker-compose.yml" up -d discord-bot
+  docker compose -f "$APP_ROOT/docker-compose.yml" --profile legacy-slack stop slack-bridge >/dev/null 2>&1 || true
+  docker compose -f "$APP_ROOT/docker-compose.yml" --profile legacy-slack rm -f slack-bridge >/dev/null 2>&1 || true
+fi
 
 requeue_stale_worker_jobs() {
   local processing_dir="$CODEX_WORKER_DIR/processing"
