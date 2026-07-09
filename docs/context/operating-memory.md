@@ -136,7 +136,9 @@ remote work.
   did you do?", "that screenshot above", and multi-user collaboration without
   marking those nearby messages as handled worker jobs. Useful mavebot channel
   replies are preserved too, while short working acknowledgements are filtered
-  out as noise.
+  out as noise. The default nearby-context window matches the 30-minute restart
+  catch-up window so follow-ups after a real coding run still see the prompt
+  and final answer.
 - Discord restart catch-up groups still-unhandled adjacent messages into the
   same worker job instead of replaying each recent message separately. This
   keeps post-restart behavior closer to Codex Desktop, where context,

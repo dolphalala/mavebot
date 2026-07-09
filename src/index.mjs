@@ -132,7 +132,7 @@ const discordCodexCatchupWindowMs = Number.parseInt(
   10
 );
 const discordCodexRecentContextWindowMs = Number.parseInt(
-  process.env.DISCORD_CODEX_RECENT_CONTEXT_WINDOW_MS || String(10 * 60 * 1000),
+  process.env.DISCORD_CODEX_RECENT_CONTEXT_WINDOW_MS || String(DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS),
   10
 );
 const discordCodexRecentContextLimit = Number.parseInt(
@@ -308,7 +308,7 @@ function pendingDiscordJobKey(message) {
 function normalizedDiscordRecentContextWindowMs() {
   return Number.isFinite(discordCodexRecentContextWindowMs) && discordCodexRecentContextWindowMs > 0
     ? discordCodexRecentContextWindowMs
-    : 10 * 60 * 1000;
+    : DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS;
 }
 
 function normalizedDiscordRecentContextLimit() {
@@ -392,7 +392,31 @@ function discordContextMessageIsUseful(message) {
   if (!text) {
     return false;
   }
-  return !DISCORD_CODEX_WORKING_MESSAGES.includes(text);
+  return !isDiscordWorkingAckText(text);
+}
+
+function isDiscordWorkingAckText(text) {
+  const normalized = String(text || '').trim();
+  if (!normalized) {
+    return false;
+  }
+  if (DISCORD_CODEX_WORKING_MESSAGES.includes(normalized)) {
+    return true;
+  }
+  return [
+    /^(?:got it|got you|i got you|okay|ok)[.! ]*(?:i['’]?ll|i will)?\s*(?:check|take a look|work|dig|look)/i,
+    /^(?:i['’]?ll|i will)\s+(?:check|take a look|work on|dig into|look into)/i,
+    /^(?:i['’]?m|i am)\s+on it\.?$/i,
+    /^one sec\b/i,
+    /^working on it\b/i
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function discordContextRowIsUseful(row) {
+  if (!row?.bot) {
+    return true;
+  }
+  return !isDiscordWorkingAckText(row.text || '');
 }
 
 async function buildDiscordContextRowForMessage(message, { downloadAttachments = false } = {}) {
@@ -453,7 +477,8 @@ async function recentDiscordCodexContextRows(message, activeRows = []) {
     limit: normalizedDiscordContextLogMaxRows()
   });
 
-  return selectNearbyDiscordContextRows([...persistentRows, ...recentDiscordCodexRows], {
+  const usefulRows = [...persistentRows, ...recentDiscordCodexRows].filter(discordContextRowIsUseful);
+  return selectNearbyDiscordContextRows(usefulRows, {
     channelId,
     anchorTime,
     windowMs,

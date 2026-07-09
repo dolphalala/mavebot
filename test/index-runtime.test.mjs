@@ -55,6 +55,7 @@ test('Discord Codex runtime exposes intake diagnostics in health output', async 
   assert.match(source, /discordCodexCatchupLimit/);
   assert.match(source, /discordCodexCatchupWindowMs/);
   assert.match(source, /discordCodexRecentContextWindowMs/);
+  assert.match(source, /DISCORD_CODEX_RECENT_CONTEXT_WINDOW_MS \|\| String\(DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS\)/);
   assert.match(source, /discordCodexRecentContextLimit/);
   assert.match(source, /discordCodexRecentContextRows/);
   assert.match(source, /discordCodexContextLogPath/);
@@ -62,6 +63,7 @@ test('Discord Codex runtime exposes intake diagnostics in health output', async 
   assert.match(source, /discordCodexPersistentContextRows/);
   assert.match(source, /recentDiscordCodexContextRows/);
   assert.match(source, /discordContextLogWriteQueue/);
+  assert.match(source, /isDiscordWorkingAckText/);
   assert.match(source, /appendDiscordContextRows/);
   assert.match(source, /readDiscordContextLog/);
   assert.match(source, /rememberDiscordCodexError\('catch-up'/);
