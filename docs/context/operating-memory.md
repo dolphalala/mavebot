@@ -164,7 +164,9 @@ remote work.
   the worker's `context/auth-retry-state.json` plus
   `discordCodexAuthBlockedJobs`, so a "working" acknowledgement can be
   distinguished from a server Codex-login blocker without reading container
-  logs.
+  logs. `discordCodexWorkerAuth.blockedJobs` reflects the current
+  `auth-blocked/` queue count, while `lastProbeBlockedJobs` preserves the
+  count from the last worker auth probe.
 - The deploy script normally builds `discord-bot` and `codex-worker`, then
   stops/removes the legacy Slack bridge. It only builds/starts `slack-bridge`
   when `ENABLE_SLACK_BRIDGE=1`. It recreates `codex-worker` only when no worker

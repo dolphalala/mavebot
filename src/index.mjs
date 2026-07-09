@@ -227,8 +227,10 @@ const app = express();
 app.get('/healthz', async (_req, res) => {
   let clashHistoryScheduler = null;
   let discordCodexPersistentContextRows = 0;
-  const discordCodexWorkerAuth = await readDiscordCodexWorkerAuthState();
   const discordCodexAuthBlockedJobs = await countDiscordCodexWorkerRecords('auth-blocked');
+  const discordCodexWorkerAuth = await readDiscordCodexWorkerAuthState({
+    currentBlockedJobs: discordCodexAuthBlockedJobs
+  });
   try {
     const clashHistoryStore = await readClashHistoryStore(clashHistoryStorePath());
     clashHistoryScheduler = clashHistoryStore.scheduler || null;
@@ -375,13 +377,15 @@ async function countDiscordCodexWorkerRecords(name) {
   }
 }
 
-async function readDiscordCodexWorkerAuthState() {
+async function readDiscordCodexWorkerAuthState({ currentBlockedJobs = null } = {}) {
   try {
     const state = JSON.parse(await readFile(discordCodexAuthRetryStatePath, 'utf8'));
+    const lastProbeBlockedJobs = Number.parseInt(state.blockedJobs || '0', 10) || 0;
     return {
       at: state.at || '',
       ready: Boolean(state.ready),
-      blockedJobs: Number.parseInt(state.blockedJobs || '0', 10) || 0,
+      blockedJobs: Number.isFinite(currentBlockedJobs) ? currentBlockedJobs : lastProbeBlockedJobs,
+      lastProbeBlockedJobs,
       reason: String(state.reason || '').slice(0, 300)
     };
   } catch {
