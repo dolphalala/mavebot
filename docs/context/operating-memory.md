@@ -139,11 +139,16 @@ remote work.
   killing the worker mid-request while still keeping worker code current.
 - Worker jobs are marked with `attempts`, `startedAt`, and `worker` metadata
   after being claimed. If a processing job is stale, the worker and deploy
-  script can requeue it; malformed claimed JSON is moved to `failed` instead of
-  being left invisible in `processing`.
+  script can requeue it; malformed or unreadable claimed JSON is logged and
+  moved or quarantined under `failed` instead of being left invisible in
+  `processing`.
 - If the channel says the server-side Codex login is expired, Discord intake is
   still receiving jobs but `codex-worker` cannot run `codex exec` until its
   mounted `CODEX_HOME` is re-authenticated.
+- `codex login status` can still say "Logged in using ChatGPT" after the
+  refresh token has been revoked. Verify auth with a tiny no-code `codex exec`
+  smoke inside `urba-codex-worker`; `HTTP 401`, `token_invalidated`, or
+  `refresh_token_invalidated` means the server must be logged in again.
 - The current server Codex auth is stored under
   `/opt/urba-apps/discord-bot/codex-home` and is independent of Slack. To
   switch the server worker to a different ChatGPT/Codex account, pause or

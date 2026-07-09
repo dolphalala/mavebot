@@ -136,11 +136,15 @@ and update it when a turn changes what future tasks should know.
 
 - Keep the GitHub repository synchronized with live server changes so worker
   jobs and server auto-deploys use the same code.
-- On 2026-06-30, Allen asked Slack to create `/legends`; the bridge did create
-  the job. Root cause of the stall was expired server-side Codex CLI auth
-  (`HTTP 401` / refresh token already used), not Slack event delivery.
-  `CODEX_HOME` was re-authenticated and the worker now surfaces auth expiry as
-  a clear setup blocker.
+- On 2026-07-09, Discord `#codex` intake and queue handling were verified, but
+  server-side Codex CLI auth is expired again. `codex login status` still
+  reports "Logged in using ChatGPT", but a real `codex exec` returns `HTTP 401`
+  with `token_invalidated` / `refresh_token_invalidated`. Complete a fresh
+  device-auth login for the mounted server `CODEX_HOME` before expecting remote
+  jobs to execute. Allen wants the new login to use `billing@urba.media`.
+- The worker now surfaces expired Codex auth as a clear channel blocker, stores
+  the real 401 cause in failed job JSON, and quarantines unreadable claimed jobs
+  instead of leaving them stuck in `processing`.
 - Also on 2026-06-30, the deploy path was fixed so `codex-worker` is built and
   safely recreated after active jobs clear. The final worker queue smoke test
   completed with no Slack post error and no stuck jobs.

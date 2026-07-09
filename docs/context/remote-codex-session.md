@@ -79,6 +79,11 @@ command.
 - When Discord `#codex` intake misbehaves, check `/healthz` for
   `discordCodexSetupReady`, `discordCodexLastCatchup`, and
   `discordCodexLastError` before assuming the command implementation is broken.
+- If a job is enqueued but fails before Codex can reason, inspect the failed job
+  JSON and worker logs. `HTTP 401`, `token_invalidated`, or
+  `refresh_token_invalidated` means the mounted server `CODEX_HOME` needs a
+  fresh ChatGPT/Codex device login; this is independent of Slack and cannot be
+  fixed by code changes.
 - If a worker push is rejected because `origin/main` advanced during a job, the
   worker should fetch, rebase, rerun checks, and retry the push instead of
   failing the channel request.
