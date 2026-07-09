@@ -105,6 +105,11 @@ const discordCodexWorkerJobDir =
   process.env.SLACK_CODEX_WORKER_JOB_DIR ||
   process.env.SLACK_WORKER_JOB_DIR ||
   DEFAULT_DISCORD_CODEX_JOB_DIR;
+const discordCodexWorkerBaseDir = path.dirname(discordCodexWorkerJobDir);
+const discordCodexAuthRetryStatePath =
+  process.env.DISCORD_CODEX_AUTH_RETRY_STATE_PATH ||
+  process.env.CODEX_WORKER_AUTH_RETRY_STATE_PATH ||
+  path.join(discordCodexWorkerBaseDir, 'context/auth-retry-state.json');
 const discordFileContextDir =
   process.env.DISCORD_FILE_CONTEXT_DIR || DEFAULT_DISCORD_FILE_CONTEXT_DIR;
 const discordCodexContextLogPath =
@@ -222,6 +227,8 @@ const app = express();
 app.get('/healthz', async (_req, res) => {
   let clashHistoryScheduler = null;
   let discordCodexPersistentContextRows = 0;
+  const discordCodexWorkerAuth = await readDiscordCodexWorkerAuthState();
+  const discordCodexAuthBlockedJobs = await countDiscordCodexWorkerRecords('auth-blocked');
   try {
     const clashHistoryStore = await readClashHistoryStore(clashHistoryStorePath());
     clashHistoryScheduler = clashHistoryStore.scheduler || null;
@@ -260,6 +267,8 @@ app.get('/healthz', async (_req, res) => {
     discordCodexLastMessageAt,
     discordCodexLastCatchup,
     discordCodexLastError,
+    discordCodexWorkerAuth,
+    discordCodexAuthBlockedJobs,
     pictionaryStorePath: pictionaryStorePath(),
     pictionaryActiveGames: activePictionaryGames.size,
     clashHistoryStorePath: clashHistoryStorePath(),
@@ -340,6 +349,44 @@ function normalizedDiscordContextBackfillLimit() {
   return Number.isFinite(discordCodexContextBackfillLimit) && discordCodexContextBackfillLimit > 0
     ? Math.min(discordCodexContextBackfillLimit, 100)
     : DEFAULT_DISCORD_CODEX_CONTEXT_BACKFILL_LIMIT;
+}
+
+function discordCodexWorkerRecordDir(name) {
+  return path.join(discordCodexWorkerBaseDir, name);
+}
+
+function discordCodexWorkerRecordDirs() {
+  return [
+    discordCodexWorkerJobDir,
+    discordCodexWorkerRecordDir('processing'),
+    discordCodexWorkerRecordDir('done'),
+    discordCodexWorkerRecordDir('failed'),
+    discordCodexWorkerRecordDir('auth-blocked')
+  ];
+}
+
+async function countDiscordCodexWorkerRecords(name) {
+  try {
+    return (await readdir(discordCodexWorkerRecordDir(name)))
+      .filter((entry) => entry.endsWith('.json'))
+      .length;
+  } catch {
+    return 0;
+  }
+}
+
+async function readDiscordCodexWorkerAuthState() {
+  try {
+    const state = JSON.parse(await readFile(discordCodexAuthRetryStatePath, 'utf8'));
+    return {
+      at: state.at || '',
+      ready: Boolean(state.ready),
+      blockedJobs: Number.parseInt(state.blockedJobs || '0', 10) || 0,
+      reason: String(state.reason || '').slice(0, 300)
+    };
+  } catch {
+    return null;
+  }
 }
 
 function discordRowTime(row) {
@@ -498,13 +545,7 @@ async function discordCodexJobRecordExists(jobId) {
     return false;
   }
 
-  const baseDir = path.dirname(discordCodexWorkerJobDir);
-  const dirs = [
-    discordCodexWorkerJobDir,
-    path.join(baseDir, 'processing'),
-    path.join(baseDir, 'done'),
-    path.join(baseDir, 'failed')
-  ];
+  const dirs = discordCodexWorkerRecordDirs();
 
   for (const dir of dirs) {
     try {
@@ -525,13 +566,7 @@ async function discordCodexMessageRecordExists(message) {
     return true;
   }
 
-  const baseDir = path.dirname(discordCodexWorkerJobDir);
-  const dirs = [
-    discordCodexWorkerJobDir,
-    path.join(baseDir, 'processing'),
-    path.join(baseDir, 'done'),
-    path.join(baseDir, 'failed')
-  ];
+  const dirs = discordCodexWorkerRecordDirs();
 
   for (const dir of dirs) {
     let names = [];

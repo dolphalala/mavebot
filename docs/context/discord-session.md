@@ -15,6 +15,9 @@ long-lived server state.
   they are sent close together.
 - Live Discord intake should keep one user's quick follow-up messages together
   but avoid merging different users' simultaneous prompts into one job.
+- Restart catch-up should follow the same per-author grouping rule; other users'
+  nearby messages stay available as context but should not become one merged
+  active task.
 - Nearby Discord channel messages from any user should be available as
   background context for follow-ups, screenshots, and collaboration without
   becoming extra hidden tasks.
@@ -64,6 +67,8 @@ long-lived server state.
 - Recent worker job JSON records in `done/`, `failed/`, and `auth-blocked/`
   are included in prompts as a bounded audit trail for follow-up questions
   such as "what did you do?" and "why didn't that work?"
+- `auth-blocked/` job records count as handled message IDs for catch-up, so
+  login-held requests are not replayed as duplicates after a restart.
 - Durable product, deployment, and user-preference facts belong in
   `docs/context/*.md`, not in raw channel history.
 - Keep context docs compact. Move domain rules into focused files and rewrite
@@ -113,6 +118,10 @@ long-lived server state.
 - Keep response-quality audits possible: completed worker jobs should preserve
   sanitized inner Codex output and final mavebot channel output so skipped asks
   can be diagnosed from server records instead of guessing from chat alone.
+- The July 2026 Discord audit found three recurring quality gaps to keep
+  guarding against: skipped plan/demo answers on broad requests, overly short
+  "fixed it" replies that hide what changed, and auth-expired jobs looking like
+  silent hangs unless `/healthz` exposes the worker auth state.
 - Keep memory efficient as Discord channel history grows: summarize durable
   facts, move domain guidance into focused files, and delete duplicated stale
   notes once the facts are preserved.

@@ -160,6 +160,11 @@ remote work.
   `discordCodexContextLogMaxRows`, and
   `discordCodexPersistentContextRows` so the nearby-context layer can be
   checked without reading process memory or opening the JSONL log directly.
+- The Discord bot `/healthz` response includes `discordCodexWorkerAuth` from
+  the worker's `context/auth-retry-state.json` plus
+  `discordCodexAuthBlockedJobs`, so a "working" acknowledgement can be
+  distinguished from a server Codex-login blocker without reading container
+  logs.
 - The deploy script normally builds `discord-bot` and `codex-worker`, then
   stops/removes the legacy Slack bridge. It only builds/starts `slack-bridge`
   when `ENABLE_SLACK_BRIDGE=1`. It recreates `codex-worker` only when no worker
@@ -182,6 +187,8 @@ remote work.
   auth probe before requeueing the saved jobs. This keeps requests retryable
   after a server login refresh without replaying them while auth is still
   broken.
+- Discord restart catch-up treats `auth-blocked/` records as already handled
+  message IDs, so login-held requests are not duplicated after a bot restart.
 - `codex login status` can still say "Logged in using ChatGPT" after the
   refresh token has been revoked. Verify auth with a tiny no-code `codex exec`
   smoke inside `urba-codex-worker`; `HTTP 401`, `token_invalidated`, or

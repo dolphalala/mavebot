@@ -489,7 +489,7 @@ test('groupDiscordCodexMessageBursts keeps restart catch-up prompts together', (
       channelId: '1523893930993778698',
       createdTimestamp: now - 2_000,
       content: 'and fix it like desktop would',
-      author: { id: 'user-2', bot: false }
+      author: { id: 'user-1', bot: false }
     },
     {
       id: 'later',
@@ -510,6 +510,45 @@ test('groupDiscordCodexMessageBursts keeps restart catch-up prompts together', (
   assert.deepEqual(
     bursts.map((burst) => burst.map((message) => message.id)),
     [['first', 'screen', 'follow-up'], ['later']]
+  );
+});
+
+test('groupDiscordCodexMessageBursts keeps different users as separate active jobs', () => {
+  const now = Date.parse('2026-07-08T12:00:00.000Z');
+  const messages = [
+    {
+      id: 'allen-ask',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 14_000,
+      content: 'build /roster',
+      author: { id: 'allen', bot: false }
+    },
+    {
+      id: 'lana-ask',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 8_000,
+      content: 'also fix pictionary',
+      author: { id: 'lana', bot: false }
+    },
+    {
+      id: 'lana-follow-up',
+      channelId: '1523893930993778698',
+      createdTimestamp: now - 2_000,
+      content: 'with harder clues',
+      author: { id: 'lana', bot: false }
+    }
+  ];
+
+  const bursts = groupDiscordCodexMessageBursts(messages, {
+    channelId: '1523893930993778698',
+    now,
+    windowMs: 60_000,
+    gapMs: 15_000
+  });
+
+  assert.deepEqual(
+    bursts.map((burst) => burst.map((message) => message.id)),
+    [['allen-ask'], ['lana-ask', 'lana-follow-up']]
   );
 });
 

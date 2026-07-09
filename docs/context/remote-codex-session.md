@@ -17,10 +17,11 @@ local Codex Desktop session.
   process cache, so deploys and restarts should not erase the short-term
   session memory needed for "above", "that screenshot", or "what did you do?"
   follow-ups.
-- For live intake, bundle quick follow-ups from the same user, but do not merge
-  different users' simultaneous prompts into one live debounce job. Restart
-  catch-up may preserve mixed-user bursts as context so missed screenshots and
-  follow-up text are not split from the prompt that made them meaningful.
+- For live intake and restart catch-up, bundle quick follow-ups from the same
+  user, but do not merge different users' simultaneous prompts into one active
+  job. Messages from other users should still be available as nearby context
+  so collaboration and references are preserved without dropping or combining
+  distinct requests.
 - Infer the relevant repo/server context from durable memory before acting.
 - Work end to end when possible: inspect, implement, test, push, wait for
   deploy, verify live behavior, then answer plainly in the channel.
@@ -96,7 +97,8 @@ command.
   Short working acknowledgements such as "I'm on it" should not be preserved as
   durable context.
 - On startup, Discord `#codex` should catch up recent human messages that do
-  not already have a job record in `jobs`, `processing`, `done`, or `failed`;
+  not already have a job record in `jobs`, `processing`, `done`, `failed`, or
+  `auth-blocked`;
   it should first backfill the durable context log from recent channel history,
   check bundled message IDs rather than just the final job filename, and group
   remaining adjacent messages before enqueueing. This prevents restart-window
@@ -104,9 +106,12 @@ command.
   a burst is only partially recorded, preserve the whole burst as context for
   the catch-up job so screenshots and follow-up text are not separated from the
   prompt that made them meaningful.
+- A request held in `auth-blocked/` for a fresh server Codex login must not be
+  requeued as a duplicate active request after restart.
 - When Discord `#codex` intake misbehaves, check `/healthz` for
   `discordCodexSetupReady`, `discordCodexLastCatchup`,
-  `discordCodexRecentContextRows`, and
+  `discordCodexRecentContextRows`, `discordCodexWorkerAuth`,
+  `discordCodexAuthBlockedJobs`, and
   `discordCodexLastError` before assuming the command implementation is broken.
 - For response-quality audits, inspect the matching `done/*.json` record. It
   stores sanitized `codexMessage` and `finalMessage`, which makes it possible

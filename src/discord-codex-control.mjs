@@ -471,7 +471,8 @@ export function groupDiscordCodexMessageBursts(
     channelId,
     now = Date.now(),
     windowMs = DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS,
-    gapMs = DEFAULT_DISCORD_CODEX_BURST_GAP_MS
+    gapMs = DEFAULT_DISCORD_CODEX_BURST_GAP_MS,
+    groupByAuthor = true
   } = {}
 ) {
   const recentMessages = recentDiscordCodexMessagesForCatchup(messages, {
@@ -487,11 +488,16 @@ export function groupDiscordCodexMessageBursts(
     const previousMessage = previousBurst?.at(-1);
     const previousTimestamp = Number(previousMessage?.createdTimestamp || 0);
     const currentTimestamp = Number(message?.createdTimestamp || 0);
+    const sameAuthor =
+      !groupByAuthor ||
+      !previousMessage ||
+      String(previousMessage?.author?.id || '') === String(message?.author?.id || '');
     const sameBurst =
       previousBurst &&
       Number.isFinite(previousTimestamp) &&
       Number.isFinite(currentTimestamp) &&
-      currentTimestamp - previousTimestamp <= maxGap;
+      currentTimestamp - previousTimestamp <= maxGap &&
+      sameAuthor;
 
     if (sameBurst) {
       previousBurst.push(message);
@@ -510,6 +516,7 @@ export async function planDiscordCodexCatchupBursts(
     now = Date.now(),
     windowMs = DEFAULT_DISCORD_CODEX_CATCHUP_WINDOW_MS,
     gapMs = DEFAULT_DISCORD_CODEX_BURST_GAP_MS,
+    groupByAuthor = true,
     handled = async () => false
   } = {}
 ) {
@@ -517,7 +524,8 @@ export async function planDiscordCodexCatchupBursts(
     channelId,
     now,
     windowMs,
-    gapMs
+    gapMs,
+    groupByAuthor
   });
   const planned = [];
   let skippedHandledBursts = 0;

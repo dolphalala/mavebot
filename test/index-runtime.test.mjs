@@ -52,6 +52,10 @@ test('Discord Codex runtime exposes intake diagnostics in health output', async 
 
   assert.match(source, /discordCodexLastCatchup/);
   assert.match(source, /discordCodexLastError/);
+  assert.match(source, /discordCodexWorkerAuth/);
+  assert.match(source, /discordCodexAuthBlockedJobs/);
+  assert.match(source, /readDiscordCodexWorkerAuthState/);
+  assert.match(source, /auth-retry-state\.json/);
   assert.match(source, /discordCodexCatchupLimit/);
   assert.match(source, /discordCodexContextBackfillLimit/);
   assert.match(source, /discordCodexCatchupWindowMs/);
@@ -72,4 +76,12 @@ test('Discord Codex runtime exposes intake diagnostics in health output', async 
   assert.match(source, /rememberDiscordCodexError\('attachment-download'/);
   assert.match(source, /rememberDiscordCodexError\('context-log'/);
   assert.match(source, /rememberDiscordCodexError\('message-create'/);
+});
+
+test('Discord Codex runtime treats auth-blocked jobs as handled records', async () => {
+  const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
+
+  assert.match(source, /discordCodexWorkerRecordDirs/);
+  assert.match(source, /discordCodexWorkerRecordDir\('auth-blocked'\)/);
+  assert.match(source, /countDiscordCodexWorkerRecords\('auth-blocked'\)/);
 });

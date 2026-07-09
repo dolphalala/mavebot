@@ -96,18 +96,23 @@ Registering a command without a matching runtime handler causes Discord's
 3. Keep active message IDs separate from nearby background context. Nearby
    rows can help resolve "above" and "that screenshot", but they must not count
    as handled worker messages unless they are part of the active burst.
+   `auth-blocked/` records are still handled worker messages for duplicate
+   detection until the worker login is refreshed and the saved job is requeued.
 4. If changing Discord nearby context, preserve the durable JSONL tail behavior:
    useful user messages, uploads, and non-noisy mavebot replies survive
    restarts, but short working acknowledgements and smoke tests do not bloat
    context. Keep broad context backfill separate from the smaller missed-work
    catch-up limit.
-5. For Slack files/screenshots, preserve file metadata and local shared-volume
+5. Restart catch-up grouping belongs in `src/discord-codex-control.mjs` and
+   should stay per author. Health diagnostics and existing-record checks belong
+   in `src/index.mjs`.
+6. For Slack files/screenshots, preserve file metadata and local shared-volume
    paths so the worker can inspect uploads from
    `/shared/codex-worker/context/slack-files/`.
-6. Add tests around prompt shape, memory compaction, queue behavior, file
+7. Add tests around prompt shape, memory compaction, queue behavior, file
    context, message de-duplication, verified live wording, or message cleaning.
-7. Update `remote-codex-session.md` and this file when behavior or context
+8. Update `remote-codex-session.md` and this file when behavior or context
    loading changes.
-8. Update `local-codex-parity.md` if the standard for matching local Codex
+9. Update `local-codex-parity.md` if the standard for matching local Codex
    Desktop behavior changes.
 9. Verify the worker queue, generated memory files, and live channel response.
