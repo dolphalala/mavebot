@@ -7,11 +7,13 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   activeRequestNeedsDetailedAnswer,
+  authBlockedJobExtra,
   buildCodexExecArgs,
   buildCodexWorkerPrompt,
   buildMovedJobRecord,
   buildWorkerRuntimeSnapshot,
   checkUrl,
+  codexLoginStatusLooksReady,
   codexImagePathsForJob,
   compactTranscriptRows,
   commitMessageForJob,
@@ -860,6 +862,52 @@ test('workerFailureMessage detects Codex auth failures from command output', () 
   assert.doesNotMatch(message, /refresh token|access token|401/i);
 });
 
+test('codexLoginStatusLooksReady rejects logged-out status before retry probe', () => {
+  assert.equal(codexLoginStatusLooksReady({ code: 0, stdout: 'Logged in using ChatGPT' }), true);
+  assert.equal(codexLoginStatusLooksReady({ code: 1, stdout: 'Not logged in' }), false);
+  assert.equal(codexLoginStatusLooksReady({ code: 0, stdout: 'Not logged in' }), false);
+  assert.equal(codexLoginStatusLooksReady('Please sign in again'), false);
+});
+
+test('auth-blocked job records can be cleaned when requeued', () => {
+  const extra = authBlockedJobExtra(
+    new Error('HTTP 401 Unauthorized: token_invalidated'),
+    {
+      at: '2026-07-09T12:30:00.000Z',
+      retryAfterMs: 300000
+    }
+  );
+
+  assert.equal(extra.authBlocked, true);
+  assert.equal(extra.authBlockedAt, '2026-07-09T12:30:00.000Z');
+  assert.equal(extra.authRetryAfterMs, 300000);
+  assert.match(extra.error, /401|token_invalidated/i);
+
+  const requeued = buildMovedJobRecord(
+    {
+      id: 'job-1',
+      failedAt: 'old',
+      error: 'old error',
+      authBlocked: true,
+      authBlockedAt: 'old',
+      authRetryAfterMs: 300000,
+      contextFiles: { summaryPath: '/shared/summary.md' },
+      contextSize: 10
+    },
+    {
+      authRequeuedAt: '2026-07-09T12:35:00.000Z'
+    },
+    { clearFailure: true }
+  );
+
+  assert.equal(requeued.id, 'job-1');
+  assert.equal(requeued.authRequeuedAt, '2026-07-09T12:35:00.000Z');
+  assert.equal(Object.hasOwn(requeued, 'authBlocked'), false);
+  assert.equal(Object.hasOwn(requeued, 'authBlockedAt'), false);
+  assert.equal(Object.hasOwn(requeued, 'authRetryAfterMs'), false);
+  assert.equal(Object.hasOwn(requeued, 'error'), false);
+});
+
 test('errorDiagnosticText preserves start and end of failed process output', () => {
   const error = new Error('codex exec exited 1');
   error.result = {
@@ -907,6 +955,7 @@ test('buildWorkerRuntimeSnapshot explains deploy and safety boundaries without s
   assert.match(snapshot, /origin\/main/);
   assert.match(snapshot, /scripts\/deploy-server\.sh/);
   assert.match(snapshot, /Discord #codex/);
+  assert.match(snapshot, /authBlockedDir/);
   assert.match(snapshot, /requireSlackBridgeHealth/);
   assert.match(snapshot, /npm run check/);
   assert.match(snapshot, /transcript is normalized/);

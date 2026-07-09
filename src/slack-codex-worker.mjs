@@ -40,6 +40,10 @@ const failedDir =
   process.env.CODEX_WORKER_FAILED_DIR ||
   process.env.SLACK_WORKER_FAILED_DIR ||
   path.join(sharedDir, 'failed');
+const authBlockedDir =
+  process.env.CODEX_WORKER_AUTH_BLOCKED_DIR ||
+  process.env.SLACK_WORKER_AUTH_BLOCKED_DIR ||
+  path.join(sharedDir, 'auth-blocked');
 const contextDir =
   process.env.CODEX_WORKER_CONTEXT_DIR ||
   process.env.SLACK_WORKER_CONTEXT_DIR ||
@@ -104,6 +108,11 @@ const runtimeHealthTimeoutMs = parsePositiveInt(
     process.env.SLACK_WORKER_RUNTIME_HEALTH_TIMEOUT_MS,
   60000
 );
+const authRetryProbeIntervalMs = parsePositiveInt(
+  process.env.CODEX_WORKER_AUTH_RETRY_PROBE_INTERVAL_MS ||
+    process.env.SLACK_WORKER_AUTH_RETRY_PROBE_INTERVAL_MS,
+  5 * 60 * 1000
+);
 const recentTurnLimit = parsePositiveInt(
   process.env.CODEX_WORKER_RECENT_TURNS || process.env.SLACK_WORKER_RECENT_TURNS,
   40
@@ -125,6 +134,7 @@ const transcriptPath = path.join(contextDir, 'transcript.jsonl');
 const summaryPath = path.join(contextDir, 'summary.md');
 const recentPath = path.join(contextDir, 'recent.md');
 const sessionPath = path.join(contextDir, 'session.md');
+const authProbeOutputPath = path.join(contextDir, 'auth-probe-last-message.md');
 const codexOutputPath =
   process.env.CODEX_WORKER_CODEX_OUTPUT_PATH ||
   process.env.SLACK_WORKER_CODEX_OUTPUT_PATH ||
@@ -145,6 +155,9 @@ const repoContextPriority = [
   'clash-database-guidance.md',
   'clash-ui-guidance.md'
 ];
+
+let nextAuthRetryProbeAt = 0;
+let lastAuthRetryProbe = null;
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value || '', 10);
@@ -395,6 +408,34 @@ export function isCodexAuthError(value) {
     /HTTP(?: error)?: 401/i.test(text) ||
     /token_expired/i.test(text) ||
     /Please log out and sign in again/i.test(text);
+}
+
+export function codexLoginStatusLooksReady(resultOrText) {
+  const text =
+    typeof resultOrText === 'string'
+      ? resultOrText
+      : [
+          resultOrText?.stdout,
+          resultOrText?.stderr,
+          resultOrText?.message
+        ].filter(Boolean).join('\n');
+  const code = typeof resultOrText === 'string' ? 0 : Number(resultOrText?.code ?? 0);
+  if (code !== 0) {
+    return false;
+  }
+  return !/(?:not logged in|not authenticated|login required|please log in|please sign in)/i.test(text);
+}
+
+export function authBlockedJobExtra(error, {
+  at = new Date().toISOString(),
+  retryAfterMs = authRetryProbeIntervalMs
+} = {}) {
+  return {
+    authBlocked: true,
+    authBlockedAt: at,
+    authRetryAfterMs: retryAfterMs,
+    error: safeErrorText(error)
+  };
 }
 
 export function workerFailureMessage(error) {
@@ -673,6 +714,7 @@ async function ensureDirectories() {
     mkdir(processingDir, { recursive: true }),
     mkdir(doneDir, { recursive: true }),
     mkdir(failedDir, { recursive: true }),
+    mkdir(authBlockedDir, { recursive: true }),
     mkdir(contextDir, { recursive: true }),
     mkdir(path.dirname(repoDir), { recursive: true })
   ]);
@@ -748,11 +790,109 @@ async function claimNextJob() {
   return null;
 }
 
+async function codexAuthProbe() {
+  const statusDir = (await pathExists(repoDir)) ? repoDir : sharedDir;
+  await mkdir(statusDir, { recursive: true });
+  const status = await runProcess(codexBin, ['login', 'status'], {
+    cwd: statusDir,
+    timeoutMs: 30_000,
+    allowFailure: true
+  });
+  if (!codexLoginStatusLooksReady(status)) {
+    return {
+      ready: false,
+      reason: truncate((status.stdout || status.stderr || 'Codex is not logged in.').trim(), 300)
+    };
+  }
+
+  const probeDir = statusDir;
+  const probe = await runProcess(
+    codexBin,
+    [
+      'exec',
+      '--cd',
+      probeDir,
+      '--sandbox',
+      'danger-full-access',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '--output-last-message',
+      authProbeOutputPath,
+      '-'
+    ],
+    {
+      cwd: probeDir,
+      input: 'Auth probe only. Do not change files. Reply exactly: OK',
+      timeoutMs: 60_000,
+      allowFailure: true
+    }
+  );
+  if (probe.code !== 0 || isCodexAuthError(probe)) {
+    return {
+      ready: false,
+      reason: truncate(errorDiagnosticText({ message: 'Codex auth probe failed.', result: probe }), 500)
+    };
+  }
+
+  return { ready: true, reason: 'Codex auth probe passed.' };
+}
+
+async function requeueAuthBlockedJobsIfReady() {
+  const names = await listJsonFiles(authBlockedDir);
+  if (!names.length) {
+    return { checked: false, requeued: 0 };
+  }
+
+  const now = Date.now();
+  if (now < nextAuthRetryProbeAt) {
+    return { checked: false, requeued: 0, waiting: true };
+  }
+  nextAuthRetryProbeAt = now + authRetryProbeIntervalMs;
+
+  const probe = await codexAuthProbe().catch((error) => ({
+    ready: false,
+    reason: safeErrorText(error, 500)
+  }));
+  lastAuthRetryProbe = {
+    at: new Date().toISOString(),
+    blockedJobs: names.length,
+    ...probe
+  };
+  await writePrivateText(
+    path.join(contextDir, 'auth-retry-state.json'),
+    `${JSON.stringify(lastAuthRetryProbe, null, 2)}\n`
+  ).catch(() => {});
+
+  if (!probe.ready) {
+    console.log(`Codex auth still blocked; ${names.length} saved job(s) remain held.`);
+    return { checked: true, requeued: 0, ready: false };
+  }
+
+  let requeued = 0;
+  for (const name of names) {
+    const source = path.join(authBlockedDir, name);
+    const job = await readJsonFile(source).catch(() => null);
+    if (!job) {
+      continue;
+    }
+    await moveJob(source, jobDir, job, {
+      authRequeuedAt: new Date().toISOString()
+    }, { clearFailure: true });
+    requeued += 1;
+  }
+  if (requeued) {
+    console.log(`Codex auth is healthy; requeued ${requeued} saved job(s).`);
+  }
+  return { checked: true, requeued, ready: true };
+}
+
 export function buildMovedJobRecord(current = {}, extra = {}, { clearFailure = false } = {}) {
   const record = { ...current, ...extra };
   if (clearFailure) {
     delete record.failedAt;
     delete record.error;
+    delete record.authBlocked;
+    delete record.authBlockedAt;
+    delete record.authRetryAfterMs;
     delete record.contextFiles;
     delete record.contextSize;
   }
@@ -1086,6 +1226,7 @@ export function buildWorkerRuntimeSnapshot(job = {}) {
       processingDir,
       doneDir,
       failedDir,
+      authBlockedDir,
       contextDir,
       repoDir,
       liveAppDir
@@ -1612,6 +1753,7 @@ async function handleJob(claimed) {
   } catch (error) {
     const message = workerFailureMessage(error);
     console.error(safeErrorText(error));
+    const authBlocked = isCodexAuthError(error);
     contextSnapshot = await appendTurn({
       at: new Date().toISOString(),
       role: 'assistant',
@@ -1624,16 +1766,28 @@ async function handleJob(claimed) {
     await postJobMessage(job, message).catch((postError) => {
       console.error(`Failed to post job error: ${redact(postError.message)}`);
     });
-    await moveJob(jobPath, failedDir, job, {
-      failedAt: new Date().toISOString(),
-      error: safeErrorText(error),
-      contextFiles: {
-        summaryPath,
-        recentPath,
-        sessionPath
-      },
-      contextSize: contextSnapshot.summary.length + contextSnapshot.recent.length
-    });
+    if (authBlocked) {
+      await moveJob(jobPath, authBlockedDir, job, {
+        ...authBlockedJobExtra(error),
+        contextFiles: {
+          summaryPath,
+          recentPath,
+          sessionPath
+        },
+        contextSize: contextSnapshot.summary.length + contextSnapshot.recent.length
+      });
+    } else {
+      await moveJob(jobPath, failedDir, job, {
+        failedAt: new Date().toISOString(),
+        error: safeErrorText(error),
+        contextFiles: {
+          summaryPath,
+          recentPath,
+          sessionPath
+        },
+        contextSize: contextSnapshot.summary.length + contextSnapshot.recent.length
+      });
+    }
   }
 }
 
@@ -1644,6 +1798,7 @@ async function loop() {
   console.log(`${workerName} Codex worker started. Watching ${jobDir}.`);
 
   for (;;) {
+    await requeueAuthBlockedJobsIfReady();
     const claimed = await claimNextJob();
     if (!claimed) {
       await sleep(pollIntervalMs);

@@ -171,6 +171,13 @@ remote work.
 - If the channel says the server-side Codex login is expired, Discord intake is
   still receiving jobs but `codex-worker` cannot run `codex exec` until its
   mounted `CODEX_HOME` is re-authenticated.
+- When `codex exec` fails with a Codex auth error, the worker moves the request
+  into `/opt/urba-apps/discord-bot/shared/codex-worker/auth-blocked/` instead
+  of treating it as an ordinary failed job. The worker periodically checks
+  `codex login status`; when that looks logged in, it runs a tiny `codex exec`
+  auth probe before requeueing the saved jobs. This keeps requests retryable
+  after a server login refresh without replaying them while auth is still
+  broken.
 - `codex login status` can still say "Logged in using ChatGPT" after the
   refresh token has been revoked. Verify auth with a tiny no-code `codex exec`
   smoke inside `urba-codex-worker`; `HTTP 401`, `token_invalidated`, or
