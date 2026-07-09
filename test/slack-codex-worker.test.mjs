@@ -137,6 +137,24 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
       channel: '1523893930993778698',
       jobId: '1523893930993778698-codex-parity-live-123',
       text: 'Confirmed: I can read the attached image file and post a normal Discord channel reply.'
+    },
+    {
+      at: '2026-07-07T00:09:00.000Z',
+      role: 'user',
+      user: 'Codex smoke',
+      source: 'discord',
+      channel: '1523893930993778698',
+      jobId: 'discord-auth-smoke-1783591385380',
+      text: 'Auth smoke test after worker diagnostics update. Do not change files.'
+    },
+    {
+      at: '2026-07-07T00:10:00.000Z',
+      role: 'user',
+      user: 'Codex smoke',
+      source: 'discord',
+      channel: '1523893930993778698',
+      jobId: 'discord-only-smoke-1783589874735',
+      text: 'Discord-only worker smoke test after Slack bridge removal. Do not change files.'
     }
   ];
 
@@ -149,6 +167,8 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.equal(isLowSignalTranscriptRow(rows[6]), true);
   assert.equal(isLowSignalTranscriptRow(rows[7]), true);
   assert.equal(isLowSignalTranscriptRow(rows[8]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[9]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[10]), true);
 
   const snapshot = compactTranscriptRows(rows, {
     recentLimit: 5,
@@ -162,7 +182,9 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.doesNotMatch(snapshot.recent, /Memory compaction is clean/);
   assert.doesNotMatch(snapshot.recent, /working acknowledgements/);
   assert.doesNotMatch(snapshot.recent, /attached image file/);
-  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 8/);
+  assert.doesNotMatch(snapshot.recent, /Auth smoke test/);
+  assert.doesNotMatch(snapshot.recent, /Discord-only worker smoke/);
+  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 10/);
 });
 
 test('compactTranscriptRows strips worker handoff boilerplate from retained memory', () => {

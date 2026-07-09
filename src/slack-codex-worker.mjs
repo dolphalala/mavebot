@@ -1005,13 +1005,15 @@ export function isLowSignalTranscriptRow(row) {
 
   if (
     /^(discord-live-verify-|discord-code-change-ack-)/.test(jobId) ||
-    /(?:codex-(?:desktop-)?parity|worker-auth-smoke)/.test(jobId)
+    /(?:codex-(?:desktop-)?parity|worker-auth-smoke|discord-auth-smoke|discord-only-smoke)/.test(jobId)
   ) {
     return true;
   }
 
   return [
     /worker verification task/,
+    /auth smoke test/,
+    /discord-only worker smoke test/,
     /live verification only/,
     /live verification only ok/,
     /server-worker-verification/,
