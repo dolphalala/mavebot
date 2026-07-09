@@ -18,9 +18,11 @@ import {
   codexImagePathsForJob,
   compactTranscriptRows,
   commitMessageForJob,
+  deployWebhookPayload,
   detailedWorkerChannelMessage,
   errorDiagnosticText,
   finalSlackMessage,
+  githubWebhookSignature,
   humanizeWorkerChannelMessage,
   isCodexImageFile,
   isCodexAuthError,
@@ -30,6 +32,7 @@ import {
   readRecentWorkerJobHistory,
   readRepoContextBundle,
   shouldRunChecksForChangedFiles,
+  triggerDeployWebhook,
   workerAuthStatusRecord,
   workerFailureMessage,
   workerProgressMessage
@@ -864,10 +867,50 @@ test('workerProgressMessage keeps long-job updates short and human', () => {
     'Still waiting on the server deploy to finish.'
   );
   assert.equal(
+    workerProgressMessage('deploy-trigger', 1),
+    'Changes are saved. I am telling the server to deploy now.'
+  );
+  assert.equal(
     workerProgressMessage('runtime-health', 1),
     'Still on it. I am checking the live bot now.'
   );
   assert.doesNotMatch(workerProgressMessage('checks', 1), /worker|queue|job|processing/i);
+});
+
+test('deploy webhook helpers send GitHub-style signed push events', async () => {
+  const payload = deployWebhookPayload('abc123', { ref: 'refs/heads/main' });
+  assert.equal(payload.ref, 'refs/heads/main');
+  assert.equal(payload.after, 'abc123');
+  assert.equal(payload.repository.full_name, 'dolphalala/mavebot');
+
+  const body = JSON.stringify(payload);
+  assert.match(githubWebhookSignature('secret', body), /^sha256=[a-f0-9]{64}$/);
+
+  const calls = [];
+  const result = await triggerDeployWebhook('abc123', {
+    url: 'http://127.0.0.1:4189/discord-bot-deploy',
+    secret: 'secret',
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return new Response('deploy started\n', { status: 202 });
+    }
+  });
+
+  assert.equal(result.triggered, true);
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 202);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.headers['X-GitHub-Event'], 'push');
+  assert.match(calls[0].options.headers['X-Hub-Signature-256'], /^sha256=[a-f0-9]{64}$/);
+  assert.deepEqual(JSON.parse(calls[0].options.body), payload);
+});
+
+test('triggerDeployWebhook skips cleanly when not configured', async () => {
+  const result = await triggerDeployWebhook('abc123', { url: '', secret: '' });
+  assert.equal(result.triggered, false);
+  assert.equal(result.skipped, true);
+  assert.match(result.reason, /not configured/);
 });
 
 test('finalSlackMessage strips inline premature live claims before wrapper status', () => {

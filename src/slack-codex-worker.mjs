@@ -3,7 +3,7 @@ import http from 'node:http';
 import https from 'node:https';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import {
   access,
   appendFile,
@@ -100,6 +100,15 @@ const commandTimeoutMs = parsePositiveInt(
 const deployTimeoutMs = parsePositiveInt(
   process.env.CODEX_WORKER_DEPLOY_TIMEOUT_MS || process.env.SLACK_WORKER_DEPLOY_TIMEOUT_MS,
   5 * 60 * 1000
+);
+const deployWebhookUrl =
+  process.env.CODEX_WORKER_DEPLOY_WEBHOOK_URL || process.env.SLACK_WORKER_DEPLOY_WEBHOOK_URL || '';
+const deployWebhookSecret =
+  process.env.CODEX_WORKER_DEPLOY_WEBHOOK_SECRET || process.env.SLACK_WORKER_DEPLOY_WEBHOOK_SECRET || '';
+const deployWebhookTimeoutMs = parsePositiveInt(
+  process.env.CODEX_WORKER_DEPLOY_WEBHOOK_TIMEOUT_MS ||
+    process.env.SLACK_WORKER_DEPLOY_WEBHOOK_TIMEOUT_MS,
+  10000
 );
 const fetchTimeoutMs = parsePositiveInt(
   process.env.CODEX_WORKER_FETCH_TIMEOUT_MS || process.env.SLACK_WORKER_FETCH_TIMEOUT_MS,
@@ -581,6 +590,7 @@ const workerStageLabels = {
   'dependencies-after-codex': 'refreshing packages',
   checks: 'running checks',
   'commit-and-push': 'saving changes to GitHub',
+  'deploy-trigger': 'nudging the server deploy',
   'deploy-wait': 'waiting for the server deploy',
   'runtime-health': 'checking the live bot',
   'post-message': 'sending the answer'
@@ -601,6 +611,11 @@ export function workerProgressMessage(stageName, count = 1) {
     return count <= 1
       ? 'Changes are saved. I am waiting for the server to pick them up.'
       : 'Still waiting on the server deploy to finish.';
+  }
+  if (stageName === 'deploy-trigger') {
+    return count <= 1
+      ? 'Changes are saved. I am telling the server to deploy now.'
+      : 'Still nudging the server deploy.';
   }
   if (stageName === 'checks') {
     return count <= 1
@@ -1363,7 +1378,7 @@ export function compactTranscriptRows(rows, options = {}) {
     '',
     '- Repo: dolphalala/mavebot.',
     '- Server app path: /opt/urba-apps/discord-bot/app.',
-    '- Production deploy follows GitHub origin/main through the server poll deploy timer.',
+    '- Production deploy follows GitHub origin/main; the worker triggers the private server deploy webhook when configured, and the 30-second poll deploy timer remains the fallback.',
     '- Discord #codex is the primary control surface and should behave like a persistent Codex Desktop-style session, with mavebot posting normal channel replies.',
     '- Slack #bot is legacy only and must not be required for Discord worker success.',
     '- Repo docs/context/*.md files are durable operating memory. Keep them concise, restructure them when stale, and remove duplicated obsolete notes.',
@@ -1642,7 +1657,9 @@ export function buildWorkerRuntimeSnapshot(job = {}) {
     },
     deploy: {
       target: `origin/${branch}`,
-      mechanism: 'server poll deploy pulls GitHub main and runs scripts/deploy-server.sh',
+      mechanism: 'worker-triggered private deploy webhook, with server poll deploy fallback',
+      script: 'scripts/deploy-server.sh',
+      privateWebhookConfigured: Boolean(deployWebhookUrl && deployWebhookSecret),
       botHealthUrl,
       optionalSlackBridgeHealthUrl: bridgeHealthUrl || null,
       requireSlackBridgeHealth: requireBridgeHealth
@@ -2056,6 +2073,73 @@ async function waitForLiveCommit(fullCommit) {
   };
 }
 
+export function deployWebhookPayload(fullCommit, { ref = `refs/heads/${branch}` } = {}) {
+  return {
+    ref,
+    after: fullCommit || '',
+    repository: {
+      full_name: repoUrl.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '')
+    },
+    pusher: {
+      name: workerName
+    }
+  };
+}
+
+export function githubWebhookSignature(secret, body) {
+  if (!secret) {
+    return '';
+  }
+  return `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
+}
+
+export async function triggerDeployWebhook(
+  fullCommit,
+  {
+    url = deployWebhookUrl,
+    secret = deployWebhookSecret,
+    timeoutMs = deployWebhookTimeoutMs,
+    fetchImpl = fetch
+  } = {}
+) {
+  if (!url || !secret) {
+    return { triggered: false, skipped: true, reason: 'deploy webhook not configured' };
+  }
+
+  const body = JSON.stringify(deployWebhookPayload(fullCommit));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  timer.unref?.();
+
+  try {
+    const response = await fetchImpl(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-GitHub-Event': 'push',
+        'X-Hub-Signature-256': githubWebhookSignature(secret, body)
+      },
+      body,
+      signal: controller.signal
+    });
+    const text = await response.text().catch(() => '');
+    return {
+      triggered: true,
+      ok: response.ok,
+      status: response.status,
+      response: truncate(text, 300)
+    };
+  } catch (error) {
+    return {
+      triggered: true,
+      ok: false,
+      error: truncate(redact(error?.message || error), 300)
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function checkUrl(url, timeoutMs = 10000) {
   if (!url) {
     return false;
@@ -2260,6 +2344,9 @@ async function handleJob(claimed) {
     const pushResult = hasChanges
       ? await stage('commit-and-push', () => commitAndPush(job))
       : { pushed: false, commit: await gitStdout(['rev-parse', '--short', 'HEAD']), skipped: true };
+    const deployTriggerResult = pushResult.pushed
+      ? await stage('deploy-trigger', () => triggerDeployWebhook(pushResult.fullCommit))
+      : { triggered: false, skipped: true, reason: 'no push needed' };
     const deployResult = pushResult.pushed
       ? await stage('deploy-wait', () => waitForLiveCommit(pushResult.fullCommit))
       : { matched: false, reason: 'no push needed', skipped: true };
@@ -2270,6 +2357,7 @@ async function handleJob(claimed) {
       codexMessage,
       checkOk,
       pushResult,
+      deployTriggerResult,
       deployResult,
       runtime,
       job

@@ -42,6 +42,10 @@ long-lived server state.
 - Long code/deploy jobs should not sit silently after the first acknowledgement.
   Post a few short progress notes when a stage runs long, using normal human
   language, then give the real final answer after verification.
+- Changed-file jobs should trigger the server-local private deploy webhook from
+  the worker when configured, then still verify the live commit and health. The
+  30-second poll deploy timer is only the fallback, because waiting for it makes
+  Discord feel randomly slow.
 - If Allen, Lana, or another user asks for a plan, demo, explanation, design,
   review, screenshot analysis, database model, or "how this works," preserve
   enough structure in the final answer to actually answer it.
@@ -82,6 +86,12 @@ long-lived server state.
   noisy sections instead of appending repeated status notes.
 - Never store secrets, raw env values, OAuth tokens, cookies, or private keys in
   context docs.
+- 2026-07-09 latency investigation: the live `#codex` channel had no human
+  message after Allen's earlier "hello is this working now" test, so the visible
+  4-minute delay came from the older worker path before immediate status
+  replies and stage diagnostics. Current no-change worker smokes are around
+  7-8 seconds; changed-file jobs should now use the private deploy webhook
+  before relying on the poll timer.
 
 ## Persistent Product Context
 

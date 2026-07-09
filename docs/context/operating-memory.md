@@ -89,8 +89,13 @@ remote work.
   player tracking. Past war/CWL player attack history can only be collected
   from now forward unless the official API still exposes the active war or CWL
   war tags; public war logs only provide summary rows.
-- GitHub deploys should use the server-local
-  `urba-discord-poll-deploy.timer`, not a public webhook.
+- GitHub deploys should use the server-local private deploy webhook when
+  configured. The webhook service is
+  `urba-discord-deploy-webhook.service`, backed by
+  `scripts/deploy-webhook.py`, and should bind to the Docker bridge IP so the
+  `codex-worker` container can trigger it without exposing a public port. The
+  `urba-discord-poll-deploy.timer` remains the fallback and runs every 30
+  seconds.
 - The server poll deploy only follows `origin/main`. A Codex cloud task that
   only edits its task workspace, branch, or PR is not deployed and must not be
   described as live. Code-changing Discord `#codex` tasks should push/merge to
@@ -106,7 +111,9 @@ remote work.
   compose profile. Normal `#codex` messages become JSON jobs in
   `/opt/urba-apps/discord-bot/shared/codex-worker/jobs`; the worker runs Codex
   CLI in `/opt/urba-apps/discord-bot/shared/codex-worker/repo`, commits, pushes
-  `origin/main`, and waits for the 30-second poll deploy to pull that commit.
+  `origin/main`, triggers the private deploy webhook when configured, then waits
+  for the live app checkout and runtime health to verify the change. If the
+  webhook is unavailable, the 30-second poll deploy still pulls the commit.
 - Discord channel-to-code uses the same worker queue. Normal messages from
   non-bot users in Discord channel `1523893930993778698` (`#codex`) become
   JSON jobs in `/opt/urba-apps/discord-bot/shared/codex-worker/jobs`, and the
