@@ -125,6 +125,8 @@ long-lived server state.
   guarding against: skipped plan/demo answers on broad requests, overly short
   "fixed it" replies that hide what changed, and auth-expired jobs looking like
   silent hangs unless `/healthz` exposes the worker auth state.
+- 2026-07-09 live smoke verified worker current-stage health diagnostics and
+  progress behavior.
 - Keep memory efficient as Discord channel history grows: summarize durable
   facts, move domain guidance into focused files, and delete duplicated stale
   notes once the facts are preserved.
