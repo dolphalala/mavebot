@@ -35,6 +35,9 @@ long-lived server state.
 
 - Brief working messages should sound human and short. They are only a visible
   "I got this" acknowledgement, not a final answer.
+- Long code/deploy jobs should not sit silently after the first acknowledgement.
+  Post a few short progress notes when a stage runs long, using normal human
+  language, then give the real final answer after verification.
 - If Allen, Lana, or another user asks for a plan, demo, explanation, design,
   review, screenshot analysis, database model, or "how this works," preserve
   enough structure in the final answer to actually answer it.

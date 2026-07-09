@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
-import { access, readFile, readdir } from 'node:fs/promises';
+import { access, readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import express from 'express';
 import {
@@ -228,6 +228,7 @@ app.get('/healthz', async (_req, res) => {
   let clashHistoryScheduler = null;
   let discordCodexPersistentContextRows = 0;
   const discordCodexAuthBlockedJobs = await countDiscordCodexWorkerRecords('auth-blocked');
+  const discordCodexWorkerQueue = await readDiscordCodexWorkerQueueSnapshot();
   const discordCodexWorkerAuth = await readDiscordCodexWorkerAuthState({
     currentBlockedJobs: discordCodexAuthBlockedJobs
   });
@@ -271,6 +272,7 @@ app.get('/healthz', async (_req, res) => {
     discordCodexLastError,
     discordCodexWorkerAuth,
     discordCodexAuthBlockedJobs,
+    discordCodexWorkerQueue,
     pictionaryStorePath: pictionaryStorePath(),
     pictionaryActiveGames: activePictionaryGames.size,
     clashHistoryStorePath: clashHistoryStorePath(),
@@ -375,6 +377,100 @@ async function countDiscordCodexWorkerRecords(name) {
   } catch {
     return 0;
   }
+}
+
+function discordCodexWorkerRecordAgeMs(record = {}, now = Date.now()) {
+  const started = Date.parse(record.startedAt || '');
+  const created = Date.parse(record.createdAt || '');
+  const start = Number.isFinite(started) ? started : created;
+  return Number.isFinite(start) ? Math.max(0, now - start) : null;
+}
+
+function summarizeDiscordCodexWorkerRecord(record = {}, { name = '', mtimeMs = 0 } = {}) {
+  return {
+    id: String(record.id || name || '').slice(0, 180),
+    source: record.source || '',
+    channel: record.channel || '',
+    user: record.username || record.user || '',
+    attempts: Number.parseInt(record.attempts || '0', 10) || 0,
+    createdAt: record.createdAt || '',
+    startedAt: record.startedAt || '',
+    finishedAt: record.finishedAt || record.completedAt || record.failedAt || '',
+    durationMs: Number.isFinite(record.durationMs) ? record.durationMs : null,
+    ageMs: discordCodexWorkerRecordAgeMs(record),
+    currentStage: record.currentStage || record.workerTiming?.currentStage || null,
+    changedFileCount: Array.isArray(record.changedFiles) ? record.changedFiles.length : null,
+    mtimeMs
+  };
+}
+
+async function readDiscordCodexWorkerRecords(name, { limit = 3 } = {}) {
+  const dir = discordCodexWorkerRecordDir(name);
+  let entries = [];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    return [];
+  }
+
+  const records = [];
+  for (const entry of entries.filter((item) => item.endsWith('.json'))) {
+    const filePath = path.join(dir, entry);
+    try {
+      const [info, record] = await Promise.all([
+        stat(filePath),
+        readFile(filePath, 'utf8').then((body) => JSON.parse(body.replace(/^\uFEFF/, '')))
+      ]);
+      records.push(summarizeDiscordCodexWorkerRecord(record, {
+        name: entry.replace(/\.json$/i, ''),
+        mtimeMs: info.mtimeMs
+      }));
+    } catch {}
+  }
+
+  return records
+    .sort((left, right) => (right.mtimeMs || 0) - (left.mtimeMs || 0))
+    .slice(0, limit);
+}
+
+async function readDiscordCodexWorkerQueueSnapshot() {
+  const [
+    jobs,
+    processing,
+    authBlocked,
+    failed,
+    done,
+    jobCount,
+    processingCount,
+    authBlockedCount,
+    failedCount,
+    doneCount
+  ] = await Promise.all([
+    readDiscordCodexWorkerRecords('jobs', { limit: 5 }),
+    readDiscordCodexWorkerRecords('processing', { limit: 5 }),
+    readDiscordCodexWorkerRecords('auth-blocked', { limit: 3 }),
+    readDiscordCodexWorkerRecords('failed', { limit: 3 }),
+    readDiscordCodexWorkerRecords('done', { limit: 3 }),
+    countDiscordCodexWorkerRecords('jobs'),
+    countDiscordCodexWorkerRecords('processing'),
+    countDiscordCodexWorkerRecords('auth-blocked'),
+    countDiscordCodexWorkerRecords('failed'),
+    countDiscordCodexWorkerRecords('done')
+  ]);
+  return {
+    counts: {
+      jobs: jobCount,
+      processing: processingCount,
+      authBlocked: authBlockedCount,
+      failed: failedCount,
+      done: doneCount
+    },
+    jobs,
+    processing,
+    authBlocked,
+    latestFailed: failed,
+    latestDone: done
+  };
 }
 
 async function readDiscordCodexWorkerAuthState({ currentBlockedJobs = null } = {}) {

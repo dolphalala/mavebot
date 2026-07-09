@@ -264,6 +264,15 @@ remote work.
 - Completed and failed worker job JSON records include `finishedAt`,
   `durationMs`, and `workerTiming.stages`. Use those fields to debug slow
   Discord `#codex` responses before changing queue or deploy behavior.
+- While a job is in `processing`, the worker persists `currentStage` plus the
+  in-progress `workerTiming` into that job record. The Discord bot `/healthz`
+  response exposes `discordCodexWorkerQueue` with queue counts and safe
+  current-stage previews, so slow jobs can be diagnosed without opening prompt
+  text or container logs first.
+- Long worker stages post a few short progress updates in the Discord channel
+  after the configured threshold. These are human status notes only; final
+  answers still come after checks, push, deploy, and runtime verification when
+  code changed.
 - Conversational jobs where Codex makes no file changes should skip the release
   path after `git status` and post the answer directly. Jobs with changed
   files still commit/push, wait for deploy when pushed, and verify runtime.

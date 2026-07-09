@@ -31,7 +31,8 @@ import {
   readRepoContextBundle,
   shouldRunChecksForChangedFiles,
   workerAuthStatusRecord,
-  workerFailureMessage
+  workerFailureMessage,
+  workerProgressMessage
 } from '../src/slack-codex-worker.mjs';
 
 test('compactTranscriptRows keeps recent turns bounded and older turns summarized', () => {
@@ -847,6 +848,22 @@ test('finalSlackMessage strips routine deploy/check chatter from Codex replies',
     }),
     "Fixed the remote runner behavior.\n\nIt's live now."
   );
+});
+
+test('workerProgressMessage keeps long-job updates short and human', () => {
+  assert.equal(
+    workerProgressMessage('codex-exec', 1),
+    "Still on it. I'm working through the code now."
+  );
+  assert.equal(
+    workerProgressMessage('deploy-wait', 2),
+    'Still waiting on the server deploy to finish.'
+  );
+  assert.equal(
+    workerProgressMessage('runtime-health', 1),
+    'Still on it. I am checking the live bot now.'
+  );
+  assert.doesNotMatch(workerProgressMessage('checks', 1), /worker|queue|job|processing/i);
 });
 
 test('finalSlackMessage strips inline premature live claims before wrapper status', () => {

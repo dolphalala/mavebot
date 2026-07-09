@@ -140,6 +140,18 @@ const workerJobHistoryLimit = parsePositiveInt(
   process.env.CODEX_WORKER_JOB_HISTORY_LIMIT || process.env.SLACK_WORKER_JOB_HISTORY_LIMIT,
   8
 );
+const progressFirstMs = parsePositiveInt(
+  process.env.CODEX_WORKER_PROGRESS_FIRST_MS || process.env.SLACK_WORKER_PROGRESS_FIRST_MS,
+  45_000
+);
+const progressIntervalMs = parsePositiveInt(
+  process.env.CODEX_WORKER_PROGRESS_INTERVAL_MS || process.env.SLACK_WORKER_PROGRESS_INTERVAL_MS,
+  90_000
+);
+const progressMaxMessages = parsePositiveInt(
+  process.env.CODEX_WORKER_PROGRESS_MAX_MESSAGES || process.env.SLACK_WORKER_PROGRESS_MAX_MESSAGES,
+  3
+);
 
 const transcriptPath = path.join(contextDir, 'transcript.jsonl');
 const summaryPath = path.join(contextDir, 'summary.md');
@@ -561,31 +573,169 @@ function createJobTiming(job = {}) {
   };
 }
 
-async function timedStage(timing, name, fn) {
+const workerStageLabels = {
+  'ensure-repo': 'syncing the repo',
+  'dependencies-before-codex': 'checking dependencies',
+  'codex-exec': 'thinking through the code',
+  'git-status-after-codex': 'checking what changed',
+  'dependencies-after-codex': 'refreshing packages',
+  checks: 'running checks',
+  'commit-and-push': 'saving changes to GitHub',
+  'deploy-wait': 'waiting for the server deploy',
+  'runtime-health': 'checking the live bot',
+  'post-message': 'sending the answer'
+};
+
+function workerStageLabel(name) {
+  return workerStageLabels[name] || String(name || 'working').replace(/[-_]+/g, ' ');
+}
+
+export function workerProgressMessage(stageName, count = 1) {
+  const label = workerStageLabel(stageName);
+  if (stageName === 'codex-exec') {
+    return count <= 1
+      ? "Still on it. I'm working through the code now."
+      : "Still with you. The coding step is taking a bit, but I'm not stuck.";
+  }
+  if (stageName === 'deploy-wait') {
+    return count <= 1
+      ? 'Changes are saved. I am waiting for the server to pick them up.'
+      : 'Still waiting on the server deploy to finish.';
+  }
+  if (stageName === 'checks') {
+    return count <= 1
+      ? 'I am running the checks now.'
+      : 'Still checking it. I will only call it done when the checks pass.';
+  }
+  return count <= 1
+    ? `Still on it. I am ${label} now.`
+    : `Still working. Current step: ${label}.`;
+}
+
+async function updateProcessingJobState(jobPath, extra = {}) {
+  if (!jobPath) {
+    return;
+  }
+  const current = await readJsonFile(jobPath).catch(() => ({}));
+  await writePrivateText(jobPath, `${JSON.stringify({ ...current, ...extra }, null, 2)}\n`);
+}
+
+function createStageProgressReporter(job, jobPath) {
+  let timer = null;
+  let sent = 0;
+  let stageName = '';
+  let stageStartedAt = '';
+  let stopped = false;
+
+  function clearTimer() {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  }
+
+  function schedule(delayMs) {
+    if (stopped || sent >= progressMaxMessages || delayMs <= 0) {
+      return;
+    }
+    timer = setTimeout(() => {
+      timer = null;
+      if (stopped || sent >= progressMaxMessages) {
+        return;
+      }
+      sent += 1;
+      const message = workerProgressMessage(stageName, sent);
+      void postJobMessage(job, message)
+        .catch((error) => {
+          console.error(`Progress message failed: ${redact(error?.message || error)}`);
+        })
+        .finally(() => {
+          void updateProcessingJobState(jobPath, {
+            currentStage: {
+              name: stageName,
+              label: workerStageLabel(stageName),
+              startedAt: stageStartedAt,
+              lastProgressAt: new Date().toISOString(),
+              progressMessages: sent
+            }
+          }).catch(() => {});
+          schedule(progressIntervalMs);
+        });
+    }, delayMs);
+    timer.unref?.();
+  }
+
+  return {
+    start(nextStageName) {
+      clearTimer();
+      stageName = nextStageName;
+      stageStartedAt = new Date().toISOString();
+      if (progressFirstMs > 0 && progressMaxMessages > 0) {
+        schedule(progressFirstMs);
+      }
+    },
+    stop() {
+      clearTimer();
+    },
+    finish() {
+      stopped = true;
+      clearTimer();
+    }
+  };
+}
+
+async function timedStage(timing, name, fn, { jobPath = '', progress = null } = {}) {
   const startedAt = new Date().toISOString();
   const startMs = Date.now();
+  const currentStage = {
+    name,
+    label: workerStageLabel(name),
+    startedAt
+  };
+  await updateProcessingJobState(jobPath, {
+    currentStage,
+    workerTiming: {
+      ...timing,
+      currentStage
+    }
+  }).catch((error) => {
+    console.error(`Could not persist stage ${name}: ${redact(error?.message || error)}`);
+  });
+  progress?.start?.(name);
   try {
     const result = await fn();
     const durationMs = elapsedMs(startMs);
-    timing?.stages?.push?.({
+    progress?.stop?.();
+    const stage = {
       name,
       startedAt,
       finishedAt: new Date().toISOString(),
       durationMs,
       ok: true
-    });
+    };
+    timing?.stages?.push?.(stage);
+    await updateProcessingJobState(jobPath, {
+      currentStage: null,
+      workerTiming: timing
+    }).catch(() => {});
     console.log(`Stage ${name} finished in ${durationMs}ms.`);
     return result;
   } catch (error) {
     const durationMs = elapsedMs(startMs);
-    timing?.stages?.push?.({
+    progress?.stop?.();
+    const stage = {
       name,
       startedAt,
       finishedAt: new Date().toISOString(),
       durationMs,
       ok: false,
       error: truncate(redact(error?.message || error), 300)
-    });
+    };
+    timing?.stages?.push?.(stage);
+    await updateProcessingJobState(jobPath, {
+      currentStage: null,
+      workerTiming: timing
+    }).catch(() => {});
     console.error(`Stage ${name} failed after ${durationMs}ms.`);
     throw error;
   }
@@ -2054,6 +2204,8 @@ async function handleJob(claimed) {
   const { job, path: jobPath } = claimed;
   console.log(`Processing ${job.source || 'slack'} job ${job.id}: ${truncate(job.text, 120)}`);
   const timing = createJobTiming(job);
+  const progress = createStageProgressReporter(job, jobPath);
+  const stage = (name, fn) => timedStage(timing, name, fn, { jobPath, progress });
 
   let contextSnapshot = await appendTurn({
     at: new Date().toISOString(),
@@ -2066,22 +2218,18 @@ async function handleJob(claimed) {
   });
 
   try {
-    await timedStage(timing, 'ensure-repo', () => ensureRepo());
-    const initialDependencyResult = await timedStage(timing, 'dependencies-before-codex', () =>
-      installDependencies()
-    );
-    const codexMessage = await timedStage(timing, 'codex-exec', () => runCodex(job, contextSnapshot));
-    const changedFiles = await timedStage(timing, 'git-status-after-codex', () => gitChangedFiles());
+    await stage('ensure-repo', () => ensureRepo());
+    const initialDependencyResult = await stage('dependencies-before-codex', () => installDependencies());
+    const codexMessage = await stage('codex-exec', () => runCodex(job, contextSnapshot));
+    const changedFiles = await stage('git-status-after-codex', () => gitChangedFiles());
     const hasChanges = changedFiles.length > 0;
     const checksNeeded = shouldRunChecksForChangedFiles(changedFiles);
     let postCodexDependencyResult = { installed: false, reason: 'skipped because Codex made no file changes' };
     let checkOk = true;
     if (hasChanges) {
-      postCodexDependencyResult = await timedStage(timing, 'dependencies-after-codex', () =>
-        installDependencies()
-      );
+      postCodexDependencyResult = await stage('dependencies-after-codex', () => installDependencies());
       if (checksNeeded) {
-        await timedStage(timing, 'checks', () => runChecks());
+        await stage('checks', () => runChecks());
       } else {
         timing.stages.push({
           name: 'checks',
@@ -2105,13 +2253,13 @@ async function handleJob(claimed) {
       });
     }
     const pushResult = hasChanges
-      ? await timedStage(timing, 'commit-and-push', () => commitAndPush(job))
+      ? await stage('commit-and-push', () => commitAndPush(job))
       : { pushed: false, commit: await gitStdout(['rev-parse', '--short', 'HEAD']), skipped: true };
     const deployResult = pushResult.pushed
-      ? await timedStage(timing, 'deploy-wait', () => waitForLiveCommit(pushResult.fullCommit))
+      ? await stage('deploy-wait', () => waitForLiveCommit(pushResult.fullCommit))
       : { matched: false, reason: 'no push needed', skipped: true };
     const runtime = hasChanges
-      ? await timedStage(timing, 'runtime-health', () => verifyRuntime())
+      ? await stage('runtime-health', () => verifyRuntime())
       : { botOk: true, bridgeOk: true, bridgeChecked: false, skipped: true, reason: 'no code changes' };
     const slackText = finalSlackMessage({
       codexMessage,
@@ -2133,7 +2281,7 @@ async function handleJob(claimed) {
     });
     let slackPostError = '';
     try {
-      await timedStage(timing, 'post-message', () => postJobMessage(job, slackText));
+      await stage('post-message', () => postJobMessage(job, slackText));
     } catch (postError) {
       slackPostError = truncate(redact(postError.message || postError), 1000);
       console.error(`Final message post failed: ${slackPostError}`);
@@ -2201,6 +2349,8 @@ async function handleJob(claimed) {
         contextSize: contextSnapshot.summary.length + contextSnapshot.recent.length
       });
     }
+  } finally {
+    progress.finish();
   }
 }
 
