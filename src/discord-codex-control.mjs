@@ -24,6 +24,8 @@ export const DISCORD_CODEX_WORKING_MESSAGES = [
 ];
 export const DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE =
   'Enable Message Content Intent in the Discord Developer Portal for mavebot, save it, then restart the bot so I can read normal messages in #codex.';
+export const DISCORD_CODEX_IMMEDIATE_STATUS_REPLY =
+  "Yep, I'm here. Send me what to change or check.";
 
 function safeIdPart(value) {
   return String(value || 'missing')
@@ -60,6 +62,52 @@ export function isDiscordCodexWorkingAckText(text) {
     /^working on it\b/i,
     /^i caught th(?:is|ese) after restart\b/i
   ].some((pattern) => pattern.test(normalized));
+}
+
+export function discordImmediateStatusReplyText(text) {
+  const normalized = String(text || '')
+    .toLowerCase()
+    .replace(/[`*_~|>()[\]{}#@]/g, ' ')
+    .replace(/[?!.,:;'"-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normalized || normalized.length > 80) {
+    return '';
+  }
+
+  const exactChecks = new Set([
+    'hello',
+    'hi',
+    'hey',
+    'yo',
+    'test',
+    'testing',
+    'testing hello',
+    'hello test',
+    'does this work',
+    'is this working',
+    'is it working',
+    'is this working now',
+    'hello is this working now',
+    'test is this working',
+    'testing is this working',
+    'can you hear me',
+    'can u hear me',
+    'are you there',
+    'are u there'
+  ]);
+  if (exactChecks.has(normalized)) {
+    return DISCORD_CODEX_IMMEDIATE_STATUS_REPLY;
+  }
+
+  if (/^(?:hello|hi|hey|yo|test|testing) (?:does|is|can|are)\b/.test(normalized)) {
+    return DISCORD_CODEX_IMMEDIATE_STATUS_REPLY;
+  }
+  if (/^(?:does|is|can|are)\b.*\b(?:work|working|hear me|there)\b$/.test(normalized)) {
+    return DISCORD_CODEX_IMMEDIATE_STATUS_REPLY;
+  }
+
+  return '';
 }
 
 export function isLowSignalDiscordContextRow(row = {}) {

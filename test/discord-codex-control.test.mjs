@@ -8,10 +8,12 @@ import {
   buildDiscordCodexWorkerJob,
   buildDiscordMessageRow,
   DISCORD_CODEX_WORKING_MESSAGES,
+  DISCORD_CODEX_IMMEDIATE_STATUS_REPLY,
   DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE,
   DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
   discordCodexSetupBlocker,
   discordFilesToWorkerLines,
+  discordImmediateStatusReplyText,
   groupDiscordCodexMessageBursts,
   discordJobContainsMessage,
   discordLiveBurstKey,
@@ -638,6 +640,14 @@ test('randomWorkingMessage can be deterministic for tests', () => {
     randomWorkingMessage(() => DISCORD_CODEX_WORKING_MESSAGES.length - 1),
     "I'll dig into that now."
   );
+});
+
+test('discordImmediateStatusReplyText only fast-paths short connectivity checks', () => {
+  assert.equal(discordImmediateStatusReplyText('hello is this working now'), DISCORD_CODEX_IMMEDIATE_STATUS_REPLY);
+  assert.equal(discordImmediateStatusReplyText('test is this working?'), DISCORD_CODEX_IMMEDIATE_STATUS_REPLY);
+  assert.equal(discordImmediateStatusReplyText('can you hear me'), DISCORD_CODEX_IMMEDIATE_STATUS_REPLY);
+  assert.equal(discordImmediateStatusReplyText('fix the test command'), '');
+  assert.equal(discordImmediateStatusReplyText('testing the pictionary command with a screenshot'), '');
 });
 
 test('discordLiveBurstKey bundles one user but separates simultaneous users', () => {

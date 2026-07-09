@@ -35,6 +35,10 @@ long-lived server state.
 
 - Brief working messages should sound human and short. They are only a visible
   "I got this" acknowledgement, not a final answer.
+- Very short connectivity checks such as "hello", "test", or "is this
+  working" should answer immediately from mavebot and write a completed worker
+  record so restart catch-up does not replay them. Real requests, screenshots,
+  and anything command-like still go through the full Codex worker.
 - Long code/deploy jobs should not sit silently after the first acknowledgement.
   Post a few short progress notes when a stage runs long, using normal human
   language, then give the real final answer after verification.

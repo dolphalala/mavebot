@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
-import { access, readFile, readdir, stat } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import express from 'express';
 import {
@@ -82,6 +82,7 @@ import {
   appendDiscordContextRows,
   buildDiscordCodexWorkerJob,
   buildDiscordMessageRow,
+  discordImmediateStatusReplyText,
   discordJobContainsMessage,
   discordLiveBurstKey,
   discordCodexSetupBlocker,
@@ -693,6 +694,73 @@ async function discordCodexMessageRecordExists(message) {
   return false;
 }
 
+function discordImmediateStatusReplyForRows(rows = []) {
+  if (rows.length !== 1 || rows[0]?.files?.length) {
+    return '';
+  }
+  return discordImmediateStatusReplyText(rows[0]?.text);
+}
+
+async function writeDiscordImmediateDoneRecord(message, rows, finalMessage) {
+  const finishedAt = new Date().toISOString();
+  const job = buildDiscordCodexWorkerJob(message, {
+    createdAt: finishedAt,
+    messageRows: rows
+  });
+  const record = {
+    ...job,
+    startedAt: finishedAt,
+    finishedAt,
+    completedAt: finishedAt,
+    durationMs: 0,
+    pushResult: { pushed: false, skipped: true, reason: 'immediate status reply' },
+    deployResult: { matched: false, skipped: true, reason: 'no code changes' },
+    runtime: {
+      botOk: true,
+      bridgeChecked: false,
+      skipped: true,
+      reason: 'immediate status reply'
+    },
+    codexMessage: finalMessage,
+    finalMessage,
+    immediate: true
+  };
+
+  const doneDir = discordCodexWorkerRecordDir('done');
+  await mkdir(doneDir, { recursive: true });
+  try {
+    await writeFile(path.join(doneDir, `${job.id}.json`), `${JSON.stringify(record, null, 2)}\n`, {
+      flag: 'wx',
+      mode: 0o600
+    });
+  } catch (error) {
+    if (error?.code !== 'EEXIST') {
+      throw error;
+    }
+  }
+  return record;
+}
+
+async function answerDiscordImmediateStatus(message, rows, { acknowledge = true } = {}) {
+  const finalMessage = discordImmediateStatusReplyForRows(rows);
+  if (!finalMessage) {
+    return null;
+  }
+
+  const record = await writeDiscordImmediateDoneRecord(message, rows, finalMessage);
+  discordCodexMessageCount += rows.length;
+  discordCodexLastMessageAt = new Date().toISOString();
+  if (acknowledge) {
+    await message.channel?.send?.({
+      content: finalMessage,
+      allowedMentions: { parse: [] }
+    }).catch((error) => {
+      rememberDiscordCodexError('immediate-status-reply', error);
+    });
+  }
+  return { queued: false, immediate: true, id: record.id };
+}
+
 async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup = false } = {}) {
   let files = [];
   try {
@@ -707,14 +775,20 @@ async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup
   const row = buildDiscordMessageRow(message, { files });
   await persistDiscordCodexRows([row]);
 
+  if (catchup && await discordCodexMessageRecordExists(message)) {
+    return { queued: false, duplicate: true };
+  }
+
+  const immediateResult = await answerDiscordImmediateStatus(message, [row], { acknowledge });
+  if (immediateResult) {
+    return immediateResult;
+  }
+
   if (catchup) {
     const job = buildDiscordCodexWorkerJob(message, {
       messageRows: [row],
       nearbyRows: await recentDiscordCodexContextRows(message, [row])
     });
-    if (await discordCodexMessageRecordExists(message)) {
-      return { queued: false, duplicate: true };
-    }
     const result = await enqueueDiscordCodexWorkerJob(discordCodexWorkerJobDir, job);
     if (result.queued) {
       discordCodexMessageCount += 1;
@@ -766,6 +840,11 @@ async function enqueueDiscordCodexMessageBurst(
   await persistDiscordCodexRows(rows);
 
   const sourceMessage = messages.at(-1);
+  const immediateResult = await answerDiscordImmediateStatus(sourceMessage, rows, { acknowledge });
+  if (immediateResult) {
+    return immediateResult;
+  }
+
   const job = buildDiscordCodexWorkerJob(sourceMessage, {
     messageRows: rows,
     sourceMessageId,
