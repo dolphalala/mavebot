@@ -439,6 +439,8 @@ export const PICTIONARY_TOPICS = [
     answer: 'Inferno Tower',
     aliases: ['inferno'],
     category: 'Defenses',
+    assetName: 'Inferno Tower10 Single',
+    assetAliases: ['Inferno Tower10 Multi', 'Inferno Tower1 Single'],
     shape: 'defense',
     accent: '#ff6b35',
     clues: ['single or multi', 'melts tanks', 'hot beam']
@@ -475,6 +477,8 @@ export const PICTIONARY_TOPICS = [
     answer: 'Town Hall',
     aliases: ['th'],
     category: 'Buildings',
+    assetName: 'Town Hall15',
+    assetAliases: ['Town Hall13'],
     shape: 'building',
     accent: '#4fc3f7',
     clues: ['main base heart', 'stars depend on it', 'weapon at high levels']

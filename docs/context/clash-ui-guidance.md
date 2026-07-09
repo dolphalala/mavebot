@@ -30,6 +30,10 @@ Every Slack/Codex worker task that touches Clash commands should read it after
   - `Spiky Ball` -> `File:Spiky_Ball_info.png`
 - Some dotted names need exact filename overrides, such as `P.E.K.K.A`,
   `L.A.S.S.I`, and `M.E.C.H.A`.
+- Building and defense art can be level-named on Fandom, such as
+  `Inferno_Tower10_Single.png` or `Cannon_level6_info.png`; asset lookup should
+  fall back to the wiki page thumbnail/original image before using placeholder
+  art.
 - If an icon cannot be fetched quickly, degrade to a labeled placeholder tile
   instead of failing the Discord command.
 - Avoid scraping random Google image results. If a new source is added, document

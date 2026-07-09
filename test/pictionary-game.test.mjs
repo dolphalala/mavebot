@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import {
+  PICTIONARY_TOPICS,
   buildPictionaryLeaderboard,
   formatPictionaryLeaderboard,
   isCorrectPictionaryGuess,
@@ -73,6 +74,19 @@ test('selectPictionaryTopic avoids used topics, respects categories, and support
   assert.notEqual(second.category, first.category);
   assert.ok(pictionaryTopicDifficultyRank(expert) >= 3);
   assert.deepEqual(pictionaryTopicAssetNames(expert), [expert.answer]);
+});
+
+test('pictionary uses explicit Clash art names for level-named building assets', () => {
+  const infernoTower = PICTIONARY_TOPICS.find((topic) => topic.id === 'inferno-tower');
+  const townHall = PICTIONARY_TOPICS.find((topic) => topic.id === 'town-hall');
+
+  assert.deepEqual(pictionaryTopicAssetNames(infernoTower), [
+    'Inferno Tower10 Single',
+    'Inferno Tower',
+    'Inferno Tower10 Multi',
+    'Inferno Tower1 Single'
+  ]);
+  assert.deepEqual(pictionaryTopicAssetNames(townHall), ['Town Hall15', 'Town Hall', 'Town Hall13']);
 });
 
 test('recordPictionaryGame persists leaderboard stats and corrupt backups', async (t) => {

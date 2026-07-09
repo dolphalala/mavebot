@@ -2,6 +2,7 @@ const COC_WIKI_API_URL = 'https://clashofclans.fandom.com/api.php';
 const USER_AGENT = 'mavebot/0.1 Discord bot Clash asset lookup';
 const DEFAULT_FETCH_TIMEOUT_MS = 5000;
 const DEFAULT_BATCH_SIZE = 20;
+const PAGE_IMAGE_THUMB_SIZE = 512;
 
 const ASSET_FILE_OVERRIDES = new Map(
   [
@@ -13,6 +14,7 @@ const ASSET_FILE_OVERRIDES = new Map(
 );
 
 const imageUrlCache = new Map();
+const negativeImageUrlCache = new Set();
 
 function normalizeAssetName(value) {
   return String(value || '')
@@ -75,6 +77,19 @@ function imageInfoUrlForTitles(titles) {
   return `${COC_WIKI_API_URL}?${params.toString()}`;
 }
 
+function pageImageUrlForTitles(titles) {
+  const params = new URLSearchParams({
+    action: 'query',
+    titles: titles.join('|'),
+    prop: 'pageimages',
+    piprop: 'thumbnail|original',
+    pithumbsize: String(PAGE_IMAGE_THUMB_SIZE),
+    format: 'json',
+    origin: '*'
+  });
+  return `${COC_WIKI_API_URL}?${params.toString()}`;
+}
+
 function imageUrlsFromApiBody(body) {
   const result = new Map();
   for (const page of Object.values(body?.query?.pages || {})) {
@@ -82,6 +97,19 @@ function imageUrlsFromApiBody(body) {
       continue;
     }
     const url = page.imageinfo?.[0]?.url || null;
+    result.set(page.title, url);
+    result.set(titleKey(page.title), url);
+  }
+  return result;
+}
+
+function pageImageUrlsFromApiBody(body) {
+  const result = new Map();
+  for (const page of Object.values(body?.query?.pages || {})) {
+    if (!page?.title) {
+      continue;
+    }
+    const url = page.thumbnail?.source || page.original?.source || null;
     result.set(page.title, url);
     result.set(titleKey(page.title), url);
   }
@@ -105,6 +133,10 @@ export function cocWikiImageInfoUrl(name) {
   return imageInfoUrlForTitles(fileTitleCandidatesForName(name));
 }
 
+export function cocWikiPageImageUrl(name) {
+  return pageImageUrlForTitles([normalizeAssetName(name)]);
+}
+
 export async function fetchCocWikiImageUrl(
   name,
   { fetchImpl = fetch, timeoutMs = DEFAULT_FETCH_TIMEOUT_MS } = {}
@@ -119,16 +151,31 @@ export async function fetchCocWikiImageUrl(
   }
 
   const candidates = fileTitleCandidatesForName(normalized);
-  const body = await fetchJsonWithTimeout(cocWikiImageInfoUrl(normalized), {
+  const imageInfoBody = await fetchJsonWithTimeout(cocWikiImageInfoUrl(normalized), {
     fetchImpl,
     timeoutMs
   });
-  const urlsByTitle = imageUrlsFromApiBody(body);
-  const url =
+  const urlsByTitle = imageUrlsFromApiBody(imageInfoBody);
+  let url =
     candidates
       .map((title) => urlsByTitle.get(title) || urlsByTitle.get(titleKey(title)))
       .find(Boolean) || null;
+
+  if (!url) {
+    const pageImageBody = await fetchJsonWithTimeout(cocWikiPageImageUrl(normalized), {
+      fetchImpl,
+      timeoutMs
+    });
+    const pageUrlsByTitle = pageImageUrlsFromApiBody(pageImageBody);
+    url = pageUrlsByTitle.get(normalized) || pageUrlsByTitle.get(normalized.toLowerCase()) || null;
+  }
+
   imageUrlCache.set(cacheKey, url);
+  if (url) {
+    negativeImageUrlCache.delete(cacheKey);
+  } else {
+    negativeImageUrlCache.add(cacheKey);
+  }
   return url;
 }
 
@@ -159,12 +206,16 @@ export async function fetchCocWikiImageMap(
       if (cached) {
         result.set(name, cached);
         result.set(cacheKey, cached);
+        continue;
       }
-      continue;
+      if (negativeImageUrlCache.has(cacheKey)) {
+        continue;
+      }
     }
     missing.push(name);
   }
 
+  const pageImageMissing = [];
   for (let index = 0; index < missing.length; index += batchSize) {
     const batch = missing.slice(index, index + batchSize);
     const titleToName = new Map(
@@ -184,8 +235,33 @@ export async function fetchCocWikiImageMap(
       const cacheKey = cacheKeyForName(name);
       imageUrlCache.set(cacheKey, url);
       if (url) {
+        negativeImageUrlCache.delete(cacheKey);
         result.set(name, url);
         result.set(cacheKey, url);
+      } else {
+        pageImageMissing.push(name);
+      }
+    }
+  }
+
+  for (let index = 0; index < pageImageMissing.length; index += batchSize) {
+    const batch = pageImageMissing.slice(index, index + batchSize);
+    const body = await fetchJsonWithTimeout(pageImageUrlForTitles(batch), {
+      fetchImpl,
+      timeoutMs
+    });
+    const urlsByTitle = pageImageUrlsFromApiBody(body);
+
+    for (const name of batch) {
+      const cacheKey = cacheKeyForName(name);
+      const url = urlsByTitle.get(name) || urlsByTitle.get(cacheKey) || null;
+      imageUrlCache.set(cacheKey, url);
+      if (url) {
+        negativeImageUrlCache.delete(cacheKey);
+        result.set(name, url);
+        result.set(cacheKey, url);
+      } else {
+        negativeImageUrlCache.add(cacheKey);
       }
     }
   }
