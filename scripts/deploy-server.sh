@@ -4,6 +4,7 @@ set -Eeuo pipefail
 APP_ROOT="${APP_ROOT:-/opt/urba-apps/discord-bot/app}"
 APP_ENV="${APP_ENV:-/opt/urba-apps/discord-bot/.env}"
 SLACK_ENV="${SLACK_ENV:-/opt/urba-apps/discord-bot/slack-bridge.env}"
+CODEX_WORKER_ENV="${CODEX_WORKER_ENV:-/opt/urba-apps/discord-bot/codex-worker.env}"
 SLACK_MEMORY_FILE="${SLACK_MEMORY_FILE:-/opt/urba-apps/discord-bot/shared/slack-memory.jsonl}"
 SLACK_CODEX_STATE_FILE="${SLACK_CODEX_STATE_FILE:-/opt/urba-apps/discord-bot/shared/codex-forward-state.json}"
 SLACK_USER_TOKEN_FILE="${SLACK_USER_TOKEN_FILE:-/opt/urba-apps/discord-bot/shared/slack-user-tokens.json}"
@@ -44,6 +45,46 @@ fi
 if [ ! -f "$SLACK_ENV" ]; then
   install -m 600 /dev/null "$SLACK_ENV"
 fi
+
+if [ ! -f "$CODEX_WORKER_ENV" ]; then
+  install -m 600 /dev/null "$CODEX_WORKER_ENV"
+fi
+
+env_has_value() {
+  local file="$1"
+  local key="$2"
+  [ -f "$file" ] || return 1
+  awk -F= -v key="$key" '
+    $1 == key {
+      value = substr($0, length($1) + 2)
+      gsub(/[[:space:]]/, "", value)
+      if (value != "") {
+        found = 1
+      }
+    }
+    END { exit found ? 0 : 1 }
+  ' "$file"
+}
+
+env_value() {
+  local file="$1"
+  local key="$2"
+  awk -F= -v key="$key" '
+    $1 == key {
+      print substr($0, length($1) + 2)
+      exit
+    }
+  ' "$file"
+}
+
+if ! env_has_value "$CODEX_WORKER_ENV" GITHUB_TOKEN; then
+  if env_has_value "$APP_ENV" GITHUB_TOKEN; then
+    printf 'GITHUB_TOKEN=%s\n' "$(env_value "$APP_ENV" GITHUB_TOKEN)" >>"$CODEX_WORKER_ENV"
+  elif env_has_value "$SLACK_ENV" GITHUB_TOKEN; then
+    printf 'GITHUB_TOKEN=%s\n' "$(env_value "$SLACK_ENV" GITHUB_TOKEN)" >>"$CODEX_WORKER_ENV"
+  fi
+fi
+chmod 600 "$CODEX_WORKER_ENV"
 
 if [ "$ENABLE_SLACK_BRIDGE" = "1" ]; then
   mkdir -p "$(dirname "$SLACK_MEMORY_FILE")"
@@ -107,17 +148,7 @@ else
 fi
 
 has_value() {
-  local key="$1"
-  awk -F= -v key="$key" '
-    $1 == key {
-      value = substr($0, length($1) + 2)
-      gsub(/[[:space:]]/, "", value)
-      if (value != "") {
-        found = 1
-      }
-    }
-    END { exit found ? 0 : 1 }
-  ' "$APP_ENV"
+  env_has_value "$APP_ENV" "$1"
 }
 
 if ! has_value DISCORD_TOKEN || ! has_value DISCORD_CLIENT_ID; then

@@ -149,9 +149,9 @@ and update it when a turn changes what future tasks should know.
   safely recreated after active jobs clear. The final worker queue smoke test
   completed with no Slack post error and no stuck jobs.
 - Continue improving Discord commands for Clash of Clans workflows.
-- Migrate `GITHUB_TOKEN` out of the legacy `slack-bridge.env` into a neutral
-  worker env file when doing the next secrets/config cleanup, then remove the
-  worker dependency on the legacy env filename.
+- Normal Discord `#codex` worker operation no longer loads `slack-bridge.env`;
+  deploy migrates `GITHUB_TOKEN` into the neutral server-only
+  `codex-worker.env` when needed.
 - Keep context docs efficient as Discord channel history grows: summarize
   durable facts, move domain guidance into focused files, and delete duplicated
   stale notes once the fact is preserved in the right place.

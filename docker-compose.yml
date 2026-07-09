@@ -91,7 +91,7 @@ services:
     restart: unless-stopped
     env_file:
       - /opt/urba-apps/discord-bot/.env
-      - /opt/urba-apps/discord-bot/slack-bridge.env
+      - /opt/urba-apps/discord-bot/codex-worker.env
     environment:
       NODE_ENV: production
       CODEX_HOME: /codex-home

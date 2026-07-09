@@ -43,6 +43,10 @@ remote work.
 - Production server alias: `urba-chatwoot`, host `5.78.127.221`.
 - Server app path: `/opt/urba-apps/discord-bot/app`.
 - Runtime env path: `/opt/urba-apps/discord-bot/.env`.
+- Codex worker-only env path: `/opt/urba-apps/discord-bot/codex-worker.env`.
+  Deploy creates it with mode `600` and migrates `GITHUB_TOKEN` from the old
+  Slack env file if needed, so normal Discord `#codex` work no longer loads
+  Slack app tokens.
 - CoC API env keys live in the same server-only env file:
   `COC_API_BASE_URL` and `COC_API_TOKEN`.
 - Docker Compose service/container: `urba-discord-bot`.
