@@ -149,7 +149,9 @@ command.
   repeatable icon sources for imagery, and
   `docs/context/clash-database-guidance.md` for polling/database design.
 - Prefer small, focused edits that fit existing project patterns.
-- Run `npm run check` after code changes.
+- Run `npm run check` after app/code/config changes. Pure markdown or
+  `docs/context/` memory-only edits may skip checks, and no-change
+  conversational answers should not run the release path.
 - Let the worker commit and push; do not manually commit inside Codex.
 - Do not claim a change is live until the server deploy path has picked up
   `origin/main` and health/command/runtime checks pass.

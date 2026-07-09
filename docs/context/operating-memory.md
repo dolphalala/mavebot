@@ -261,6 +261,14 @@ remote work.
 - Completed worker job JSON records in `done/` include sanitized `codexMessage`
   and `finalMessage` fields. Use these for later audits of what the inner
   Codex subprocess answered versus what mavebot posted to the channel.
+- Completed and failed worker job JSON records include `finishedAt`,
+  `durationMs`, and `workerTiming.stages`. Use those fields to debug slow
+  Discord `#codex` responses before changing queue or deploy behavior.
+- Conversational jobs where Codex makes no file changes should skip the release
+  path after `git status` and post the answer directly. Jobs with changed
+  files still commit/push, wait for deploy when pushed, and verify runtime.
+  `npm install` is cached by package-manifest fingerprint, and `npm run check`
+  is skipped only for pure markdown or `docs/context/` memory edits.
 - Worker prompts include a bounded summary of recent `done/`, `failed/`, and
   `auth-blocked/` job records. This helps the remote agent answer "what did
   you do?", "why didn't that work?", and "did you read everything?" without

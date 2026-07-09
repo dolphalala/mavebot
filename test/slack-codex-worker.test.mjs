@@ -12,6 +12,7 @@ import {
   buildCodexWorkerPrompt,
   buildMovedJobRecord,
   buildWorkerRuntimeSnapshot,
+  changedFilesFromGitStatus,
   checkUrl,
   codexLoginStatusLooksReady,
   codexImagePathsForJob,
@@ -28,6 +29,7 @@ import {
   pruneTranscriptRowsForStorage,
   readRecentWorkerJobHistory,
   readRepoContextBundle,
+  shouldRunChecksForChangedFiles,
   workerAuthStatusRecord,
   workerFailureMessage
 } from '../src/slack-codex-worker.mjs';
@@ -727,6 +729,40 @@ test('commitMessageForJob labels commits by the channel source', () => {
     'Slack: fix /player'
   );
   assert.equal(commitMessageForJob({ text: '' }), 'Remote: Remote request');
+});
+
+test('changedFilesFromGitStatus parses normal, renamed, and quoted paths', () => {
+  assert.deepEqual(
+    changedFilesFromGitStatus(
+      [
+        ' M src/index.mjs',
+        'A  docs/context/worker notes.md',
+        'R  old-name.mjs -> src/new-name.mjs',
+        '?? "docs/context/slack removal.md"'
+      ].join('\n')
+    ),
+    [
+      'src/index.mjs',
+      'docs/context/worker notes.md',
+      'src/new-name.mjs',
+      'docs/context/slack removal.md'
+    ]
+  );
+});
+
+test('shouldRunChecksForChangedFiles skips pure memory docs but checks app files', () => {
+  assert.equal(shouldRunChecksForChangedFiles([]), false);
+  assert.equal(
+    shouldRunChecksForChangedFiles([
+      'docs/context/discord-session.md',
+      'docs/context/operating-memory.md'
+    ]),
+    false
+  );
+  assert.equal(shouldRunChecksForChangedFiles(['README.md']), false);
+  assert.equal(shouldRunChecksForChangedFiles(['src/index.mjs']), true);
+  assert.equal(shouldRunChecksForChangedFiles(['scripts/register-commands.mjs']), true);
+  assert.equal(shouldRunChecksForChangedFiles(['package.json']), true);
 });
 
 test('finalSlackMessage always returns a human success message', () => {

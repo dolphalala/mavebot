@@ -3,6 +3,7 @@ import http from 'node:http';
 import https from 'node:https';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   access,
   appendFile,
@@ -50,6 +51,7 @@ const contextDir =
   path.join(sharedDir, 'context');
 const repoDir =
   process.env.CODEX_WORKER_REPO_DIR || process.env.SLACK_WORKER_REPO_DIR || path.join(sharedDir, 'repo');
+const dependencyMarkerPath = path.join(repoDir, 'node_modules', '.mavebot-worker-deps.json');
 const liveAppDir =
   process.env.CODEX_WORKER_LIVE_APP_DIR || process.env.SLACK_WORKER_LIVE_APP_DIR || '/live-app';
 const slackMemoryPath =
@@ -536,6 +538,65 @@ function redact(value) {
 
 function appendLimited(current, chunk) {
   return truncateMiddle(`${current}${chunk}`, maxOutputChars);
+}
+
+function elapsedMs(startMs) {
+  return Math.max(0, Date.now() - startMs);
+}
+
+function jobDurationMs(job = {}, finishedAt = new Date().toISOString()) {
+  const startMs = Date.parse(job.startedAt || job.createdAt || '');
+  const finishMs = Date.parse(finishedAt);
+  if (!Number.isFinite(startMs) || !Number.isFinite(finishMs)) {
+    return null;
+  }
+  return Math.max(0, finishMs - startMs);
+}
+
+function createJobTiming(job = {}) {
+  return {
+    createdAt: job.createdAt || null,
+    startedAt: job.startedAt || new Date().toISOString(),
+    stages: []
+  };
+}
+
+async function timedStage(timing, name, fn) {
+  const startedAt = new Date().toISOString();
+  const startMs = Date.now();
+  try {
+    const result = await fn();
+    const durationMs = elapsedMs(startMs);
+    timing?.stages?.push?.({
+      name,
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      durationMs,
+      ok: true
+    });
+    console.log(`Stage ${name} finished in ${durationMs}ms.`);
+    return result;
+  } catch (error) {
+    const durationMs = elapsedMs(startMs);
+    timing?.stages?.push?.({
+      name,
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      durationMs,
+      ok: false,
+      error: truncate(redact(error?.message || error), 300)
+    });
+    console.error(`Stage ${name} failed after ${durationMs}ms.`);
+    throw error;
+  }
+}
+
+function finishJobTiming(timing, job, finishedAt = new Date().toISOString()) {
+  return {
+    ...timing,
+    finishedAt,
+    durationMs: jobDurationMs(job, finishedAt)
+  };
 }
 
 export function errorDiagnosticText(error, maxChars = 8000) {
@@ -1608,11 +1669,65 @@ async function ensureRepo() {
   await git(['config', 'user.email', gitAuthorEmail]);
 }
 
-async function installDependencies() {
+async function dependencyManifestFingerprint() {
+  const hash = createHash('sha256');
+  let found = false;
+  for (const name of ['package.json', 'package-lock.json', 'npm-shrinkwrap.json']) {
+    const filePath = path.join(repoDir, name);
+    try {
+      const content = await readFile(filePath);
+      hash.update(name);
+      hash.update('\0');
+      hash.update(content);
+      hash.update('\0');
+      found = true;
+    } catch (error) {
+      if (error?.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
+  return found ? hash.digest('hex') : '';
+}
+
+async function dependenciesAreFresh() {
+  if (!(await pathExists(path.join(repoDir, 'node_modules')))) {
+    return { fresh: false, reason: 'node_modules missing' };
+  }
+  const fingerprint = await dependencyManifestFingerprint();
+  if (!fingerprint) {
+    return { fresh: false, reason: 'package manifest missing', fingerprint };
+  }
+  const marker = await readJsonFile(dependencyMarkerPath).catch(() => null);
+  if (marker?.fingerprint !== fingerprint) {
+    return { fresh: false, reason: 'package manifest changed', fingerprint };
+  }
+  return { fresh: true, reason: 'dependencies already installed', fingerprint };
+}
+
+async function installDependencies({ force = false } = {}) {
+  const freshness = force ? { fresh: false, reason: 'forced install' } : await dependenciesAreFresh();
+  if (freshness.fresh) {
+    return { installed: false, reason: freshness.reason, fingerprint: freshness.fingerprint };
+  }
   await runProcess('npm', ['install', '--no-package-lock'], {
     cwd: repoDir,
     timeoutMs: 10 * 60 * 1000
   });
+  const fingerprint = await dependencyManifestFingerprint();
+  await writePrivateText(
+    dependencyMarkerPath,
+    `${JSON.stringify(
+      {
+        fingerprint,
+        installedAt: new Date().toISOString(),
+        reason: freshness.reason
+      },
+      null,
+      2
+    )}\n`
+  );
+  return { installed: true, reason: freshness.reason, fingerprint };
 }
 
 async function runChecks() {
@@ -1670,6 +1785,44 @@ async function gitStdout(args, options = {}) {
 async function gitHasChanges() {
   const status = await gitStdout(['status', '--porcelain']);
   return status.length > 0;
+}
+
+export function changedFilesFromGitStatus(status = '') {
+  return String(status || '')
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .map((line) => {
+      const rawPath = line.length > 3 ? line.slice(3).trim() : line.trim();
+      const renamedPath = rawPath.includes(' -> ') ? rawPath.split(' -> ').at(-1) : rawPath;
+      return renamedPath.replace(/^"|"$/g, '').replace(/\\/g, '/');
+    })
+    .filter(Boolean);
+}
+
+async function gitChangedFiles() {
+  return changedFilesFromGitStatus(await gitStdout(['status', '--porcelain']));
+}
+
+export function shouldRunChecksForChangedFiles(files = []) {
+  return (files || []).some((file) => {
+    const normalized = String(file || '').replace(/\\/g, '/');
+    if (!normalized) {
+      return false;
+    }
+    if (normalized.startsWith('docs/context/') || normalized.endsWith('.md')) {
+      return false;
+    }
+    if (
+      normalized.startsWith('src/') ||
+      normalized.startsWith('scripts/') ||
+      normalized.startsWith('test/') ||
+      normalized.startsWith('.github/')
+    ) {
+      return true;
+    }
+    return /\.(?:cjs|css|html|js|json|lock|mjs|py|sh|toml|ts|tsx|yaml|yml)$/i.test(normalized);
+  });
 }
 
 async function aheadCount() {
@@ -1900,6 +2053,7 @@ export function finalSlackMessage({ codexMessage, checkOk, pushResult, deployRes
 async function handleJob(claimed) {
   const { job, path: jobPath } = claimed;
   console.log(`Processing ${job.source || 'slack'} job ${job.id}: ${truncate(job.text, 120)}`);
+  const timing = createJobTiming(job);
 
   let contextSnapshot = await appendTurn({
     at: new Date().toISOString(),
@@ -1912,19 +2066,56 @@ async function handleJob(claimed) {
   });
 
   try {
-    await ensureRepo();
-    await installDependencies();
-    const codexMessage = await runCodex(job, contextSnapshot);
-    await installDependencies();
-    await runChecks();
-    const pushResult = await commitAndPush(job);
+    await timedStage(timing, 'ensure-repo', () => ensureRepo());
+    const initialDependencyResult = await timedStage(timing, 'dependencies-before-codex', () =>
+      installDependencies()
+    );
+    const codexMessage = await timedStage(timing, 'codex-exec', () => runCodex(job, contextSnapshot));
+    const changedFiles = await timedStage(timing, 'git-status-after-codex', () => gitChangedFiles());
+    const hasChanges = changedFiles.length > 0;
+    const checksNeeded = shouldRunChecksForChangedFiles(changedFiles);
+    let postCodexDependencyResult = { installed: false, reason: 'skipped because Codex made no file changes' };
+    let checkOk = true;
+    if (hasChanges) {
+      postCodexDependencyResult = await timedStage(timing, 'dependencies-after-codex', () =>
+        installDependencies()
+      );
+      if (checksNeeded) {
+        await timedStage(timing, 'checks', () => runChecks());
+      } else {
+        timing.stages.push({
+          name: 'checks',
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+          durationMs: 0,
+          ok: true,
+          skipped: true,
+          reason: 'only docs/context or markdown changed'
+        });
+      }
+    } else {
+      timing.stages.push({
+        name: 'release-path',
+        startedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        durationMs: 0,
+        ok: true,
+        skipped: true,
+        reason: 'no file changes after Codex'
+      });
+    }
+    const pushResult = hasChanges
+      ? await timedStage(timing, 'commit-and-push', () => commitAndPush(job))
+      : { pushed: false, commit: await gitStdout(['rev-parse', '--short', 'HEAD']), skipped: true };
     const deployResult = pushResult.pushed
-      ? await waitForLiveCommit(pushResult.fullCommit)
-      : { matched: false, reason: 'no push needed' };
-    const runtime = await verifyRuntime();
+      ? await timedStage(timing, 'deploy-wait', () => waitForLiveCommit(pushResult.fullCommit))
+      : { matched: false, reason: 'no push needed', skipped: true };
+    const runtime = hasChanges
+      ? await timedStage(timing, 'runtime-health', () => verifyRuntime())
+      : { botOk: true, bridgeOk: true, bridgeChecked: false, skipped: true, reason: 'no code changes' };
     const slackText = finalSlackMessage({
       codexMessage,
-      checkOk: true,
+      checkOk,
       pushResult,
       deployResult,
       runtime,
@@ -1942,16 +2133,24 @@ async function handleJob(claimed) {
     });
     let slackPostError = '';
     try {
-      await postJobMessage(job, slackText);
+      await timedStage(timing, 'post-message', () => postJobMessage(job, slackText));
     } catch (postError) {
       slackPostError = truncate(redact(postError.message || postError), 1000);
       console.error(`Final message post failed: ${slackPostError}`);
     }
+    const finishedAt = new Date().toISOString();
     await moveJob(jobPath, doneDir, job, {
       completedAt: new Date().toISOString(),
+      finishedAt,
+      durationMs: jobDurationMs(job, finishedAt),
+      changedFiles,
+      checksNeeded,
+      initialDependencyResult,
+      postCodexDependencyResult,
       pushResult,
       deployResult,
       runtime,
+      workerTiming: finishJobTiming(timing, job, finishedAt),
       codexMessage: truncate(redact(codexMessage), 8000),
       finalMessage: truncate(redact(slackText), 3000),
       slackPostError
@@ -1973,8 +2172,12 @@ async function handleJob(claimed) {
       console.error(`Failed to post job error: ${redact(postError.message)}`);
     });
     if (authBlocked) {
+      const finishedAt = new Date().toISOString();
       await moveJob(jobPath, authBlockedDir, job, {
         ...authBlockedJobExtra(error),
+        finishedAt,
+        durationMs: jobDurationMs(job, finishedAt),
+        workerTiming: finishJobTiming(timing, job, finishedAt),
         contextFiles: {
           summaryPath,
           recentPath,
@@ -1983,9 +2186,13 @@ async function handleJob(claimed) {
         contextSize: contextSnapshot.summary.length + contextSnapshot.recent.length
       });
     } else {
+      const finishedAt = new Date().toISOString();
       await moveJob(jobPath, failedDir, job, {
         failedAt: new Date().toISOString(),
+        finishedAt,
+        durationMs: jobDurationMs(job, finishedAt),
         error: safeErrorText(error),
+        workerTiming: finishJobTiming(timing, job, finishedAt),
         contextFiles: {
           summaryPath,
           recentPath,

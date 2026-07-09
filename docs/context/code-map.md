@@ -49,8 +49,11 @@ It is a map, not a replacement for reading the current source.
   `codex exec` with `--image` and owns the final verified live/not-live channel
   wording after checks and deploy verification. Completed job records keep
   sanitized copies of the inner Codex response and final channel message for
-  later response-quality audits; the prompt also includes a bounded recent job
-  record summary for "what happened" follow-ups.
+  later response-quality audits; they also keep stage timings for latency
+  debugging. The worker skips install/check/push/deploy on no-change
+  conversational turns, caches dependency install freshness by package
+  manifest, and includes a bounded recent job record summary for "what
+  happened" follow-ups.
 
 ## Change Recipes
 
