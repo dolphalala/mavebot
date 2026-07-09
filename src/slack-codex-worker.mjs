@@ -1275,7 +1275,8 @@ function summarizeWorkerJobRecord(record = {}, status = 'unknown') {
   const activeText = truncate(stripSlackLinks(record.text || ''), 700);
   const finalText = truncate(stripSlackLinks(record.finalMessage || ''), 700);
   const codexText = truncate(stripSlackLinks(record.codexMessage || ''), 900);
-  const errorText = truncate(errorDiagnosticText(record.error || record.reason || '', 700), 700);
+  const rawError = record.error || record.reason || '';
+  const errorText = rawError ? truncate(errorDiagnosticText(rawError, 700), 700) : '';
   const lines = [
     `- ${record.completedAt || record.failedAt || record.authBlockedAt || record.createdAt || 'unknown'} [${status}] ${record.id || 'unknown job'}`,
     record.username || record.user ? `  user: ${record.username || record.user}` : '',

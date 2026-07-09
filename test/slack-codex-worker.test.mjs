@@ -516,6 +516,7 @@ test('readRecentWorkerJobHistory summarizes real jobs and skips smoke jobs', asy
   assert.match(history, /discord-real/);
   assert.match(history, /make \/roster and explain the plan/);
   assert.match(history, /I added the roster command/);
+  assert.doesNotMatch(history, /unknown error/);
   assert.doesNotMatch(history, /Smoke test|discord-live-verify/);
 });
 
