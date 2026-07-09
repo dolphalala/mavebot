@@ -16,6 +16,7 @@ import {
   compactTranscriptRows,
   commitMessageForJob,
   detailedWorkerChannelMessage,
+  errorDiagnosticText,
   finalSlackMessage,
   humanizeWorkerChannelMessage,
   isCodexImageFile,
@@ -702,6 +703,33 @@ test('workerFailureMessage keeps channel failures short and non-secret', () => {
 
   assert.match(message, /test\/check failure/);
   assert.doesNotMatch(message, /SECRET_TOKEN|stack trace|npm run check exited/i);
+});
+
+test('workerFailureMessage detects Codex auth failures from command output', () => {
+  const error = new Error('codex exec exited 1');
+  error.result = {
+    stdout:
+      'ERROR: Your access token could not be refreshed because your refresh token was revoked. Please log out and sign in again.',
+    stderr: ''
+  };
+
+  const message = workerFailureMessage(error);
+
+  assert.match(message, /server login expired/);
+  assert.doesNotMatch(message, /refresh token|access token|401/i);
+});
+
+test('errorDiagnosticText preserves start and end of failed process output', () => {
+  const error = new Error('codex exec exited 1');
+  error.result = {
+    stdout: `token_invalidated\n${'x'.repeat(5000)}\nfinal prompt tail`,
+    stderr: ''
+  };
+
+  const text = errorDiagnosticText(error, 500);
+
+  assert.match(text, /token_invalidated/);
+  assert.match(text, /final prompt tail/);
 });
 
 test('buildMovedJobRecord clears stale failed fields after successful retry', () => {

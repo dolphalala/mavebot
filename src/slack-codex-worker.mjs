@@ -124,6 +124,18 @@ function truncate(value, limit = 2000) {
   return `${text.slice(0, limit)}...`;
 }
 
+function truncateMiddle(value, limit = 2000) {
+  const text = String(value || '').trim();
+  if (!Number.isFinite(limit) || limit <= 0 || text.length <= limit) {
+    return text;
+  }
+  const marker = '\n...[output truncated, keeping start and end]...\n';
+  const available = Math.max(0, limit - marker.length);
+  const headLength = Math.floor(available * 0.4);
+  const tailLength = available - headLength;
+  return `${text.slice(0, headLength)}${marker}${text.slice(-tailLength)}`;
+}
+
 const codexImageExtensionPattern = /\.(?:png|jpe?g|webp)$/i;
 const codexImageMimeTypes = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
 
@@ -279,9 +291,11 @@ export function humanizeWorkerChannelMessage(text) {
 }
 
 export function isCodexAuthError(value) {
-  const text = String(value?.message || value || '');
+  const text = errorDiagnosticText(value);
   return /access token could not be refreshed/i.test(text) ||
     /refresh token was already used/i.test(text) ||
+    /refresh_token_invalidated/i.test(text) ||
+    /token_invalidated/i.test(text) ||
     /HTTP(?: error)?: 401/i.test(text) ||
     /token_expired/i.test(text) ||
     /Please log out and sign in again/i.test(text);
@@ -338,16 +352,27 @@ function redact(value) {
 }
 
 function appendLimited(current, chunk) {
-  const next = `${current}${chunk}`;
-  if (next.length <= maxOutputChars) {
-    return next;
+  return truncateMiddle(`${current}${chunk}`, maxOutputChars);
+}
+
+export function errorDiagnosticText(error, maxChars = 8000) {
+  if (!error || typeof error === 'string') {
+    return truncate(redact(String(error || 'unknown error')), maxChars);
   }
-  return next.slice(-maxOutputChars);
+  const processOutput = [
+    error.result?.stderr,
+    error.result?.stdout
+  ].filter(Boolean);
+  const parts = [
+    error.message,
+    ...processOutput,
+    processOutput.length ? '' : error.stack
+  ].filter(Boolean);
+  return truncateMiddle(redact(parts.join('\n')), maxChars);
 }
 
 function safeErrorText(error, maxChars = 4000) {
-  const value = error?.stack || error?.message || error;
-  return truncate(redact(String(value || 'unknown error')), maxChars);
+  return errorDiagnosticText(error, maxChars);
 }
 
 async function pathExists(filePath) {
@@ -1469,7 +1494,7 @@ async function handleJob(claimed) {
     }, { clearFailure: true });
   } catch (error) {
     const message = workerFailureMessage(error);
-    console.error(redact(error.stack || error.message || error));
+    console.error(safeErrorText(error));
     contextSnapshot = await appendTurn({
       at: new Date().toISOString(),
       role: 'assistant',
@@ -1484,7 +1509,7 @@ async function handleJob(claimed) {
     });
     await moveJob(jobPath, failedDir, job, {
       failedAt: new Date().toISOString(),
-      error: truncate(redact(error.message || error), 4000),
+      error: safeErrorText(error),
       contextFiles: {
         summaryPath,
         recentPath,
