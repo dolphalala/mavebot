@@ -42,6 +42,10 @@ long-lived server state.
 - Long code/deploy jobs should not sit silently after the first acknowledgement.
   Post a few short progress notes when a stage runs long, using normal human
   language, then give the real final answer after verification.
+- Extra messages or screenshots sent by the same user during the short debounce
+  window should be accepted into the same active turn without posting another
+  channel message. mavebot can use a quiet reaction for those follow-ups so the
+  user can tell the message was caught.
 - Changed-file jobs should trigger the server-local private deploy webhook from
   the worker when configured, then still verify the live commit and health. The
   30-second poll deploy timer is only the fallback, because waiting for it makes
@@ -149,6 +153,9 @@ long-lived server state.
   jobs already on disk, so simultaneous users see clearer "queued after the
   current work" language while the active user's own debounce window still
   feels immediate.
+- `/healthz` exposes pending Discord burst summaries with safe counts for
+  messages and files, so "did it catch my follow-up/screenshot?" can be checked
+  without reading raw prompt text.
 - Keep memory efficient as Discord channel history grows: summarize durable
   facts, move domain guidance into focused files, and delete duplicated stale
   notes once the facts are preserved.

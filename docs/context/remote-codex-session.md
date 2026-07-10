@@ -22,6 +22,9 @@ local Codex Desktop session.
   job. Messages from other users should still be available as nearby context
   so collaboration and references are preserved without dropping or combining
   distinct requests.
+- During live debounce, same-user follow-up messages may receive a quiet
+  reaction instead of another channel acknowledgement. That means they were
+  added to the pending active turn, not ignored.
 - Infer the relevant repo/server context from durable memory before acting.
 - Work end to end when possible: inspect, implement, test, push, wait for
   deploy, verify live behavior, then answer plainly in the channel.
@@ -119,7 +122,7 @@ command.
 - When Discord `#codex` intake misbehaves, check `/healthz` for
   `discordCodexSetupReady`, `discordCodexLastCatchup`,
   `discordCodexRecentContextRows`, `discordCodexWorkerAuth`,
-  `discordCodexAuthBlockedJobs`, and
+  `discordCodexAuthBlockedJobs`, pending burst/message/file counts, and
   `discordCodexLastError` before assuming the command implementation is broken.
 - For response-quality audits, inspect the matching `done/*.json` record. It
   stores sanitized `codexMessage` and `finalMessage`, which makes it possible

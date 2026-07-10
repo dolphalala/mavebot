@@ -153,6 +153,10 @@ const discordCodexRecentContextLimit = Number.parseInt(
 );
 const discordMessageContentIntentPreference =
   process.env.DISCORD_MESSAGE_CONTENT_INTENT || 'auto';
+const discordCodexFollowupReaction =
+  process.env.DISCORD_CODEX_FOLLOWUP_REACTION === undefined
+    ? '\u2705'
+    : process.env.DISCORD_CODEX_FOLLOWUP_REACTION;
 const configuredLegendsIntervalMs = Number.parseInt(
   process.env.LEGENDS_TRACK_INTERVAL_MS || '',
   10
@@ -228,6 +232,7 @@ const app = express();
 app.get('/healthz', async (_req, res) => {
   let clashHistoryScheduler = null;
   let discordCodexPersistentContextRows = 0;
+  const discordCodexPendingSummary = summarizePendingDiscordCodexJobs();
   const discordCodexAuthBlockedJobs = await countDiscordCodexWorkerRecords('auth-blocked');
   const discordCodexWorkerQueue = await readDiscordCodexWorkerQueueSnapshot();
   const discordCodexWorkerAuth = await readDiscordCodexWorkerAuthState({
@@ -266,7 +271,10 @@ app.get('/healthz', async (_req, res) => {
     discordCodexRecentContextWindowMs,
     discordCodexRecentContextLimit,
     discordCodexRecentContextRows: recentDiscordCodexRows.length,
-    discordCodexPendingBursts: pendingDiscordCodexJobs.size,
+    discordCodexPendingBursts: discordCodexPendingSummary.counts.bursts,
+    discordCodexPendingRows: discordCodexPendingSummary.counts.rows,
+    discordCodexPendingFiles: discordCodexPendingSummary.counts.files,
+    discordCodexPendingJobs: discordCodexPendingSummary.bursts,
     discordCodexMessageCount,
     discordCodexLastMessageAt,
     discordCodexLastCatchup,
@@ -402,6 +410,43 @@ function summarizeDiscordCodexWorkerRecord(record = {}, { name = '', mtimeMs = 0
     currentStage: record.currentStage || record.workerTiming?.currentStage || null,
     changedFileCount: Array.isArray(record.changedFiles) ? record.changedFiles.length : null,
     mtimeMs
+  };
+}
+
+function summarizePendingDiscordCodexJobs(now = Date.now()) {
+  const bursts = [...pendingDiscordCodexJobs.entries()].map(([key, pending]) => {
+    const rows = Array.isArray(pending?.rows) ? pending.rows : [];
+    const files = rows.flatMap((row) => row?.files || []);
+    const createdMs = Date.parse(pending?.createdAt || '');
+    const updatedAt = pending?.updatedAt || rows.at(-1)?.receivedAt || '';
+    const updatedMs = Date.parse(updatedAt);
+    return {
+      key: String(key || '').slice(0, 180),
+      channel: pending?.message?.channelId || rows.at(-1)?.channel || '',
+      user: pending?.message?.author?.id || rows.at(-1)?.user || '',
+      username:
+        pending?.message?.author?.tag ||
+        pending?.message?.author?.username ||
+        rows.at(-1)?.username ||
+        '',
+      messages: rows.length,
+      fileCount: files.length,
+      createdAt: pending?.createdAt || '',
+      updatedAt,
+      ageMs: Number.isFinite(createdMs) ? Math.max(0, now - createdMs) : null,
+      updatedAgeMs: Number.isFinite(updatedMs) ? Math.max(0, now - updatedMs) : null
+    };
+  });
+
+  return {
+    counts: {
+      bursts: bursts.length,
+      rows: bursts.reduce((total, burst) => total + burst.messages, 0),
+      files: bursts.reduce((total, burst) => total + burst.fileCount, 0)
+    },
+    bursts: bursts
+      .sort((left, right) => (left.updatedAgeMs || 0) - (right.updatedAgeMs || 0))
+      .slice(0, 5)
   };
 }
 
@@ -774,6 +819,18 @@ async function discordCodexWorkingAckMessage({ pendingBursts = 0 } = {}) {
   }
 }
 
+async function acknowledgeDiscordCodexFollowup(message) {
+  const reaction = String(discordCodexFollowupReaction || '').trim();
+  if (!reaction || !message?.react) {
+    return;
+  }
+  try {
+    await message.react(reaction);
+  } catch (error) {
+    rememberDiscordCodexError('followup-reaction', error);
+  }
+}
+
 async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup = false } = {}) {
   let files = [];
   try {
@@ -828,6 +885,8 @@ async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup
         allowedMentions: { parse: [] }
       });
     }
+  } else if (acknowledge) {
+    await acknowledgeDiscordCodexFollowup(message);
   }
   await result.promise;
   return result;
@@ -962,6 +1021,8 @@ function scheduleDiscordCodexWorkerJob(message, row) {
     pending = {
       message,
       rows: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: '',
       timer: null,
       resolve: null,
       reject: null,
@@ -975,6 +1036,7 @@ function scheduleDiscordCodexWorkerJob(message, row) {
   }
 
   pending.message = message;
+  pending.updatedAt = row?.receivedAt || new Date().toISOString();
   if (row) {
     pending.rows.push(row);
   }

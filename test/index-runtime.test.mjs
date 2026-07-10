@@ -73,6 +73,10 @@ test('Discord Codex runtime exposes intake diagnostics in health output', async 
   assert.match(source, /discordCodexPersistentContextRows/);
   assert.match(source, /recentDiscordCodexContextRows/);
   assert.match(source, /discordContextLogWriteQueue/);
+  assert.match(source, /summarizePendingDiscordCodexJobs/);
+  assert.match(source, /discordCodexPendingRows/);
+  assert.match(source, /discordCodexPendingFiles/);
+  assert.match(source, /discordCodexPendingJobs/);
   assert.match(source, /isDiscordWorkingAckText/);
   assert.match(source, /appendDiscordContextRows/);
   assert.match(source, /readDiscordContextLog/);
@@ -97,5 +101,9 @@ test('Discord Codex runtime uses queue-aware human acknowledgements', async () =
   assert.match(source, /discordCodexWorkingAckMessage/);
   assert.match(source, /pendingBursts: Math\.max\(0, pendingDiscordCodexJobs\.size - 1\)/);
   assert.match(source, /discordWorkingMessageForQueue\(\{\s*\.\.\.snapshot,\s*pendingBursts\s*\}\)/);
+  assert.match(source, /DISCORD_CODEX_FOLLOWUP_REACTION/);
+  assert.match(source, /acknowledgeDiscordCodexFollowup/);
+  assert.match(source, /message\.react\(reaction\)/);
+  assert.match(source, /rememberDiscordCodexError\('followup-reaction'/);
   assert.match(source, /rememberDiscordCodexError\('working-ack-queue'/);
 });
