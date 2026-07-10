@@ -56,7 +56,9 @@ export function discordWorkingMessageForQueue(queueSnapshot = {}, randomInt = cr
   const counts = queueSnapshot?.counts || {};
   const waiting = Number.parseInt(counts.jobs || '0', 10) || 0;
   const processing = Number.parseInt(counts.processing || '0', 10) || 0;
-  if (waiting > 0 || processing > 0) {
+  const pendingBursts =
+    Number.parseInt(queueSnapshot?.pendingBursts ?? counts.pendingBursts ?? '0', 10) || 0;
+  if (waiting > 0 || processing > 0 || pendingBursts > 0) {
     return DISCORD_CODEX_QUEUED_MESSAGES[randomInt(DISCORD_CODEX_QUEUED_MESSAGES.length)];
   }
   return randomWorkingMessage(randomInt);

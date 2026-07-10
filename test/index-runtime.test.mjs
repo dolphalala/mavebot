@@ -95,6 +95,7 @@ test('Discord Codex runtime uses queue-aware human acknowledgements', async () =
   const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
 
   assert.match(source, /discordCodexWorkingAckMessage/);
-  assert.match(source, /discordWorkingMessageForQueue\(await readDiscordCodexWorkerQueueSnapshot\(\)\)/);
+  assert.match(source, /pendingBursts: Math\.max\(0, pendingDiscordCodexJobs\.size - 1\)/);
+  assert.match(source, /discordWorkingMessageForQueue\(\{\s*\.\.\.snapshot,\s*pendingBursts\s*\}\)/);
   assert.match(source, /rememberDiscordCodexError\('working-ack-queue'/);
 });

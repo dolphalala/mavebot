@@ -38,6 +38,10 @@ local Codex Desktop session.
   active users, file counts, likely work lanes, and whether multi-step or
   multi-agent-style handling is helpful. Use this as an orientation aid, but
   still verify against the active text and source files.
+- Worker prompts include a short active-turn working-guidance section derived
+  from that metadata. Use it to split broad requests into audit,
+  implementation, planning, visual, domain, verification, and memory/docs work
+  without dumping raw channel history into every prompt.
 - When a job includes `nearbyText`, `nearbyContextMessages`, or `nearbyFiles`,
   treat them as nearby channel context only. Use them to resolve references
   such as "above", "that screenshot", "what did you do?", and collaborative
@@ -120,6 +124,10 @@ command.
 - For response-quality audits, inspect the matching `done/*.json` record. It
   stores sanitized `codexMessage` and `finalMessage`, which makes it possible
   to compare what Codex produced with what mavebot posted.
+- Recent worker job-record summaries include compact turn metadata such as
+  message count, speakers, files, lanes, and multi-agent hints. Use that line
+  to reconstruct why a previous job was broad, visual, multi-user, or
+  memory-sensitive before retrying or judging it.
 - If a job is enqueued but fails before Codex can reason, inspect the failed job
   JSON and worker logs. `HTTP 401`, `token_invalidated`, or
   `refresh_token_invalidated` means the mounted server `CODEX_HOME` needs a

@@ -78,6 +78,9 @@ long-lived server state.
 - Recent worker job JSON records in `done/`, `failed/`, and `auth-blocked/`
   are included in prompts as a bounded audit trail for follow-up questions
   such as "what did you do?" and "why didn't that work?"
+- Recent worker job summaries now include compact active-turn shape: message
+  count, users, file counts, lanes, and multi-agent hints. This lets later
+  Discord turns audit prior work without rereading the entire channel.
 - `auth-blocked/` job records count as handled message IDs for catch-up, so
   login-held requests are not replayed as duplicates after a restart.
 - Durable product, deployment, and user-preference facts belong in
@@ -142,6 +145,10 @@ long-lived server state.
   silent hangs unless `/healthz` exposes the worker auth state.
 - 2026-07-09 live smoke verified worker current-stage health diagnostics and
   progress behavior.
+- Working acknowledgements account for other pending Discord bursts as well as
+  jobs already on disk, so simultaneous users see clearer "queued after the
+  current work" language while the active user's own debounce window still
+  feels immediate.
 - Keep memory efficient as Discord channel history grows: summarize durable
   facts, move domain guidance into focused files, and delete duplicated stale
   notes once the facts are preserved.

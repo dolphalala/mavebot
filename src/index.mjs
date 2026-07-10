@@ -761,12 +761,16 @@ async function answerDiscordImmediateStatus(message, rows, { acknowledge = true 
   return { queued: false, immediate: true, id: record.id };
 }
 
-async function discordCodexWorkingAckMessage() {
+async function discordCodexWorkingAckMessage({ pendingBursts = 0 } = {}) {
   try {
-    return discordWorkingMessageForQueue(await readDiscordCodexWorkerQueueSnapshot());
+    const snapshot = await readDiscordCodexWorkerQueueSnapshot();
+    return discordWorkingMessageForQueue({
+      ...snapshot,
+      pendingBursts
+    });
   } catch (error) {
     rememberDiscordCodexError('working-ack-queue', error);
-    return discordWorkingMessageForQueue();
+    return discordWorkingMessageForQueue({ pendingBursts });
   }
 }
 
@@ -818,7 +822,9 @@ async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup
     discordCodexLastMessageAt = new Date().toISOString();
     if (acknowledge) {
       await message.channel.send({
-        content: await discordCodexWorkingAckMessage(),
+        content: await discordCodexWorkingAckMessage({
+          pendingBursts: Math.max(0, pendingDiscordCodexJobs.size - 1)
+        }),
         allowedMentions: { parse: [] }
       });
     }

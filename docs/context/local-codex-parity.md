@@ -36,6 +36,9 @@ Use context in layers instead of dumping the full channel history:
 - Discord worker jobs include compact active-turn metadata for message count,
   active users, files, likely work lanes, and multi-step/multi-agent hints.
   Use it to choose the right working shape without replacing source inspection.
+- Worker prompts convert that metadata into a short active-turn guidance block
+  so broad Discord asks are handled through explicit lanes instead of only the
+  last sentence of the prompt.
 - Burst grouping is per author. Other users' nearby messages can explain
   references and collaboration, but separate users' prompts should not be
   silently merged into one active task.
@@ -52,6 +55,8 @@ Use context in layers instead of dumping the full channel history:
   These records include stage timings when available, so latency audits should
   identify whether time was spent in Codex execution, checks, push, deploy, or
   runtime verification before changing behavior.
+  They also include compact turn metadata, which helps future jobs see whether
+  a prior run was multi-message, multi-user, visual, or multi-agent-shaped.
 - `auth-blocked/` records are part of that audit trail and must be treated as
   handled work for catch-up duplicate detection until the server Codex login is
   refreshed and the worker requeues them.

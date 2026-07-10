@@ -665,6 +665,10 @@ test('randomWorkingMessage can be deterministic for tests', () => {
     discordWorkingMessageForQueue({ counts: { jobs: 0, processing: 1 } }, () => DISCORD_CODEX_QUEUED_MESSAGES.length - 1),
     DISCORD_CODEX_QUEUED_MESSAGES.at(-1)
   );
+  assert.equal(
+    discordWorkingMessageForQueue({ counts: { jobs: 0, processing: 0 }, pendingBursts: 1 }, () => 1),
+    DISCORD_CODEX_QUEUED_MESSAGES[1]
+  );
   assert.equal(isLowSignalDiscordContextRow({
     bot: true,
     text: DISCORD_CODEX_QUEUED_MESSAGES[0]

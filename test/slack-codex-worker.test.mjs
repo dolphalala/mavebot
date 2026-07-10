@@ -457,6 +457,10 @@ test('buildCodexWorkerPrompt marks plan and demo requests for detailed answers',
   assert.match(prompt, /Do not answer with only an acknowledgement/);
   assert.match(prompt, /compact plan, a concrete demo\/example/);
   assert.match(prompt, /Use active request turn metadata/);
+  assert.match(prompt, /# Active Turn Working Guidance/);
+  assert.match(prompt, /Suggested working lanes/);
+  assert.match(prompt, /planning lane/);
+  assert.match(prompt, /This looks multi-step/);
 });
 
 test('buildCodexWorkerPrompt includes recent worker job history for follow-up audits', () => {
@@ -504,6 +508,16 @@ test('readRecentWorkerJobHistory summarizes real jobs and skips smoke jobs', asy
       source: 'discord',
       username: 'Allen',
       text: 'make /roster and explain the plan',
+      turn: {
+        activeMessageCount: 2,
+        activeUserCount: 1,
+        activeFileCount: 1,
+        nearbyContextCount: 3,
+        lanes: ['audit', 'implementation', 'memory'],
+        multiStepLikely: true,
+        multiAgentHelpful: true,
+        activeUsers: ['Allen']
+      },
       finalMessage: 'I added the roster command and explained the signup flow.',
       codexMessage: 'Plan:\n- Add storage\n- Add command pages',
       pushResult: { pushed: true },
@@ -540,6 +554,9 @@ test('readRecentWorkerJobHistory summarizes real jobs and skips smoke jobs', asy
   });
 
   assert.match(history, /discord-real/);
+  assert.match(history, /turn: .*messages:2/);
+  assert.match(history, /lanes:audit\|implementation\|memory/);
+  assert.match(history, /multiAgentHelpful/);
   assert.match(history, /make \/roster and explain the plan/);
   assert.match(history, /I added the roster command/);
   assert.match(history, /timing: .*codex-exec 4200ms/);

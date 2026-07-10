@@ -1589,16 +1589,48 @@ function summarizeWorkerTiming(timing = {}) {
   return truncate(selected.join(', '), 600);
 }
 
+function summarizeTurnMetadata(turn = {}) {
+  if (!turn || typeof turn !== 'object') {
+    return '';
+  }
+  const parts = [];
+  const addNumber = (label, value) => {
+    if (Number.isFinite(value) && value > 0) {
+      parts.push(`${label}:${value}`);
+    }
+  };
+  addNumber('messages', Number(turn.activeMessageCount));
+  addNumber('users', Number(turn.activeUserCount));
+  addNumber('files', Number(turn.activeFileCount));
+  addNumber('nearby', Number(turn.nearbyContextCount));
+  addNumber('nearbyFiles', Number(turn.nearbyFileCount));
+  if (Array.isArray(turn.lanes) && turn.lanes.length) {
+    parts.push(`lanes:${turn.lanes.map((lane) => String(lane || '').trim()).filter(Boolean).join('|')}`);
+  }
+  if (turn.multiStepLikely) {
+    parts.push('multiStep');
+  }
+  if (turn.multiAgentHelpful) {
+    parts.push('multiAgentHelpful');
+  }
+  if (Array.isArray(turn.activeUsers) && turn.activeUsers.length) {
+    parts.push(`speakers:${turn.activeUsers.map((user) => String(user || '').trim()).filter(Boolean).join('|')}`);
+  }
+  return truncate(parts.filter(Boolean).join(', '), 500);
+}
+
 function summarizeWorkerJobRecord(record = {}, status = 'unknown') {
   const activeText = truncate(stripSlackLinks(record.text || ''), 700);
   const finalText = truncate(stripSlackLinks(record.finalMessage || ''), 700);
   const codexText = truncate(stripSlackLinks(record.codexMessage || ''), 900);
   const timingText = summarizeWorkerTiming(record.workerTiming);
+  const turnText = summarizeTurnMetadata(record.turn);
   const rawError = record.error || record.reason || '';
   const errorText = rawError ? truncate(errorDiagnosticText(rawError, 700), 700) : '';
   const lines = [
     `- ${record.completedAt || record.failedAt || record.authBlockedAt || record.createdAt || 'unknown'} [${status}] ${record.id || 'unknown job'}`,
     record.username || record.user ? `  user: ${record.username || record.user}` : '',
+    turnText ? `  turn: ${turnText}` : '',
     activeText ? `  active: ${activeText.replace(/\n+/g, ' / ')}` : '',
     finalText ? `  final: ${finalText.replace(/\n+/g, ' / ')}` : '',
     codexText ? `  inner: ${codexText.replace(/\n+/g, ' / ')}` : '',
@@ -1719,6 +1751,54 @@ export function buildWorkerRuntimeSnapshot(job = {}) {
   }, null, 2);
 }
 
+function formatActiveTurnWorkingGuidance(turn = {}) {
+  if (!turn || typeof turn !== 'object') {
+    return '';
+  }
+  const lanes = Array.isArray(turn.lanes)
+    ? turn.lanes.map((lane) => String(lane || '').trim()).filter(Boolean)
+    : [];
+  if (!lanes.length && !turn.multiStepLikely && !turn.multiAgentHelpful && !turn.activeFileCount) {
+    return '';
+  }
+
+  const laneDescriptions = {
+    audit: 'audit lane: inspect recent context, worker history, logs, and the actual source before claiming what happened',
+    implementation: 'implementation lane: make the focused repo changes that satisfy the active ask',
+    planning: 'planning lane: answer design/how-it-works questions with a concrete plan or example, not only code',
+    memory: 'memory/docs lane: update or compact docs/context when durable behavior or preferences changed',
+    visual: 'visual lane: inspect attached or nearby images before reasoning about screenshots or UI examples',
+    'domain-research': 'domain lane: use durable Clash guidance and reputable sources before adding game-specific behavior'
+  };
+
+  const lines = [
+    '# Active Turn Working Guidance',
+    '- Treat this as a planning aid generated from the active Discord turn. The active user text still wins.'
+  ];
+  if (lanes.length) {
+    lines.push('- Suggested working lanes:');
+    for (const lane of lanes) {
+      lines.push(`  - ${laneDescriptions[lane] || `${lane} lane: handle this part explicitly`}`);
+    }
+  }
+  if (turn.activeMessageCount > 1) {
+    lines.push(`- The active turn has ${turn.activeMessageCount} bundled messages; answer every explicit ask in order.`);
+  }
+  if (turn.activeUserCount > 1) {
+    lines.push(`- The active turn has ${turn.activeUserCount} active users; preserve speaker intent and let the newest message resolve conflicts.`);
+  }
+  if (turn.activeFileCount > 0 || turn.nearbyFileCount > 0) {
+    lines.push('- File/image context is present; inspect relevant local files before answering or changing code.');
+  }
+  if (turn.multiStepLikely) {
+    lines.push('- This looks multi-step; keep your own checklist and continue through the obvious next step.');
+  }
+  if (turn.multiAgentHelpful) {
+    lines.push('- Multi-agent-style handling is helpful: split into investigation, implementation, verification, and memory/docs lanes. Use real parallel tools only if available; otherwise run the lanes sequentially.');
+  }
+  return lines.join('\n');
+}
+
 async function readSlackMemoryTail(limit = 20) {
   try {
     const content = await readFile(slackMemoryPath, 'utf8');
@@ -1731,6 +1811,7 @@ async function readSlackMemoryTail(limit = 20) {
 function promptHeader(job) {
   const source = job.source === 'discord' ? 'Discord' : 'Slack';
   const needsDetailedAnswer = activeRequestNeedsDetailedAnswer(job);
+  const turnGuidance = formatActiveTurnWorkingGuidance(job.turn || {});
   return [
     'You are the server-side mavebot Codex runner.',
     '',
@@ -1752,6 +1833,7 @@ function promptHeader(job) {
         ? job.nearbyContextMessages
         : []
     }, null, 2),
+    ...(turnGuidance ? ['', turnGuidance] : []),
     '',
     'Hard rules:',
     '- Work in the current repository checkout only.',
