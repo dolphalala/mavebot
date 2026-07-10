@@ -7,4 +7,3 @@ README.md
 docs/*
 !docs/context
 !docs/context/operating-memory.md
-!docs/context/slack-session.md
