@@ -39,6 +39,11 @@ long-lived server state.
   working" should answer immediately from mavebot and write a completed worker
   record so restart catch-up does not replay them. Real requests, screenshots,
   and anything command-like still go through the full Codex worker.
+- Very short queue checks such as "status", "queue", "are you busy", and
+  "what are you working on?" should also answer immediately from runtime queue
+  and auth state. They should not spawn a full Codex job unless the message
+  includes files, multiple bundled messages, or real debug/implementation
+  wording.
 - Long code/deploy jobs should not sit silently after the first acknowledgement.
   Post a few short progress notes when a stage runs long, using normal human
   language, then give the real final answer after verification.
@@ -156,6 +161,9 @@ long-lived server state.
 - `/healthz` exposes pending Discord burst summaries with safe counts for
   messages and files, so "did it catch my follow-up/screenshot?" can be checked
   without reading raw prompt text.
+- `status`/`queue` style channel checks answer from `/healthz`-equivalent
+  runtime state and write immediate done records. They are low-signal status
+  rows, not durable project context.
 - Keep memory efficient as Discord channel history grows: summarize durable
   facts, move domain guidance into focused files, and delete duplicated stale
   notes once the facts are preserved.

@@ -82,6 +82,7 @@ import {
   appendDiscordContextRows,
   buildDiscordCodexWorkerJob,
   buildDiscordMessageRow,
+  discordImmediateStatusKind,
   discordImmediateStatusReplyText,
   discordJobContainsMessage,
   discordLiveBurstKey,
@@ -739,9 +740,90 @@ async function discordCodexMessageRecordExists(message) {
   return false;
 }
 
-function discordImmediateStatusReplyForRows(rows = []) {
+function humanCount(count, singular, plural = `${singular}s`) {
+  const value = Number.parseInt(count || '0', 10) || 0;
+  return `${value} ${value === 1 ? singular : plural}`;
+}
+
+function queueStatusLine({ jobs = 0, pendingRows = 0, pendingFiles = 0 } = {}) {
+  const parts = [];
+  if (jobs > 0) {
+    parts.push(humanCount(jobs, 'request'));
+  }
+  if (pendingRows > 0) {
+    parts.push(humanCount(pendingRows, 'message'));
+  }
+  if (pendingFiles > 0) {
+    parts.push(humanCount(pendingFiles, 'file'));
+  }
+  return parts.length ? parts.join(', ') : 'nothing waiting';
+}
+
+async function buildDiscordCodexQueueStatusReply() {
+  const pending = summarizePendingDiscordCodexJobs();
+  let queue = { counts: {} };
+  let auth = null;
+  let blockedJobs = 0;
+
+  try {
+    blockedJobs = await countDiscordCodexWorkerRecords('auth-blocked');
+    [queue, auth] = await Promise.all([
+      readDiscordCodexWorkerQueueSnapshot(),
+      readDiscordCodexWorkerAuthState({ currentBlockedJobs: blockedJobs })
+    ]);
+  } catch (error) {
+    rememberDiscordCodexError('immediate-queue-status', error);
+  }
+
+  if (!discordCodexChannelId || !discordMessageContentIntentRequested) {
+    return discordCodexSetupMessage || 'I can see the bot, but the #codex channel setup is not ready yet.';
+  }
+
+  const counts = queue?.counts || {};
+  const jobs = Number.parseInt(counts.jobs || '0', 10) || 0;
+  const processing = Number.parseInt(counts.processing || '0', 10) || 0;
+  const authBlocked = Number.parseInt(counts.authBlocked || blockedJobs || '0', 10) || 0;
+  const failed = Number.parseInt(counts.failed || '0', 10) || 0;
+  const pendingRows = Number.parseInt(pending?.counts?.rows || '0', 10) || 0;
+  const pendingFiles = Number.parseInt(pending?.counts?.files || '0', 10) || 0;
+
+  if (auth && !auth.ready) {
+    const waiting = queueStatusLine({
+      jobs: jobs + authBlocked,
+      pendingRows,
+      pendingFiles
+    });
+    return `I can see the channel, but Codex login needs a refresh before I can run code. I have ${waiting}.`;
+  }
+
+  if (processing > 0) {
+    const waiting = queueStatusLine({ jobs, pendingRows, pendingFiles });
+    return `I'm working on one request now. After that: ${waiting}.`;
+  }
+
+  if (jobs > 0 || pendingRows > 0) {
+    const waiting = queueStatusLine({ jobs, pendingRows, pendingFiles });
+    return `I caught it. Current queue: ${waiting}.`;
+  }
+
+  if (authBlocked > 0) {
+    return `Nothing is running, but ${humanCount(authBlocked, 'older request')} still needs Codex login refreshed before it can retry.`;
+  }
+
+  if (failed > 0 && queue?.latestFailed?.length) {
+    return 'Nothing is running right now. The last failed request is saved in the server logs if you want me to inspect it.';
+  }
+
+  return 'Nothing is running right now. Send the next thing here.';
+}
+
+async function discordImmediateStatusReplyForRows(rows = []) {
   if (rows.length !== 1 || rows[0]?.files?.length) {
     return '';
+  }
+  const kind = discordImmediateStatusKind(rows[0]?.text);
+  if (kind === 'queue') {
+    return buildDiscordCodexQueueStatusReply();
   }
   return discordImmediateStatusReplyText(rows[0]?.text);
 }
@@ -787,7 +869,7 @@ async function writeDiscordImmediateDoneRecord(message, rows, finalMessage) {
 }
 
 async function answerDiscordImmediateStatus(message, rows, { acknowledge = true } = {}) {
-  const finalMessage = discordImmediateStatusReplyForRows(rows);
+  const finalMessage = await discordImmediateStatusReplyForRows(rows);
   if (!finalMessage) {
     return null;
   }

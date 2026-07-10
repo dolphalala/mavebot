@@ -176,6 +176,11 @@ remote work.
   count from the last worker auth probe. `verifiedByExec` is `false` for the
   worker's low-cost `codex login status` heartbeat and `true` only after a full
   `codex exec` auth probe.
+- Short Discord `#codex` queue checks such as `status`, `queue`, `are you
+  busy`, and `what are you working on?` answer immediately from runtime
+  pending-burst, worker-queue, and auth state. They write completed immediate
+  records so restart catch-up does not replay them, but they should not create
+  a full Codex job or become durable product memory.
 - The deploy script normally builds `discord-bot` and `codex-worker`, then
   stops/removes the legacy Slack bridge. It only builds/starts `slack-bridge`
   when `ENABLE_SLACK_BRIDGE=1`. It recreates `codex-worker` only when no worker

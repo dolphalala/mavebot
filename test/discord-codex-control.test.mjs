@@ -15,6 +15,7 @@ import {
   DEFAULT_DISCORD_ATTACHMENT_DOWNLOAD_MAX_BYTES,
   discordCodexSetupBlocker,
   discordFilesToWorkerLines,
+  discordImmediateStatusKind,
   discordImmediateStatusReplyText,
   groupDiscordCodexMessageBursts,
   discordJobContainsMessage,
@@ -706,11 +707,28 @@ test('analyzeDiscordCodexTurn summarizes lanes and multi-step shape', () => {
 });
 
 test('discordImmediateStatusReplyText only fast-paths short connectivity checks', () => {
+  assert.equal(discordImmediateStatusKind('hello is this working now'), 'connectivity');
+  assert.equal(discordImmediateStatusKind('test is this working?'), 'connectivity');
+  assert.equal(discordImmediateStatusKind('can you hear me'), 'connectivity');
   assert.equal(discordImmediateStatusReplyText('hello is this working now'), DISCORD_CODEX_IMMEDIATE_STATUS_REPLY);
   assert.equal(discordImmediateStatusReplyText('test is this working?'), DISCORD_CODEX_IMMEDIATE_STATUS_REPLY);
   assert.equal(discordImmediateStatusReplyText('can you hear me'), DISCORD_CODEX_IMMEDIATE_STATUS_REPLY);
   assert.equal(discordImmediateStatusReplyText('fix the test command'), '');
   assert.equal(discordImmediateStatusReplyText('testing the pictionary command with a screenshot'), '');
+});
+
+test('discordImmediateStatusKind fast-paths queue checks without stealing work prompts', () => {
+  assert.equal(discordImmediateStatusKind('status'), 'queue');
+  assert.equal(discordImmediateStatusKind('queue?'), 'queue');
+  assert.equal(discordImmediateStatusKind('are you busy right now'), 'queue');
+  assert.equal(discordImmediateStatusKind('what are you working on?'), 'queue');
+  assert.equal(discordImmediateStatusKind('is anything running'), 'queue');
+  assert.equal(discordImmediateStatusReplyText('status'), '');
+
+  assert.equal(discordImmediateStatusKind('status of /player bug'), '');
+  assert.equal(discordImmediateStatusKind('what did you do'), '');
+  assert.equal(discordImmediateStatusKind('why didnt it work'), '');
+  assert.equal(discordImmediateStatusKind('fix the status command'), '');
 });
 
 test('discordLiveBurstKey bundles one user but separates simultaneous users', () => {

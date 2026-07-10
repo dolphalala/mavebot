@@ -107,6 +107,11 @@ command.
   mavebot replies into the bounded durable context log before jobs are queued.
   Short working acknowledgements such as "I'm on it" should not be preserved as
   durable context.
+- Short queue/status checks such as "status", "queue", "are you busy", and
+  "what are you working on?" are runtime checks. The Discord bot should answer
+  them immediately from queue/auth state and write an immediate done record
+  instead of creating a Codex job, unless the message is part of a larger
+  bundled request or includes files.
 - On startup, Discord `#codex` should catch up recent human messages that do
   not already have a job record in `jobs`, `processing`, `done`, `failed`, or
   `auth-blocked`;
@@ -192,6 +197,8 @@ The channel history will grow forever, so remote jobs must keep memory useful:
 - Worker `transcript.jsonl` is normalized history, not permanent raw chat
   storage. Low-signal smoke/status rows should be pruned from the worker's
   private memory after they have served their verification purpose.
+- Immediate queue/status replies are intentionally low-signal and should not
+  be promoted into durable product memory.
 - Put domain rules in focused files under `docs/context/`, not in one giant
   catch-all file.
 - If a file gets noisy, restructure it and remove duplicated stale notes after

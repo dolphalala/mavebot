@@ -33,6 +33,15 @@ export const DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE =
 export const DISCORD_CODEX_IMMEDIATE_STATUS_REPLY =
   "Yep, I'm here. Send me what to change or check.";
 
+function normalizeImmediateStatusText(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[`*_~|>()[\]{}#@]/g, ' ')
+    .replace(/[?!.,:;'"-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function safeIdPart(value) {
   return String(value || 'missing')
     .replace(/[^A-Za-z0-9._-]/g, '_')
@@ -89,12 +98,13 @@ export function isDiscordCodexWorkingAckText(text) {
 }
 
 export function discordImmediateStatusReplyText(text) {
-  const normalized = String(text || '')
-    .toLowerCase()
-    .replace(/[`*_~|>()[\]{}#@]/g, ' ')
-    .replace(/[?!.,:;'"-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return discordImmediateStatusKind(text) === 'connectivity'
+    ? DISCORD_CODEX_IMMEDIATE_STATUS_REPLY
+    : '';
+}
+
+export function discordImmediateStatusKind(text) {
+  const normalized = normalizeImmediateStatusText(text);
   if (!normalized || normalized.length > 80) {
     return '';
   }
@@ -121,14 +131,51 @@ export function discordImmediateStatusReplyText(text) {
     'are u there'
   ]);
   if (exactChecks.has(normalized)) {
-    return DISCORD_CODEX_IMMEDIATE_STATUS_REPLY;
+    return 'connectivity';
   }
 
   if (/^(?:hello|hi|hey|yo|test|testing) (?:does|is|can|are)\b/.test(normalized)) {
-    return DISCORD_CODEX_IMMEDIATE_STATUS_REPLY;
+    return 'connectivity';
   }
   if (/^(?:does|is|can|are)\b.*\b(?:work|working|hear me|there)\b$/.test(normalized)) {
-    return DISCORD_CODEX_IMMEDIATE_STATUS_REPLY;
+    return 'connectivity';
+  }
+
+  const queueChecks = new Set([
+    'status',
+    'queue',
+    'worker status',
+    'codex status',
+    'mavebot status',
+    'what s running',
+    'what is running',
+    'what s in queue',
+    'what is in queue',
+    'what are you working on',
+    'what are u working on',
+    'what are you doing',
+    'what are u doing',
+    'anything running',
+    'anything queued',
+    'are you busy',
+    'are u busy',
+    'are you working',
+    'are u working',
+    'is anything running',
+    'is anything queued'
+  ]);
+  if (queueChecks.has(normalized)) {
+    return 'queue';
+  }
+
+  if (/^(?:what s|what is) (?:running|in queue|queued)$/.test(normalized)) {
+    return 'queue';
+  }
+  if (/^(?:are you|are u) (?:busy|working|doing anything)(?: right now| now)?$/.test(normalized)) {
+    return 'queue';
+  }
+  if (/^(?:is anything|anything) (?:running|queued|in queue)$/.test(normalized)) {
+    return 'queue';
   }
 
   return '';

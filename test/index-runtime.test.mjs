@@ -107,3 +107,19 @@ test('Discord Codex runtime uses queue-aware human acknowledgements', async () =
   assert.match(source, /rememberDiscordCodexError\('followup-reaction'/);
   assert.match(source, /rememberDiscordCodexError\('working-ack-queue'/);
 });
+
+test('Discord Codex runtime answers simple queue status without spawning a worker job', async () => {
+  const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
+
+  assert.match(source, /discordImmediateStatusKind/);
+  assert.match(source, /buildDiscordCodexQueueStatusReply/);
+  assert.match(source, /readDiscordCodexWorkerQueueSnapshot/);
+  assert.match(source, /readDiscordCodexWorkerAuthState/);
+  assert.match(source, /summarizePendingDiscordCodexJobs/);
+  assert.match(source, /immediate-queue-status/);
+  assert.match(source, /Nothing is running right now\. Send the next thing here\./);
+  assert.ok(
+    source.indexOf("kind === 'queue'") < source.indexOf('writeDiscordImmediateDoneRecord'),
+    'queue status should be handled through the immediate done-record path before worker enqueue'
+  );
+});
