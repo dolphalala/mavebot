@@ -21,7 +21,7 @@ import {
   deployWebhookPayload,
   detailedWorkerChannelMessage,
   errorDiagnosticText,
-  finalSlackMessage,
+  finalChannelMessage,
   githubWebhookSignature,
   humanizeWorkerChannelMessage,
   isCodexImageFile,
@@ -36,15 +36,15 @@ import {
   workerAuthStatusRecord,
   workerFailureMessage,
   workerProgressMessage
-} from '../src/slack-codex-worker.mjs';
+} from '../src/codex-worker.mjs';
 
 test('compactTranscriptRows keeps recent turns bounded and older turns summarized', () => {
   const rows = Array.from({ length: 6 }, (_, index) => ({
     at: `2026-06-24T00:00:0${index}.000Z`,
     role: index % 2 === 0 ? 'user' : 'assistant',
     user: index % 2 === 0 ? `U${index}` : 'mavebot',
-    source: index % 2 === 0 ? 'discord' : 'slack',
-    channel: index % 2 === 0 ? '1523893930993778698' : 'C0BCG0T838B',
+    source: 'discord',
+    channel: '1523893930993778698',
     text: `turn ${index}`
   }));
 
@@ -61,7 +61,6 @@ test('compactTranscriptRows keeps recent turns bounded and older turns summarize
   assert.match(snapshot.recent, /turn 4/);
   assert.match(snapshot.recent, /turn 5/);
   assert.match(snapshot.recent, /\[discord\/1523893930993778698\]/);
-  assert.match(snapshot.recent, /\[slack\/C0BCG0T838B\]/);
   assert.doesNotMatch(snapshot.recent, /turn 3/);
   assert.match(snapshot.session, /Recent turn count included in prompts: 2/);
   assert.match(snapshot.session, /Discord #codex jobs/);
@@ -161,7 +160,7 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
       source: 'discord',
       channel: '1523893930993778698',
       jobId: 'discord-only-smoke-1783589874735',
-      text: 'Discord-only worker smoke test after Slack bridge removal. Do not change files.'
+      text: 'Discord-only worker smoke test after bridge removal. Do not change files.'
     }
   ];
 
@@ -201,8 +200,8 @@ test('compactTranscriptRows strips worker handoff boilerplate from retained memo
         at: '2026-07-07T00:00:00.000Z',
         role: 'assistant',
         user: 'mavebot',
-        source: 'slack',
-        channel: 'C0BCG0T838B',
+        source: 'discord',
+        channel: '1523893930993778698',
         text: [
           'Added `/player` pages.',
           '',
@@ -330,18 +329,19 @@ test('pruneTranscriptRowsForStorage removes low-signal rows from durable storage
   );
 });
 
-test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
+test('buildCodexWorkerPrompt puts active Discord request before memory', () => {
   const prompt = buildCodexWorkerPrompt({
     job: {
+      source: 'discord',
       user: 'UACTIVE',
-      channel: 'CBOT',
+      channel: '1523893930993778698',
       ts: '1782400000.000000',
       text: 'change /lana now',
       files: [
         {
           name: 'screen.png',
           mimetype: 'image/png',
-          localPath: '/shared/codex-worker/context/slack-files/CBOT/1782400000/01-screen.png'
+          localPath: '/shared/codex-worker/context/discord-files/1523893930993778698/1782400000/01-screen.png'
         }
       ],
       contextMessages: [
@@ -358,14 +358,13 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
     contextIndex: 'context map',
     runtimeSnapshot: 'runtime snapshot',
     operatingMemory: 'operating memory',
-    slackSession: 'slack session',
+    remoteSession: 'discord session',
     repoContextBundle: 'clash ui guidance',
-    slackMemoryTail: 'raw memory'
   });
 
   assert.ok(
-    prompt.indexOf('Active Slack request') < prompt.indexOf('# Worker Compacted Memory'),
-    'active Slack request should be before compacted memory'
+    prompt.indexOf('Active Discord request') < prompt.indexOf('# Worker Compacted Memory'),
+    'active Discord request should be before compacted memory'
   );
   assert.ok(
     prompt.indexOf('# Project AGENTS.md') < prompt.indexOf('# Worker Compacted Memory'),
@@ -386,7 +385,6 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /persistent Codex session/);
   assert.match(prompt, /Be as capable as a local Codex Desktop session/);
   assert.match(prompt, /local-codex-parity\.md/);
-  assert.match(prompt, /Slack #bot is legacy-only/);
   assert.match(prompt, /Do not say the work is ready for the worker to commit, push, deploy, or verify/);
   assert.match(prompt, /Answer every explicit question in the active request/);
   assert.match(prompt, /multiple contextMessages/);
@@ -401,7 +399,7 @@ test('buildCodexWorkerPrompt puts active Slack request before memory', () => {
   assert.match(prompt, /# Extra Repo Context Files/);
   assert.match(prompt, /clash ui guidance/);
   assert.match(prompt, /screen\.png/);
-  assert.match(prompt, /\/shared\/codex-worker\/context\/slack-files\/CBOT\/1782400000\/01-screen\.png/);
+  assert.match(prompt, /\/shared\/codex-worker\/context\/discord-files\/1523893930993778698\/1782400000\/01-screen\.png/);
   assert.match(prompt, /extra setup context/);
 });
 
@@ -428,9 +426,7 @@ test('buildCodexWorkerPrompt marks plan and demo requests for detailed answers',
     contextIndex: '',
     runtimeSnapshot: '',
     operatingMemory: '',
-    slackSession: '',
     repoContextBundle: '',
-    slackMemoryTail: ''
   });
 
   assert.equal(activeRequestNeedsDetailedAnswer({ text: 'is there a demo?' }), true);
@@ -479,7 +475,6 @@ test('buildCodexWorkerPrompt includes recent worker job history for follow-up au
     contextIndex: '',
     runtimeSnapshot: '',
     operatingMemory: '',
-    slackSession: '',
     repoContextBundle: '',
     workerJobHistory: 'Recent worker job records, newest first.\n- fixed /roster but did not answer the plan'
   });
@@ -614,9 +609,7 @@ test('buildCodexWorkerPrompt includes nearby Discord context as background only'
     contextIndex: '',
     runtimeSnapshot: '',
     operatingMemory: '',
-    slackSession: '',
     repoContextBundle: '',
-    slackMemoryTail: ''
   });
 
   assert.equal(
@@ -635,7 +628,7 @@ test('buildCodexWorkerPrompt includes nearby Discord context as background only'
   assert.match(prompt, /nearbyFiles/);
 });
 
-test('buildCodexWorkerPrompt uses Discord session memory without Slack tail noise by default', () => {
+test('buildCodexWorkerPrompt uses Discord session memory without legacy tail noise', () => {
   const prompt = buildCodexWorkerPrompt({
     job: {
       source: 'discord',
@@ -656,8 +649,8 @@ test('buildCodexWorkerPrompt uses Discord session memory without Slack tail nois
   });
 
   assert.match(prompt, /discord session memory/);
-  assert.doesNotMatch(prompt, /Legacy Raw Slack Memory Tail/);
-  assert.doesNotMatch(prompt, /No legacy raw Slack memory tail available/);
+  assert.doesNotMatch(prompt, /Legacy Raw/);
+  assert.doesNotMatch(prompt, /tail available/);
 });
 
 test('buildCodexWorkerPrompt puts active Discord screenshots before memory', () => {
@@ -677,15 +670,14 @@ test('buildCodexWorkerPrompt puts active Discord screenshots before memory', () 
         }
       ]
     },
-    summary: 'old request: work on Slack bridge',
+    summary: 'old request: work on a different command',
     recent: 'recent request: check a different command',
     repoInstructions: 'AGENTS instructions',
     contextIndex: 'context map',
     runtimeSnapshot: 'runtime snapshot',
     operatingMemory: 'operating memory',
-    slackSession: 'session memory',
+    remoteSession: 'session memory',
     repoContextBundle: 'remote session contract',
-    slackMemoryTail: 'raw memory'
   });
 
   assert.ok(
@@ -693,7 +685,7 @@ test('buildCodexWorkerPrompt puts active Discord screenshots before memory', () 
     'active Discord request should be before compacted memory'
   );
   assert.ok(
-    prompt.indexOf('use the screenshot to fix /player') < prompt.indexOf('old request: work on Slack bridge'),
+    prompt.indexOf('use the screenshot to fix /player') < prompt.indexOf('old request: work on a different command'),
     'active Discord request should beat older memory'
   );
   assert.match(prompt, /player-screen\.png/);
@@ -701,7 +693,7 @@ test('buildCodexWorkerPrompt puts active Discord screenshots before memory', () 
   assert.match(prompt, /remote session contract/);
 });
 
-test('Codex exec args attach image files from Discord or Slack jobs', () => {
+test('Codex exec args attach image files from Discord jobs', () => {
   const imageFiles = [
     {
       name: 'discord-screen.png',
@@ -709,8 +701,8 @@ test('Codex exec args attach image files from Discord or Slack jobs', () => {
       localPath: '/shared/codex-worker/context/discord-files/C/M/01-discord-screen.png'
     },
     {
-      name: 'slack-screen.webp',
-      localPath: '/shared/codex-worker/context/slack-files/C/M/02-slack-screen.webp'
+      name: 'discord-nearby.webp',
+      localPath: '/shared/codex-worker/context/discord-files/C/M/02-discord-nearby.webp'
     },
     {
       name: 'notes.txt',
@@ -736,7 +728,7 @@ test('Codex exec args attach image files from Discord or Slack jobs', () => {
       files: [],
       nearbyFiles: [imageFiles[1]]
     }),
-    ['/shared/codex-worker/context/slack-files/C/M/02-slack-screen.webp']
+    ['/shared/codex-worker/context/discord-files/C/M/02-discord-nearby.webp']
   );
 
   const args = buildCodexExecArgs({
@@ -750,7 +742,7 @@ test('Codex exec args attach image files from Discord or Slack jobs', () => {
     ['--image', '--image']
   );
   assert.ok(args.includes('/shared/codex-worker/context/discord-files/C/M/01-discord-screen.png'));
-  assert.ok(args.includes('/shared/codex-worker/context/slack-files/C/M/02-slack-screen.webp'));
+  assert.ok(args.includes('/shared/codex-worker/context/discord-files/C/M/02-discord-nearby.webp'));
   assert.ok(!args.includes('/shared/codex-worker/context/discord-files/C/M/03-notes.txt'));
   assert.equal(args.at(-1), '-');
 });
@@ -765,12 +757,12 @@ test('commitMessageForJob labels commits by the channel source', () => {
   );
   assert.equal(
     commitMessageForJob({
-      source: 'slack',
+      source: 'web',
       text: '<@U123> fix /player'
     }),
-    'Slack: fix /player'
+    'Remote: fix /player'
   );
-  assert.equal(commitMessageForJob({ text: '' }), 'Remote: Remote request');
+  assert.equal(commitMessageForJob({ text: '' }), 'Discord: Remote request');
 });
 
 test('changedFilesFromGitStatus parses normal, renamed, and quoted paths', () => {
@@ -780,14 +772,14 @@ test('changedFilesFromGitStatus parses normal, renamed, and quoted paths', () =>
         ' M src/index.mjs',
         'A  docs/context/worker notes.md',
         'R  old-name.mjs -> src/new-name.mjs',
-        '?? "docs/context/slack removal.md"'
+        '?? "docs/context/remote notes.md"'
       ].join('\n')
     ),
     [
       'src/index.mjs',
       'docs/context/worker notes.md',
       'src/new-name.mjs',
-      'docs/context/slack removal.md'
+      'docs/context/remote notes.md'
     ]
   );
   assert.deepEqual(
@@ -811,57 +803,57 @@ test('shouldRunChecksForChangedFiles skips pure memory docs but checks app files
   assert.equal(shouldRunChecksForChangedFiles(['package.json']), true);
 });
 
-test('finalSlackMessage always returns a human success message', () => {
+test('finalChannelMessage always returns a human success message', () => {
   assert.equal(
-    finalSlackMessage({
+    finalChannelMessage({
       codexMessage: '',
       checkOk: true,
       pushResult: { pushed: false },
       deployResult: { matched: false, reason: 'no push needed' },
-      runtime: { botOk: true, bridgeOk: true }
+      runtime: { botOk: true }
     }),
     'I checked that. No code changes were needed.'
   );
 
   assert.equal(
-    finalSlackMessage({
+    finalChannelMessage({
       codexMessage: 'I updated /lana.',
       checkOk: true,
       pushResult: { pushed: true },
       deployResult: { matched: true },
-      runtime: { botOk: true, bridgeOk: true }
+      runtime: { botOk: true }
     }),
     "I updated /lana.\n\nIt's live now."
   );
 });
 
-test('finalSlackMessage does not require legacy Slack bridge health when disabled', () => {
+test('finalChannelMessage only requires Discord runtime health', () => {
   assert.equal(
-    finalSlackMessage({
+    finalChannelMessage({
       codexMessage: 'Updated the Discord worker.',
       checkOk: true,
       pushResult: { pushed: true },
       deployResult: { matched: true },
-      runtime: { botOk: true, bridgeOk: false, bridgeChecked: false }
+      runtime: { botOk: true }
     }),
     "Updated the Discord worker.\n\nIt's live now."
   );
 
   assert.equal(
-    finalSlackMessage({
+    finalChannelMessage({
       codexMessage: 'Updated the Discord worker.',
       checkOk: true,
       pushResult: { pushed: true },
       deployResult: { matched: true },
-      runtime: { botOk: false, bridgeOk: false, bridgeChecked: false }
+      runtime: { botOk: false }
     }),
     'Updated the Discord worker.\n\nHealth check needs attention: Discord not ok.'
   );
 });
 
-test('finalSlackMessage strips worker handoff boilerplate from channel replies', () => {
+test('finalChannelMessage strips worker handoff boilerplate from channel replies', () => {
   assert.equal(
-    finalSlackMessage({
+    finalChannelMessage({
       codexMessage: [
         'Updated the Discord #codex working acknowledgements.',
         '',
@@ -876,9 +868,9 @@ test('finalSlackMessage strips worker handoff boilerplate from channel replies',
   );
 });
 
-test('finalSlackMessage strips routine deploy/check chatter from Codex replies', () => {
+test('finalChannelMessage strips routine deploy/check chatter from Codex replies', () => {
   assert.equal(
-    finalSlackMessage({
+    finalChannelMessage({
       codexMessage: [
         'Fixed the remote runner behavior.',
         'Checks passed: npm install and npm run check.',
@@ -951,9 +943,9 @@ test('triggerDeployWebhook skips cleanly when not configured', async () => {
   assert.match(result.reason, /not configured/);
 });
 
-test('finalSlackMessage strips inline premature live claims before wrapper status', () => {
+test('finalChannelMessage strips inline premature live claims before wrapper status', () => {
   assert.equal(
-    finalSlackMessage({
+    finalChannelMessage({
       codexMessage: 'Updated `/pictionary` to use real asset cards. Done and live.',
       checkOk: true,
       pushResult: { pushed: true },
@@ -1012,9 +1004,9 @@ test('detailedWorkerChannelMessage preserves requested plan and demo structure',
   assert.doesNotMatch(message, /npm run check|health ok/);
 });
 
-test('finalSlackMessage preserves longer plan answers when requested', () => {
+test('finalChannelMessage preserves longer plan answers when requested', () => {
   assert.equal(
-    finalSlackMessage({
+    finalChannelMessage({
       codexMessage: [
         'Plan:',
         '- `/roster enroll clan:#JY99CJC8` saves the clan and starts snapshots.',
@@ -1040,9 +1032,9 @@ test('finalSlackMessage preserves longer plan answers when requested', () => {
   );
 });
 
-test('finalSlackMessage condenses long implementation reports for channels', () => {
+test('finalChannelMessage condenses long implementation reports for channels', () => {
   assert.equal(
-    finalSlackMessage({
+    finalChannelMessage({
       codexMessage: [
         'Found the remote-runner problems and tightened them up. The issues were mostly session-parity gaps, not `/player` or `/loveu` alone. Discord needed better restart recovery and screenshots needed to stay attached to the active prompt.',
         '',
@@ -1062,9 +1054,9 @@ test('finalSlackMessage condenses long implementation reports for channels', () 
   );
 });
 
-test('finalSlackMessage removes premature live claims when deploy is not verified', () => {
+test('finalChannelMessage removes premature live claims when deploy is not verified', () => {
   assert.equal(
-    finalSlackMessage({
+    finalChannelMessage({
       codexMessage: [
         'Fixed the worker behavior.',
         '',
@@ -1228,7 +1220,6 @@ test('buildWorkerRuntimeSnapshot explains deploy and safety boundaries without s
   assert.match(snapshot, /scripts\/deploy-server\.sh/);
   assert.match(snapshot, /Discord #codex/);
   assert.match(snapshot, /authBlockedDir/);
-  assert.match(snapshot, /requireSlackBridgeHealth/);
   assert.match(snapshot, /npm run check/);
   assert.match(snapshot, /transcript is normalized/);
   assert.match(snapshot, /localSessionParity/);
@@ -1273,7 +1264,6 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
 
   await writeFile(path.join(dir, 'operating-memory.md'), 'do not include this copy');
   await writeFile(path.join(dir, 'discord-session.md'), 'do not include canonical session copy');
-  await writeFile(path.join(dir, 'slack-session.md'), 'do not include this copy either');
   await writeFile(path.join(dir, 'README.md'), 'do not include context map copy');
   await writeFile(path.join(dir, 'clash-ui-guidance.md'), '# Clash UI\nUse icon cards.');
   await writeFile(path.join(dir, 'remote-codex-session.md'), '# Remote Contract\nAct like a session.');
@@ -1312,10 +1302,10 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   assert.doesNotMatch(bundle, /do not include context map copy/);
 });
 
-test('slack-codex-worker can be imported from stdin module scripts', () => {
+test('codex-worker can be imported from stdin module scripts', () => {
   const result = spawnSync(process.execPath, ['--input-type=module'], {
     cwd: process.cwd(),
-    input: "import './src/slack-codex-worker.mjs';\nconsole.log('import ok');\n",
+    input: "import './src/codex-worker.mjs';\nconsole.log('import ok');\n",
     encoding: 'utf8'
   });
 
@@ -1323,7 +1313,7 @@ test('slack-codex-worker can be imported from stdin module scripts', () => {
   assert.match(result.stdout, /import ok/);
 });
 
-test('checkUrl supports the Slack bridge health port', async (t) => {
+test('checkUrl supports a local health endpoint', async (t) => {
   const server = http.createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end('{"ok":true}');
@@ -1332,13 +1322,9 @@ test('checkUrl supports the Slack bridge health port', async (t) => {
   try {
     await new Promise((resolve, reject) => {
       server.once('error', reject);
-      server.listen(4190, '127.0.0.1', resolve);
+      server.listen(0, '127.0.0.1', resolve);
     });
   } catch (error) {
-    if (error?.code === 'EADDRINUSE') {
-      t.skip('port 4190 is already in use on this machine');
-      return;
-    }
     throw error;
   }
 
@@ -1349,5 +1335,6 @@ test('checkUrl supports the Slack bridge health port', async (t) => {
       })
   );
 
-  assert.equal(await checkUrl('http://127.0.0.1:4190/healthz'), true);
+  const address = server.address();
+  assert.equal(await checkUrl(`http://127.0.0.1:${address.port}/healthz`), true);
 });

@@ -15,21 +15,15 @@ long-lived server state.
   they are sent close together.
 - Live Discord intake should keep one user's quick follow-up messages together
   but avoid merging different users' simultaneous prompts into one job.
-- Restart catch-up should follow the same per-author grouping rule; other users'
-  nearby messages stay available as context but should not become one merged
-  active task.
 - Nearby Discord channel messages from any user should be available as
   background context for follow-ups, screenshots, and collaboration without
   becoming extra hidden tasks.
 - Nearby context should survive deploys and restarts through the bounded
   Discord context log, not only through live process memory.
-- Restart context backfill should be broader than the catch-up queue tail:
-  the bot can refresh a larger recent channel history for memory while only
-  queuing the smaller configured tail of unhandled messages.
 - mavebot should post normal channel replies, not thread-only replies, task
   cards, prompt dumps, or deployment logs.
 - The server-side `codex-worker` container is the normal backend for repo
-  tasks. Slack is legacy-only and should not be required.
+  tasks.
 
 ## Remote UX Decisions
 
@@ -41,9 +35,7 @@ long-lived server state.
   and anything command-like still go through the full Codex worker.
 - Very short queue checks such as "status", "queue", "are you busy", and
   "what are you working on?" should also answer immediately from runtime queue
-  and auth state. They should not spawn a full Codex job unless the message
-  includes files, multiple bundled messages, or real debug/implementation
-  wording.
+  and auth state.
 - Long code/deploy jobs should not sit silently after the first acknowledgement.
   Post a few short progress notes when a stage runs long, using normal human
   language, then give the real final answer after verification.
@@ -53,8 +45,7 @@ long-lived server state.
   user can tell the message was caught.
 - Changed-file jobs should trigger the server-local private deploy webhook from
   the worker when configured, then still verify the live commit and health. The
-  30-second poll deploy timer is only the fallback, because waiting for it makes
-  Discord feel randomly slow.
+  30-second poll deploy timer is only the fallback.
 - If Allen, Lana, or another user asks for a plan, demo, explanation, design,
   review, screenshot analysis, database model, or "how this works," preserve
   enough structure in the final answer to actually answer it.
@@ -67,8 +58,8 @@ long-lived server state.
   first, mention blockers plainly, and avoid commit/test/deploy details unless
   they explain a failure.
 - Do not say a change is live until the worker has pushed `origin/main`, the
-  server poll deploy has pulled it, and the runtime health or command path has
-  been checked.
+  server deploy has pulled it, and the runtime health or command path has been
+  checked.
 - Do not touch Chatwoot, Bookkeeper, nginx, Docker daemon settings, or other
   apps on the shared server unless the user explicitly asks for that exact app.
 
@@ -85,11 +76,10 @@ long-lived server state.
 - `summary.md`, `recent.md`, and `session.md` are regenerated bounded context
   files for future prompts.
 - Recent worker job JSON records in `done/`, `failed/`, and `auth-blocked/`
-  are included in prompts as a bounded audit trail for follow-up questions
-  such as "what did you do?" and "why didn't that work?"
-- Recent worker job summaries now include compact active-turn shape: message
-  count, users, file counts, lanes, and multi-agent hints. This lets later
-  Discord turns audit prior work without rereading the entire channel.
+  are included in prompts as a bounded audit trail for follow-up questions such
+  as "what did you do?" and "why didn't that work?"
+- Recent worker job summaries include compact active-turn shape: message count,
+  users, file counts, lanes, and multi-agent hints.
 - `auth-blocked/` job records count as handled message IDs for catch-up, so
   login-held requests are not replayed as duplicates after a restart.
 - Durable product, deployment, and user-preference facts belong in
@@ -98,13 +88,11 @@ long-lived server state.
   noisy sections instead of appending repeated status notes.
 - Never store secrets, raw env values, OAuth tokens, cookies, or private keys in
   context docs.
-- 2026-07-09 latency investigation: the live `#codex` channel had no human
-  message after Allen's earlier "hello is this working now" test, so the visible
-  4-minute delay came from the older worker path before immediate status
-  replies and stage diagnostics. Current no-change worker smokes are around
-  7-8 seconds; changed-file jobs should now use the private deploy webhook
-  before relying on the poll timer.
-- 2026-07-09 live verification: private deploy webhook triggered from the worker and the poll timer remained fallback.
+- 2026-07-09 latency investigation: no-change worker smokes were around 7-8
+  seconds; changed-file jobs should use the private deploy webhook before
+  relying on the poll timer.
+- 2026-07-09 live verification: private deploy webhook triggered from the
+  worker and the poll timer remained fallback.
 
 ## Persistent Product Context
 
@@ -133,8 +121,8 @@ long-lived server state.
 
 ## Open Work
 
-- The server-side Codex CLI auth is currently the critical external dependency.
-  If `codex exec` returns `HTTP 401`, `token_invalidated`, or
+- The server-side Codex CLI auth is the critical external dependency. If
+  `codex exec` returns `HTTP 401`, `token_invalidated`, or
   `refresh_token_invalidated`, complete a fresh device-auth login for the
   mounted server `CODEX_HOME`. Allen wants that server login to use
   `billing@urba.media`.
@@ -152,12 +140,9 @@ long-lived server state.
   guarding against: skipped plan/demo answers on broad requests, overly short
   "fixed it" replies that hide what changed, and auth-expired jobs looking like
   silent hangs unless `/healthz` exposes the worker auth state.
-- 2026-07-09 live smoke verified worker current-stage health diagnostics and
-  progress behavior.
 - Working acknowledgements account for other pending Discord bursts as well as
-  jobs already on disk, so simultaneous users see clearer "queued after the
-  current work" language while the active user's own debounce window still
-  feels immediate.
+  jobs already on disk, so simultaneous users see clearer queued language while
+  the active user's own debounce window still feels immediate.
 - `/healthz` exposes pending Discord burst summaries with safe counts for
   messages and files, so "did it catch my follow-up/screenshot?" can be checked
   without reading raw prompt text.
@@ -167,6 +152,3 @@ long-lived server state.
 - Keep memory efficient as Discord channel history grows: summarize durable
   facts, move domain guidance into focused files, and delete duplicated stale
   notes once the facts are preserved.
-- Slack removal should follow `docs/context/slack-removal-plan.md`. Do not
-  delete Slack compatibility code or docs until Discord-only auth, text/image
-  intake, deploy, and final replies have been verified through real jobs.

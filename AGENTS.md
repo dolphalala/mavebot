@@ -5,14 +5,14 @@ This project is the Vibe mirror for the Discord bot intended to run on the
 
 Before making changes, read `docs/context/README.md` first, then
 `docs/context/operating-memory.md`, `docs/context/discord-session.md`, and any
-focused context file relevant to the task. `slack-session.md` is only a legacy
-compatibility pointer; Discord `#codex` is the primary remote control channel.
-Remote Codex jobs use the same context surface, so keep it concise and current.
+focused context file relevant to the task. Discord `#codex` is the remote
+control channel. Remote Codex jobs use the same context surface, so keep it
+concise and current.
 
 ## Rules
 
-- Do not commit `.env`, Discord bot tokens, client secrets, SSH keys, cookies, or
-  server-only credentials.
+- Do not commit `.env`, Discord bot tokens, client secrets, SSH keys, cookies,
+  or server-only credentials.
 - Keep runtime config in `/opt/urba-apps/discord-bot/.env` on the server.
 - Keep this bot isolated from Chatwoot and Bookkeeper.
 - Do not edit nginx, Docker daemon settings, Chatwoot files, or existing app

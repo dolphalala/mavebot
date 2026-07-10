@@ -103,10 +103,7 @@ const healthHost = process.env.HEALTH_HOST || '0.0.0.0';
 const healthPort = Number.parseInt(process.env.HEALTH_PORT || '4188', 10);
 const discordCodexChannelId = process.env.DISCORD_CODEX_CHANNEL_ID || '';
 const discordCodexWorkerJobDir =
-  process.env.DISCORD_CODEX_WORKER_JOB_DIR ||
-  process.env.SLACK_CODEX_WORKER_JOB_DIR ||
-  process.env.SLACK_WORKER_JOB_DIR ||
-  DEFAULT_DISCORD_CODEX_JOB_DIR;
+  process.env.DISCORD_CODEX_WORKER_JOB_DIR || DEFAULT_DISCORD_CODEX_JOB_DIR;
 const discordCodexWorkerBaseDir = path.dirname(discordCodexWorkerJobDir);
 const discordCodexAuthRetryStatePath =
   process.env.DISCORD_CODEX_AUTH_RETRY_STATE_PATH ||
@@ -126,9 +123,7 @@ const discordAttachmentDownloadMaxBytes = Number.parseInt(
   10
 );
 const discordCodexWorkerDebounceMs = Number.parseInt(
-  process.env.DISCORD_CODEX_WORKER_DEBOUNCE_MS ||
-    process.env.SLACK_CODEX_WORKER_DEBOUNCE_MS ||
-    '3500',
+  process.env.DISCORD_CODEX_WORKER_DEBOUNCE_MS || '3500',
   10
 );
 const discordCodexCatchupLimit = Number.parseInt(

@@ -1,9 +1,8 @@
 # Mavebot Context Map
 
-This folder is the durable context surface for mavebot's Discord-first remote
-Codex runner. Use it to make Discord `#codex` work feel like a local Codex
-Desktop session without dumping every old chat message into every prompt.
-Slack `#bot` is legacy-only unless explicitly re-enabled.
+This folder is the durable context surface for mavebot's Discord remote Codex
+runner. Use it to make Discord `#codex` work feel like a local Codex Desktop
+session without dumping every old chat message into every prompt.
 
 ## Load Order
 
@@ -19,8 +18,8 @@ Remote worker prompts include context in this order:
 8. `operating-memory.md`.
 9. `discord-session.md`.
 10. Extra focused context files, currently prioritized as:
-   `remote-codex-session.md`, `local-codex-parity.md`, `code-map.md`,
-   `clash-database-guidance.md`, `clash-ui-guidance.md`.
+    `remote-codex-session.md`, `local-codex-parity.md`, `code-map.md`,
+    `clash-database-guidance.md`, `clash-ui-guidance.md`.
 11. Current source code and tests.
 
 The active request wins over older memory. Source code and tests are the final
@@ -33,9 +32,6 @@ authority when docs are stale.
 - `discord-session.md`: current remote session memory for user preferences, UX
   decisions, current goals, and open work from the long-running Discord
   `#codex` session.
-- `slack-session.md`: legacy compatibility pointer for old Slack-era prompts.
-- `slack-removal-plan.md`: staged plan for deleting Slack support after
-  Discord-only operation has been verified.
 - `remote-codex-session.md`: behavior contract for making Discord `#codex`
   act like a persistent Codex session.
 - `local-codex-parity.md`: checklist for making remote jobs match the quality

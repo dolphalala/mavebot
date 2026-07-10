@@ -16,4 +16,4 @@ COPY --chown=node:node docs ./docs
 
 USER node
 
-CMD ["node", "src/slack-codex-worker.mjs"]
+CMD ["node", "src/codex-worker.mjs"]

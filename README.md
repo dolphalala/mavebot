@@ -4,18 +4,16 @@ Minimal Dockerized Discord bot foundation for the shared `urba-chatwoot` host.
 
 ## What It Includes
 
-- `discord.js` v14 bot process
-- `/lana` slash command with a generated heart PNG and randomized Lana/Allen embeds
-- `/player` slash command for Clash of Clans player lookups
-- slash command registration script
-- local-only `/healthz` HTTP endpoint on port `4188`
-- Slack bridge for the `#bot` channel on local port `4190`, with Socket Mode
-  support for no-domain Slack events
-- server-side Codex worker that turns normal `#bot` messages into Codex CLI
-  jobs, keeps compacted Markdown memory, pushes `main`, and waits for deploy
-- Discord `#codex` control channel support that uses the same worker queue and
-  memory system as Slack
-- Docker Compose service named `urba-discord-bot`
+- `discord.js` v14 bot process.
+- `/lana` slash command with a generated heart PNG and randomized Lana/Allen embeds.
+- `/loveu` slash command with a generated heart PNG and randomized love poem.
+- `/player` slash command for Clash of Clans player lookups.
+- `/legends` slash command for Legend League tracking.
+- `/pictionary`, `/elder`, `/mute`, and `/bench` feature commands.
+- Slash command registration script.
+- Local-only `/healthz` HTTP endpoint on port `4188`.
+- Discord `#codex` control channel support backed by the server-side Codex worker.
+- Docker Compose service named `urba-discord-bot`.
 
 ## Local Checks
 
@@ -29,18 +27,21 @@ npm run check
 ```text
 /opt/urba-apps/discord-bot/
   .env
-  slack-bridge.env
+  codex-worker.env
   codex-home/
   shared/
     codex-worker/
       context/
+        discord-files/
       jobs/
       processing/
       done/
       failed/
+      auth-blocked/
   app/
     docker-compose.yml
     Dockerfile
+    Dockerfile.worker
     package.json
     src/
     scripts/
@@ -48,21 +49,25 @@ npm run check
 
 ## Auto Deploy
 
-GitHub deploys are handled by a server-local polling timer. The server checks
-`origin/main` and runs the deploy script when a new commit appears, so no public
-webhook endpoint or app-specific domain is required:
+GitHub deploys are handled by a server-local private deploy webhook triggered
+by the worker after it pushes `origin/main`. The 30-second server polling timer
+remains the fallback.
 
 ```text
-GitHub push to main
-  -> server timer polls origin/main
-  -> /opt/urba-apps/discord-bot/app/scripts/deploy-server.sh
-  -> docker compose build
+Discord #codex request
+  -> codex-worker job
+  -> Codex CLI edits repo checkout
+  -> npm run check when needed
+  -> commit and push origin/main
+  -> private deploy webhook, or poll timer fallback
+  -> scripts/deploy-server.sh
   -> register slash commands when Discord credentials exist
   -> restart only urba-discord-bot
+  -> verify /healthz
 ```
 
-If Discord credentials are not complete yet, the deploy script pulls and builds
-the latest image but skips starting the bot.
+If Discord credentials are incomplete, the deploy script pulls and builds the
+latest image but skips starting the bot.
 
 ## Server Setup
 
@@ -98,101 +103,28 @@ curl -i http://127.0.0.1:4188/healthz
 Global command registration can take longer to appear in Discord.
 
 The Clash of Clans developer API token must be created for the server public IP
-`5.78.127.221` and stored only in the server `.env` file. The `/player` command
-uses that token to call the official Clash of Clans API.
+`5.78.127.221` and stored only in the server `.env` file.
 
-The Discord `#codex` channel control path requires Discord Developer Portal
-Message Content Intent because users type normal messages without tagging
-mavebot. The bot auto-detects whether that intent is enabled and stays online
-with a setup note if it is off. Discord may expose the enabled setting as either
-the full or limited Gateway Message Content application flag; both are accepted.
-Adjacent `#codex` messages are debounced into one worker job so users can send
-several messages and screenshots as context before mavebot starts the task.
-Discord attachments are downloaded immediately to
-`/shared/codex-worker/context/discord-files` and passed to the worker as local
-file paths. Supported image files are also attached to `codex exec` with
-`--image` so screenshots are available as visual context, not only as filenames.
+## Discord Codex Worker
 
-## Slack Bridge
-
-The custom bridge is separate from the official Codex Slack app. It should use
-Slack Socket Mode so the server connects outbound to Slack and does not expose
-an HTTP Events API route on `chat.urba.group` or any other domain.
-
-Server-only config lives in `/opt/urba-apps/discord-bot/slack-bridge.env`:
-
-```text
-SLACK_APP_ID=
-SLACK_CLIENT_ID=
-SLACK_CLIENT_SECRET=
-SLACK_SIGNING_SECRET=
-SLACK_APP_TOKEN=
-SLACK_BOT_TOKEN=
-SLACK_CHANNEL_ID=C0BCG0T838B
-SLACK_SOCKET_MODE=1
-SLACK_CODEX_FORWARD=1
-SLACK_CODEX_FORWARD_MODE=worker
-SLACK_CODEX_USER_ID=
-SLACK_CODEX_TRIGGER_CHANNEL_ID=
-SLACK_CODEX_ENVIRONMENT=mavebot
-SLACK_CODEX_REPOSITORY=dolphalala/mavebot
-SLACK_CODEX_MIRROR_REPLIES=1
-SLACK_CODEX_FORWARD_IN_THREAD=0
-SLACK_CODEX_DELETE_FORWARD=1
-SLACK_CODEX_DELETE_FORWARD_DELAY_MS=60000
-SLACK_CODEX_STATE_PATH=/shared/codex-forward-state.json
-SLACK_CODEX_MEMORY_LIMIT=30
-SLACK_CODEX_MEMORY_TEXT_LIMIT=1500
-SLACK_CODEX_WORKER_CONTEXT_LIMIT=80
-SLACK_CODEX_WORKER_DEBOUNCE_MS=3500
-SLACK_CODEX_STATE_ENTRY_LIMIT=200
-SLACK_CODEX_WORKER_JOB_DIR=/shared/codex-worker/jobs
-SLACK_FILE_CONTEXT_DIR=/shared/codex-worker/context/slack-files
-SLACK_FILE_DOWNLOAD_MAX_BYTES=26214400
-SLACK_OAUTH_REDIRECT_URI=https://mavebot.lanawee.com/mavebot/slack/oauth/callback
-SLACK_USER_SCOPES=chat:write
-SLACK_USER_TOKEN_PATH=/shared/slack-user-tokens.json
-SLACK_BRIDGE_AUTOREPLY=0
-GITHUB_TOKEN=
-CODEX_WORKER_BRANCH=main
-CODEX_WORKER_REPOSITORY_URL=https://github.com/dolphalala/mavebot.git
-CODEX_WORKER_SHARED_DIR=/shared/codex-worker
-CODEX_WORKER_RECENT_TURNS=40
-CODEX_WORKER_SUMMARY_TURNS=120
-```
-
-The bridge saves messages from `#bot` to
-`/opt/urba-apps/discord-bot/shared/slack-memory.jsonl`. In Socket Mode,
-Slack sends Events API payloads through an outbound WebSocket after the bridge
-calls `apps.connections.open` with the app-level `xapp-...` token.
-
-The `SLACK_BOT_TOKEN` value must be the Bot User OAuth Token from Slack
-`OAuth & Permissions`; it starts with `xoxb-`.
-
-The `SLACK_APP_TOKEN` value must be an App-Level Token from Slack
-`Basic Information -> App-Level Tokens` with the `connections:write` scope; it
-starts with `xapp-`.
-
-In Slack `Event Subscriptions`, enable events and subscribe the bot to:
-
-- `message.channels`
-- `app_mention`
-- `file_shared`
-
-For screenshots and uploads to become Codex context, add the bot token scope
-`files:read`, reinstall the Slack app, and keep the bot subscribed to channel
-messages. The bridge accepts both `file_share` message events and standalone
-`file_shared` file events, looks up file-id-only events with `files.info`,
-downloads Slack files to `/shared/codex-worker/context/slack-files`, and
-includes those local paths in the worker job.
-
-For Socket Mode, do not enter a Request URL.
+The Discord `#codex` control path requires Discord Developer Portal Message
+Content Intent because users type normal messages without tagging mavebot. The
+bot auto-detects whether that intent is enabled and stays online with a setup
+note if it is off.
 
 Normal human messages in Discord `#codex` are saved as jobs under
 `/opt/urba-apps/discord-bot/shared/codex-worker/jobs`. The worker container
 uses Codex CLI auth from `/opt/urba-apps/discord-bot/codex-home`, not an
 OpenAI API key. It works in its own checkout, runs checks, commits, pushes
-`origin/main`, and then waits for the server poll deploy to pull the commit.
+`origin/main`, triggers deploy, waits for the live checkout, and posts the
+final answer back into the channel.
+
+Adjacent `#codex` messages are debounced into one worker job so users can send
+several messages and screenshots as context before mavebot starts the task.
+Discord attachments are downloaded immediately to
+`/shared/codex-worker/context/discord-files` and passed to the worker as local
+file paths. Supported image files are also attached to `codex exec` with
+`--image` so screenshots are available as visual context.
 
 The worker keeps durable context in:
 
@@ -201,7 +133,6 @@ The worker keeps durable context in:
 - `/opt/urba-apps/discord-bot/shared/codex-worker/context/recent.md`
 - `/opt/urba-apps/discord-bot/shared/codex-worker/context/session.md`
 - `/opt/urba-apps/discord-bot/shared/codex-worker/context/discord-files/`
-- `/opt/urba-apps/discord-bot/shared/codex-worker/context/slack-files/`
 
 `transcript.jsonl` is normalized history; low-signal smoke/status rows are
 pruned after verification. `summary.md` and `recent.md` are regenerated after
@@ -211,36 +142,14 @@ Repo-side durable guidance starts at `docs/context/README.md`, then
 `docs/context/remote-codex-session.md`, `docs/context/code-map.md`, and focused
 domain files such as `docs/context/clash-ui-guidance.md`.
 
-Start or update the profiled worker service manually after code changes to the
-worker itself:
+Start or update the worker service manually after code changes to the worker
+itself:
 
 ```bash
 cd /opt/urba-apps/discord-bot/app
 docker compose --profile codex-worker up -d --build codex-worker
 ```
 
-The normal deploy script does not restart `codex-worker`, so a running worker
-is not killed by the bot deploy it just triggered.
-
-The older `SLACK_CODEX_FORWARD_MODE=official` path reposts messages by the
-sender's own Slack user token as mentions to the official Codex Slack app. Keep
-that only as a fallback; it can create task cards and does not reliably push
-deployable code to `origin/main`.
-
-Set `SLACK_CODEX_TRIGGER_CHANNEL_ID` to a separate public bridge channel when
-the official Codex app's task cards or ephemeral status text should stay out of
-`#bot`. Invite both mavebot and Codex to that bridge channel. The bridge posts
-the hidden `@Codex` trigger there, listens for Codex replies there, and mirrors
-only the cleaned useful answer back into `#bot`. If no trigger channel is set,
-the bridge falls back to `#bot`, hides the long prompt behind a short visible
-message, and deletes that trigger quickly.
-
-Codex cloud still creates task-style runs. The server-side worker path is the
-preferred flow because it can push `origin/main`, wait for deploy, and post a
-plain Discord channel answer. `docs/context/slack-session.md` is kept only as a
-legacy pointer for old Slack-era prompts.
-
-To enable per-user forwarding, add an HTTPS redirect URL that Allen owns in
-Slack `OAuth & Permissions -> Redirect URLs`, and add a User Token Scope that
-allows posting on the user's behalf (`chat:write`). A user who has not
-authorized yet will get a visible setup message in `#bot`.
+The normal deploy script avoids killing an active worker request. If a worker
+job is currently processing, deploy writes a restart-needed marker and the
+worker is recreated after the queue is clear.
