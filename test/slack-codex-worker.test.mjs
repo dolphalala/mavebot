@@ -413,7 +413,14 @@ test('buildCodexWorkerPrompt marks plan and demo requests for detailed answers',
       username: 'Allen',
       channel: '1523893930993778698',
       ts: '2026-07-09T07:07:42.060Z',
-      text: 'tell me the plan. is there a demo? hows this gonna work?'
+      text: 'tell me the plan. is there a demo? hows this gonna work?',
+      turn: {
+        activeMessageCount: 1,
+        activeUserCount: 1,
+        lanes: ['planning'],
+        multiStepLikely: true,
+        multiAgentHelpful: false
+      }
     },
     summary: '',
     recent: '',
@@ -444,9 +451,12 @@ test('buildCodexWorkerPrompt marks plan and demo requests for detailed answers',
     true
   );
   assert.match(prompt, /Active request response mode:/);
+  assert.match(prompt, /"turn":/);
+  assert.match(prompt, /"lanes": \[/);
   assert.match(prompt, /asks for a plan\/demo\/how-it-works answer/);
   assert.match(prompt, /Do not answer with only an acknowledgement/);
   assert.match(prompt, /compact plan, a concrete demo\/example/);
+  assert.match(prompt, /Use active request turn metadata/);
 });
 
 test('buildCodexWorkerPrompt includes recent worker job history for follow-up audits', () => {
@@ -497,7 +507,16 @@ test('readRecentWorkerJobHistory summarizes real jobs and skips smoke jobs', asy
       finalMessage: 'I added the roster command and explained the signup flow.',
       codexMessage: 'Plan:\n- Add storage\n- Add command pages',
       pushResult: { pushed: true },
-      deployResult: { matched: true }
+      deployResult: { matched: true },
+      workerTiming: {
+        stages: [
+          { name: 'ensure-repo', durationMs: 100, ok: true },
+          { name: 'codex-exec', durationMs: 4200, ok: true },
+          { name: 'checks', durationMs: 900, ok: true },
+          { name: 'deploy-trigger', durationMs: 12, ok: true },
+          { name: 'deploy-wait', durationMs: 5000, ok: true }
+        ]
+      }
     })
   );
   await writeFile(
@@ -523,6 +542,8 @@ test('readRecentWorkerJobHistory summarizes real jobs and skips smoke jobs', asy
   assert.match(history, /discord-real/);
   assert.match(history, /make \/roster and explain the plan/);
   assert.match(history, /I added the roster command/);
+  assert.match(history, /timing: .*codex-exec 4200ms/);
+  assert.match(history, /deploy-trigger 12ms/);
   assert.doesNotMatch(history, /unknown error/);
   assert.doesNotMatch(history, /Smoke test|discord-live-verify/);
 });
@@ -1179,7 +1200,11 @@ test('buildMovedJobRecord clears stale failed fields after successful retry', ()
 test('buildWorkerRuntimeSnapshot explains deploy and safety boundaries without secrets', () => {
   const snapshot = buildWorkerRuntimeSnapshot({
     source: 'discord',
-    channel: '1523893930993778698'
+    channel: '1523893930993778698',
+    turn: {
+      lanes: ['audit', 'implementation'],
+      multiAgentHelpful: true
+    }
   });
 
   assert.match(snapshot, /origin\/main/);
@@ -1190,6 +1215,8 @@ test('buildWorkerRuntimeSnapshot explains deploy and safety boundaries without s
   assert.match(snapshot, /npm run check/);
   assert.match(snapshot, /transcript is normalized/);
   assert.match(snapshot, /localSessionParity/);
+  assert.match(snapshot, /activeTurn/);
+  assert.match(snapshot, /multiAgentHelpful/);
   assert.match(snapshot, /do not touch Chatwoot/);
   assert.doesNotMatch(snapshot, /TOKEN|SECRET|xox|github_pat/i);
 });

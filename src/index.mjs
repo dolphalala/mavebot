@@ -85,13 +85,13 @@ import {
   discordImmediateStatusReplyText,
   discordJobContainsMessage,
   discordLiveBurstKey,
+  discordWorkingMessageForQueue,
   discordCodexSetupBlocker,
   enqueueDiscordCodexWorkerJob,
   hasDiscordMessageContentIntentFlag,
   isDiscordCodexWorkingAckText,
   materializeDiscordAttachments,
   planDiscordCodexCatchupBursts,
-  randomWorkingMessage,
   readDiscordContextLog,
   selectNearbyDiscordContextRows,
   shouldHandleDiscordCodexMessage
@@ -761,6 +761,15 @@ async function answerDiscordImmediateStatus(message, rows, { acknowledge = true 
   return { queued: false, immediate: true, id: record.id };
 }
 
+async function discordCodexWorkingAckMessage() {
+  try {
+    return discordWorkingMessageForQueue(await readDiscordCodexWorkerQueueSnapshot());
+  } catch (error) {
+    rememberDiscordCodexError('working-ack-queue', error);
+    return discordWorkingMessageForQueue();
+  }
+}
+
 async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup = false } = {}) {
   let files = [];
   try {
@@ -809,7 +818,7 @@ async function enqueueDiscordCodexMessage(message, { acknowledge = true, catchup
     discordCodexLastMessageAt = new Date().toISOString();
     if (acknowledge) {
       await message.channel.send({
-        content: randomWorkingMessage(),
+        content: await discordCodexWorkingAckMessage(),
         allowedMentions: { parse: [] }
       });
     }

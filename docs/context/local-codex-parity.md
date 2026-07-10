@@ -33,6 +33,9 @@ Use context in layers instead of dumping the full channel history:
 - Active user request is the only command for the run.
 - Discord `#codex` may combine a short burst of messages and screenshots into
   one active request; treat that bundle as the current prompt.
+- Discord worker jobs include compact active-turn metadata for message count,
+  active users, files, likely work lanes, and multi-step/multi-agent hints.
+  Use it to choose the right working shape without replacing source inspection.
 - Burst grouping is per author. Other users' nearby messages can explain
   references and collaboration, but separate users' prompts should not be
   silently merged into one active task.
@@ -46,6 +49,9 @@ Use context in layers instead of dumping the full channel history:
 - Worker `summary.md` and `recent.md` provide bounded channel memory.
 - Recent worker job records provide a bounded audit trail for follow-up
   questions about what actually happened in previous jobs.
+  These records include stage timings when available, so latency audits should
+  identify whether time was spent in Codex execution, checks, push, deploy, or
+  runtime verification before changing behavior.
 - `auth-blocked/` records are part of that audit trail and must be treated as
   handled work for catch-up duplicate detection until the server Codex login is
   refreshed and the worker requeues them.

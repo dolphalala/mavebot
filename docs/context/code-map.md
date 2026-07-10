@@ -19,7 +19,9 @@ It is a map, not a replacement for reading the current source.
   `contextMessages` from nearby background context so follow-ups can refer to
   prior channel messages without marking those messages as handled jobs. The
   bounded durable Discord context log helpers live here too; they keep recent
-  channel rows available after deploys and restarts.
+  channel rows available after deploys and restarts. Worker jobs also carry
+  compact `turn` metadata for active users, files, likely work lanes, and
+  multi-step/multi-agent hints.
 
 ## Feature Modules
 
@@ -50,7 +52,8 @@ It is a map, not a replacement for reading the current source.
   wording after checks and deploy verification. Completed job records keep
   sanitized copies of the inner Codex response and final channel message for
   later response-quality audits; they also keep stage timings for latency
-  debugging. The worker skips install/check/push/deploy on no-change
+  debugging, and recent-job prompt summaries include compact timing lines when
+  available. The worker skips install/check/push/deploy on no-change
   conversational turns, caches dependency install freshness by package
   manifest, and includes a bounded recent job record summary for "what
   happened" follow-ups.

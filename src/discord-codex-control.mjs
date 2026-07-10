@@ -22,6 +22,12 @@ export const DISCORD_CODEX_WORKING_MESSAGES = [
   "I got you. Working through it now.",
   "I'll dig into that now."
 ];
+export const DISCORD_CODEX_QUEUED_MESSAGES = [
+  "I see it. I'm finishing one thing first, then this is next.",
+  "Got it. One request is ahead of this, then I'm on it.",
+  "I have it. I'll take this right after the current work.",
+  "I see this too. I'll work through it in order."
+];
 export const DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE =
   'Enable Message Content Intent in the Discord Developer Portal for mavebot, save it, then restart the bot so I can read normal messages in #codex.';
 export const DISCORD_CODEX_IMMEDIATE_STATUS_REPLY =
@@ -46,12 +52,25 @@ export function randomWorkingMessage(randomInt = crypto.randomInt) {
   return DISCORD_CODEX_WORKING_MESSAGES[randomInt(DISCORD_CODEX_WORKING_MESSAGES.length)];
 }
 
+export function discordWorkingMessageForQueue(queueSnapshot = {}, randomInt = crypto.randomInt) {
+  const counts = queueSnapshot?.counts || {};
+  const waiting = Number.parseInt(counts.jobs || '0', 10) || 0;
+  const processing = Number.parseInt(counts.processing || '0', 10) || 0;
+  if (waiting > 0 || processing > 0) {
+    return DISCORD_CODEX_QUEUED_MESSAGES[randomInt(DISCORD_CODEX_QUEUED_MESSAGES.length)];
+  }
+  return randomWorkingMessage(randomInt);
+}
+
 export function isDiscordCodexWorkingAckText(text) {
   const normalized = String(text || '').trim();
   if (!normalized) {
     return false;
   }
-  if (DISCORD_CODEX_WORKING_MESSAGES.includes(normalized)) {
+  if (
+    DISCORD_CODEX_WORKING_MESSAGES.includes(normalized) ||
+    DISCORD_CODEX_QUEUED_MESSAGES.includes(normalized)
+  ) {
     return true;
   }
   return [
@@ -60,6 +79,9 @@ export function isDiscordCodexWorkingAckText(text) {
     /^(?:i['’]?m|i am)\s+on it\.?$/i,
     /^one sec\b/i,
     /^working on it\b/i,
+    /^i see it\.\s+i['â€™]?m finishing one thing first/i,
+    /^i have it\.\s+i['â€™]?ll take this right after/i,
+    /^i see this too\.\s+i['â€™]?ll work through it in order/i,
     /^i caught th(?:is|ese) after restart\b/i
   ].some((pattern) => pattern.test(normalized));
 }
@@ -665,6 +687,72 @@ export function discordRowsToContextMessages(rows = []) {
   }));
 }
 
+function uniqueNonEmpty(values = []) {
+  return [...new Set(values.map((value) => String(value || '').trim()).filter(Boolean))];
+}
+
+function inferDiscordTurnLanes(text, { hasFiles = false } = {}) {
+  const normalized = String(text || '').toLowerCase();
+  const lanes = [];
+  const add = (name, patternOrFlag) => {
+    const matched =
+      typeof patternOrFlag === 'boolean'
+        ? patternOrFlag
+        : patternOrFlag.test(normalized);
+    if (matched && !lanes.includes(name)) {
+      lanes.push(name);
+    }
+  };
+
+  add('audit', /\b(?:what happened|what did|why|didn['\u2019]?t|doesn['\u2019]?t|not work|not working|fix why|look into|read into|review|verify|run tests?|tests? failed|test (?:this|it|that|command|flow|feature))\b/);
+  add('implementation', /\b(?:build|add|change|fix|make|create|remove|update|implement|command|feature|button|database|collector|deploy)\b/);
+  add('planning', /\b(?:plan|strategy|architecture|proposal|how would|how should|how will|demo|design)\b/);
+  add('memory', /\b(?:context|memory|md files?|docs?|remember|forget|summari[sz]e|compact)\b/);
+  add('visual', hasFiles || /\b(?:screenshot|image|photo|picture|attachment|attached|see this|look at this)\b/.test(normalized));
+  add('domain-research', /\b(?:clashking|clashperk|clash of clans|coc|league|fandom|wiki|icons?|assets?)\b/);
+
+  return lanes;
+}
+
+export function analyzeDiscordCodexTurn(rows = [], nearbyRows = []) {
+  const activeRows = (rows || []).filter(Boolean);
+  const nearby = (nearbyRows || []).filter(Boolean);
+  const activeText = discordRowsToWorkerText(activeRows);
+  const nearbyText = discordRowsToWorkerText(nearby);
+  const allText = `${activeText}\n${nearbyText}`.trim();
+  const activeFiles = activeRows.flatMap((row) => row?.files || []);
+  const nearbyFiles = nearby.flatMap((row) => row?.files || []);
+  const activeUsers = uniqueNonEmpty(activeRows.map((row) => row.username || row.user));
+  const nearbyUsers = uniqueNonEmpty(nearby.map((row) => row.username || row.user));
+  const lanes = inferDiscordTurnLanes(allText, {
+    hasFiles: activeFiles.length > 0 || nearbyFiles.length > 0
+  });
+  const activeLower = activeText.toLowerCase();
+  const multiAgentRequested =
+    /\b(?:multi[- ]?agent|parallel|sub[- ]?agents?|separate agents?|multiple agents?)\b/.test(activeLower);
+  const multiStepLikely =
+    activeRows.length > 1 ||
+    activeUsers.length > 1 ||
+    lanes.length >= 3 ||
+    /\b(?:everything|all of this|back to back|loop|keep working|flawless|perfect|end to end)\b/.test(activeLower);
+
+  return {
+    activeMessageCount: activeRows.length,
+    activeUserCount: activeUsers.length,
+    activeUsers,
+    nearbyContextCount: nearby.length,
+    activeFileCount: activeFiles.length,
+    nearbyFileCount: nearbyFiles.length,
+    lanes,
+    multiStepLikely,
+    multiAgentHelpful:
+      multiAgentRequested ||
+      (multiStepLikely && (lanes.length >= 3 || activeUsers.length > 1 || activeRows.length > 2)),
+    newestActiveMessageAt: activeRows.at(-1)?.receivedAt || '',
+    newestActiveMessageId: activeRows.at(-1)?.id || ''
+  };
+}
+
 export function buildDiscordCodexWorkerJob(
   message,
   {
@@ -688,6 +776,7 @@ export function buildDiscordCodexWorkerJob(
   const nearbyContextRows = (nearbyRows || [])
     .filter((row) => row?.id && !activeMessageIds.has(row.id));
   const nearbyFiles = nearbyContextRows.flatMap((row) => row?.files || []);
+  const turn = analyzeDiscordCodexTurn(rows, nearbyContextRows);
   return {
     id: [safeIdPart(sourceRow.channel || message?.channelId || 'discord'), safeIdPart(sourceTs)].join('-'),
     source: 'discord',
@@ -702,6 +791,7 @@ export function buildDiscordCodexWorkerJob(
     text: discordRowsToWorkerText(rows),
     messageIds,
     contextMessages,
+    turn,
     ...(nearbyContextRows.length
       ? {
           nearbyText: discordRowsToWorkerText(nearbyContextRows),

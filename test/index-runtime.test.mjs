@@ -90,3 +90,11 @@ test('Discord Codex runtime treats auth-blocked jobs as handled records', async 
   assert.match(source, /discordCodexWorkerRecordDir\('auth-blocked'\)/);
   assert.match(source, /countDiscordCodexWorkerRecords\('auth-blocked'\)/);
 });
+
+test('Discord Codex runtime uses queue-aware human acknowledgements', async () => {
+  const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
+
+  assert.match(source, /discordCodexWorkingAckMessage/);
+  assert.match(source, /discordWorkingMessageForQueue\(await readDiscordCodexWorkerQueueSnapshot\(\)\)/);
+  assert.match(source, /rememberDiscordCodexError\('working-ack-queue'/);
+});

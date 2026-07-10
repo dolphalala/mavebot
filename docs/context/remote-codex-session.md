@@ -34,6 +34,10 @@ local Codex Desktop session.
   session turn. Preserve speaker names, attached files, and every explicit ask
   in order. If several users are included, use the newest message to resolve
   conflicts, but do not silently drop earlier asks.
+- Worker jobs may include `turn` metadata summarizing active message count,
+  active users, file counts, likely work lanes, and whether multi-step or
+  multi-agent-style handling is helpful. Use this as an orientation aid, but
+  still verify against the active text and source files.
 - When a job includes `nearbyText`, `nearbyContextMessages`, or `nearbyFiles`,
   treat them as nearby channel context only. Use them to resolve references
   such as "above", "that screenshot", "what did you do?", and collaborative
@@ -137,6 +141,10 @@ command.
 - Use available parallel tools or subagents for independent investigation when
   the environment provides them; otherwise do the same work sequentially and
   only report a blocker if a required capability is actually unavailable.
+- For broad or multi-user work, split the run into internal lanes such as
+  investigation, implementation, verification, and memory/docs. The worker
+  queue stays serial for repo writes and deploys, but the Codex subprocess
+  should still parallelize independent read-only investigation when it can.
 - The worker queue is intentionally serial for repo writes and deploys to avoid
   Git races. A Codex subprocess can still use internal parallel reads/tools
   when available, but two separate channel requests should not write the repo at

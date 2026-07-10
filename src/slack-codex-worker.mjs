@@ -1564,10 +1564,36 @@ function workerJobRecordTime(record = {}, fallbackMs = 0) {
   return fallbackMs;
 }
 
+function summarizeWorkerTiming(timing = {}) {
+  const stages = Array.isArray(timing?.stages) ? timing.stages : [];
+  const selected = stages
+    .filter((stage) =>
+      [
+        'ensure-repo',
+        'codex-exec',
+        'checks',
+        'commit-and-push',
+        'deploy-trigger',
+        'deploy-wait',
+        'runtime-health'
+      ].includes(stage?.name)
+    )
+    .map((stage) => {
+      const duration = Number.isFinite(stage?.durationMs) ? `${stage.durationMs}ms` : 'unknown';
+      const status = stage?.ok === false ? ' failed' : stage?.skipped ? ' skipped' : '';
+      return `${stage.name} ${duration}${status}`;
+    });
+  if (!selected.length) {
+    return '';
+  }
+  return truncate(selected.join(', '), 600);
+}
+
 function summarizeWorkerJobRecord(record = {}, status = 'unknown') {
   const activeText = truncate(stripSlackLinks(record.text || ''), 700);
   const finalText = truncate(stripSlackLinks(record.finalMessage || ''), 700);
   const codexText = truncate(stripSlackLinks(record.codexMessage || ''), 900);
+  const timingText = summarizeWorkerTiming(record.workerTiming);
   const rawError = record.error || record.reason || '';
   const errorText = rawError ? truncate(errorDiagnosticText(rawError, 700), 700) : '';
   const lines = [
@@ -1576,6 +1602,7 @@ function summarizeWorkerJobRecord(record = {}, status = 'unknown') {
     activeText ? `  active: ${activeText.replace(/\n+/g, ' / ')}` : '',
     finalText ? `  final: ${finalText.replace(/\n+/g, ' / ')}` : '',
     codexText ? `  inner: ${codexText.replace(/\n+/g, ' / ')}` : '',
+    timingText ? `  timing: ${timingText}` : '',
     errorText ? `  blocker: ${errorText.replace(/\n+/g, ' / ')}` : '',
     record.pushResult?.pushed === false ? '  push: no code changes or no push needed' : '',
     record.deployResult?.matched === false && record.deployResult?.reason
@@ -1644,6 +1671,7 @@ export function buildWorkerRuntimeSnapshot(job = {}) {
     channel: job.channel || slackChannelId,
     activeControlSurface: 'Discord #codex',
     legacySlackActive: false,
+    activeTurn: job.turn || null,
     worker: {
       sharedDir,
       jobDir,
@@ -1679,6 +1707,7 @@ export function buildWorkerRuntimeSnapshot(job = {}) {
     ],
     localSessionParity: [
       'inspect relevant source before editing',
+      'split broad requests into investigation, implementation, verification, and memory/docs lanes',
       'update context docs for durable behavior or user-preference changes',
       'answer in plain channel language',
       'say not live when push/deploy/runtime verification did not complete'
@@ -1716,6 +1745,7 @@ function promptHeader(job) {
       text: job.text || '',
       files: Array.isArray(job.files) ? job.files : [],
       contextMessages: Array.isArray(job.contextMessages) ? job.contextMessages : [],
+      turn: job.turn || {},
       nearbyText: job.nearbyText || '',
       nearbyFiles: Array.isArray(job.nearbyFiles) ? job.nearbyFiles : [],
       nearbyContextMessages: Array.isArray(job.nearbyContextMessages)
@@ -1748,13 +1778,14 @@ function promptHeader(job) {
     '- If the user says a prior answer missed something, asks what happened, asks what you did, says it does not work, or tells you to read everything, audit nearby Discord context plus recent worker job records before changing code or replying.',
     '- For those audit/follow-up requests, explain the actual gap in plain language and then fix the relevant code/docs/tests when there is a repo-side fix.',
     '- If the active request includes multiple contextMessages, treat them as one bundled turn. Preserve speaker names, files, and every explicit ask in order.',
+    '- Use active request turn metadata when present. It summarizes message count, active users, files, likely work lanes, and whether multi-step or multi-agent-style handling is helpful.',
     '- nearbyContextMessages and nearbyText are background channel context only. Use them to resolve references like "that", "above", "the screenshot", "what did you do", or multi-user collaboration, but do not treat them as additional tasks unless the active request refers to them.',
     '- If nearbyFiles are relevant to the active request, inspect them the same way you inspect active files.',
     '- If image files are attached, inspect the image content and answer what the user asked about the image. Do not merely say you can see it.',
     '- If multiple users are bundled, use the newest message to resolve conflicts, but do not silently drop earlier asks.',
     '- If a bundled turn contains unrelated independent requests that cannot safely fit one run, complete the clear in-scope work and say exactly what remains separate.',
     '- For multi-part requests, track each part yourself and continue through the sequence without waiting for another prompt when the next action is clear.',
-    '- Use available parallel tools or subagents for independent investigation when the environment provides them; otherwise run the same loop sequentially and state any actual blocker.',
+    '- If turn.multiAgentHelpful is true, split the work into clear lanes internally such as investigation, implementation, verification, and memory/docs. Use available parallel tools or subagents when the environment provides them; otherwise run the same lanes sequentially and state only actual blockers.',
     '- Do not include commit hashes, test counts, or health-check details in the final answer unless something failed or needs user action.',
     '- Do not say the work is ready for the worker to commit, push, deploy, or verify. The worker adds live status after verification.',
     '',

@@ -5,8 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   appendDiscordContextRows,
+  analyzeDiscordCodexTurn,
   buildDiscordCodexWorkerJob,
   buildDiscordMessageRow,
+  DISCORD_CODEX_QUEUED_MESSAGES,
   DISCORD_CODEX_WORKING_MESSAGES,
   DISCORD_CODEX_IMMEDIATE_STATUS_REPLY,
   DISCORD_MESSAGE_CONTENT_SETUP_MESSAGE,
@@ -19,6 +21,7 @@ import {
   discordLiveBurstKey,
   discordMessageToWorkerText,
   discordRowsToWorkerText,
+  discordWorkingMessageForQueue,
   enqueueDiscordCodexWorkerJob,
   hasDiscordMessageContentIntentFlag,
   isLowSignalDiscordContextRow,
@@ -136,6 +139,9 @@ test('buildDiscordCodexWorkerJob marks Discord source and stable channel id', ()
   assert.deepEqual(job.messageIds, ['12345']);
   assert.equal(job.contextMessages.length, 1);
   assert.equal(job.contextMessages[0].id, '12345');
+  assert.equal(job.turn.activeMessageCount, 1);
+  assert.equal(job.turn.activeUserCount, 1);
+  assert.deepEqual(job.turn.lanes, ['implementation']);
   assert.equal(discordJobContainsMessage(job, '12345'), true);
   assert.equal(discordJobContainsMessage(job, 'other'), false);
 });
@@ -188,6 +194,12 @@ test('buildDiscordCodexWorkerJob bundles adjacent Discord messages and files', (
   assert.deepEqual(job.messageIds, ['m1', 'm2']);
   assert.equal(job.contextMessages.length, 2);
   assert.equal(job.files.length, 1);
+  assert.equal(job.turn.activeMessageCount, 2);
+  assert.equal(job.turn.activeUserCount, 2);
+  assert.equal(job.turn.activeFileCount, 1);
+  assert.equal(job.turn.multiStepLikely, true);
+  assert.equal(job.turn.multiAgentHelpful, true);
+  assert.ok(job.turn.lanes.includes('visual'));
   assert.match(discordRowsToWorkerText(rows), /screen\.png/);
   assert.equal(discordJobContainsMessage(job, 'm1'), true);
   assert.equal(discordJobContainsMessage(job, 'm2'), true);
@@ -249,6 +261,10 @@ test('buildDiscordCodexWorkerJob keeps nearby channel context out of handled ids
   assert.match(job.nearbyText, /this is the screenshot/);
   assert.equal(job.nearbyContextMessages[0].username, 'Lana');
   assert.equal(job.nearbyFiles.length, 1);
+  assert.equal(job.turn.nearbyContextCount, 1);
+  assert.equal(job.turn.nearbyFileCount, 1);
+  assert.ok(job.turn.lanes.includes('visual'));
+  assert.ok(job.turn.lanes.includes('audit'));
   assert.equal(discordJobContainsMessage(job, 'active-1'), true);
   assert.equal(discordJobContainsMessage(job, 'nearby-1'), false);
 });
@@ -640,6 +656,49 @@ test('randomWorkingMessage can be deterministic for tests', () => {
     randomWorkingMessage(() => DISCORD_CODEX_WORKING_MESSAGES.length - 1),
     "I'll dig into that now."
   );
+  assert.equal(discordWorkingMessageForQueue({ counts: { jobs: 0, processing: 0 } }, () => 0), 'Got it, checking now.');
+  assert.equal(
+    discordWorkingMessageForQueue({ counts: { jobs: 1, processing: 0 } }, () => 0),
+    DISCORD_CODEX_QUEUED_MESSAGES[0]
+  );
+  assert.equal(
+    discordWorkingMessageForQueue({ counts: { jobs: 0, processing: 1 } }, () => DISCORD_CODEX_QUEUED_MESSAGES.length - 1),
+    DISCORD_CODEX_QUEUED_MESSAGES.at(-1)
+  );
+  assert.equal(isLowSignalDiscordContextRow({
+    bot: true,
+    text: DISCORD_CODEX_QUEUED_MESSAGES[0]
+  }), true);
+});
+
+test('analyzeDiscordCodexTurn summarizes lanes and multi-step shape', () => {
+  const rows = [
+    buildDiscordMessageRow({
+      id: 'm1',
+      channelId: '1523893930993778698',
+      guildId: 'guild-1',
+      createdTimestamp: Date.parse('2026-07-09T10:00:00.000Z'),
+      content: 'review what happened and fix the /player screenshot flow',
+      author: { id: 'allen', username: 'Allen', bot: false }
+    }),
+    buildDiscordMessageRow({
+      id: 'm2',
+      channelId: '1523893930993778698',
+      guildId: 'guild-1',
+      createdTimestamp: Date.parse('2026-07-09T10:00:03.000Z'),
+      content: 'also update memory docs and use multi-agent if helpful',
+      author: { id: 'allen', username: 'Allen', bot: false }
+    })
+  ];
+  const turn = analyzeDiscordCodexTurn(rows);
+
+  assert.equal(turn.activeMessageCount, 2);
+  assert.equal(turn.activeUserCount, 1);
+  assert.equal(turn.multiStepLikely, true);
+  assert.equal(turn.multiAgentHelpful, true);
+  assert.ok(turn.lanes.includes('audit'));
+  assert.ok(turn.lanes.includes('implementation'));
+  assert.ok(turn.lanes.includes('memory'));
 });
 
 test('discordImmediateStatusReplyText only fast-paths short connectivity checks', () => {
@@ -686,8 +745,9 @@ test('discordLiveBurstKey bundles one user but separates simultaneous users', ()
 
 test('Discord Codex working messages stay short and human', () => {
   assert.ok(DISCORD_CODEX_WORKING_MESSAGES.length >= 4);
-  for (const message of DISCORD_CODEX_WORKING_MESSAGES) {
-    assert.equal(message.length <= 36, true);
+  assert.ok(DISCORD_CODEX_QUEUED_MESSAGES.length >= 3);
+  for (const message of [...DISCORD_CODEX_WORKING_MESSAGES, ...DISCORD_CODEX_QUEUED_MESSAGES]) {
+    assert.equal(message.length <= 70, true);
     assert.doesNotMatch(message, /queued|worker|job|status|processing/i);
   }
 });
