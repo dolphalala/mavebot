@@ -19,6 +19,12 @@ Refresh these sources when the user asks for current competitor behavior. Do
 not copy private data or clone an exact product. Use the public feature shape
 to design mavebot's own focused version.
 
+Last manual refresh: 2026-07-10. ClashKing docs still expose setup, rosters,
+war/CWL, graphs, legends, leaderboards, and utility sections. ClashPerk docs
+still expose setup/linking, rosters, logs, auto-role, bot personalization,
+autocomplete, and command reference sections. The official Clash API developer
+portal remains the source for API limits and available endpoints.
+
 ## What The Competitors Teach
 
 - ClashKing positions itself as an all-in-one Clash Discord bot and documents

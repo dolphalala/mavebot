@@ -731,6 +731,32 @@ test('analyzeDiscordCodexTurn classifies ClashKing and ClashPerk data asks as pr
   assert.equal(turn.multiAgentHelpful, true);
 });
 
+test('analyzeDiscordCodexTurn classifies Clash follow-up complaints as audit and product work', () => {
+  const rows = [
+    buildDiscordMessageRow({
+      id: 'm1',
+      channelId: '1523893930993778698',
+      guildId: 'guild-1',
+      createdTimestamp: Date.parse('2026-07-10T11:00:00.000Z'),
+      content: [
+        'i had it look into clashking and clashperk so read the past messages on the discord channel',
+        'and figure out what im trying to do and make it way better and change the md files',
+        'last time it just gave me half ass responses and did barely anything and added no commands'
+      ].join(' '),
+      author: { id: 'allen', username: 'Allen', bot: false }
+    })
+  ];
+  const turn = analyzeDiscordCodexTurn(rows);
+
+  assert.ok(turn.lanes.includes('audit'));
+  assert.ok(turn.lanes.includes('implementation'));
+  assert.ok(turn.lanes.includes('memory'));
+  assert.ok(turn.lanes.includes('domain-research'));
+  assert.ok(turn.lanes.includes('product-discovery'));
+  assert.equal(turn.multiStepLikely, true);
+  assert.equal(turn.multiAgentHelpful, true);
+});
+
 test('discordImmediateStatusReplyText only fast-paths short connectivity checks', () => {
   assert.equal(discordImmediateStatusKind('hello is this working now'), 'connectivity');
   assert.equal(discordImmediateStatusKind('test is this working?'), 'connectivity');

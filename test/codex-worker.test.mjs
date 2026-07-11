@@ -15,6 +15,7 @@ import {
   buildWorkerRuntimeSnapshot,
   changedFilesFromGitStatus,
   checkUrl,
+  clashProductReplyGateFailure,
   codexLoginStatusLooksReady,
   codexImagePathsForJob,
   compactTranscriptRows,
@@ -666,6 +667,8 @@ test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product disc
   assert.match(prompt, /source\/context audit/);
   assert.match(prompt, /visible command or honest blocker/);
   assert.match(prompt, /what you learned, what mavebot should build, what changed now, and a concrete demo/i);
+  assert.match(prompt, /I found the gap, What I learned, Data reality, Built now, Data model, Try, What it shows, Still missing/);
+  assert.match(prompt, /wrapper treats the answer as incomplete/);
   assert.match(prompt, /backend collector/i);
   assert.match(prompt, /If the user asks to start collecting or create the same data structure/);
   assert.match(prompt, /Backend-only work is incomplete/);
@@ -680,7 +683,7 @@ test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product disc
   );
   assert.match(prompt, /Use actual command names from src\/commands\.mjs and src\/index\.mjs/);
   assert.match(prompt, /Do not invent roster names such as \/roster enroll or \/roster build/);
-  assert.match(prompt, /What I learned, Data reality, What mavebot should build, Current visible slice, Data model\/commands, Demo\/next command, and Still missing/);
+  assert.match(prompt, /Preserve the exact delivery shape: I found the gap, What I learned, Data reality, Built now, Data model, Try, What it shows, and Still missing/);
   assert.match(prompt, /Prefer the next missing user-visible command slice over backend-only work/);
   assert.match(prompt, /Do not answer with only an acknowledgement, "backend collector added", or a bare live claim/);
 });
@@ -1264,6 +1267,9 @@ test('finalChannelMessage preserves Clash product-delivery structure', () => {
     codexMessage: [
       'I found the gap: the old ClashKing/ClashPerk answer only added storage and skipped the user-visible command.',
       '',
+      'What I learned: ClashKing and ClashPerk-style operations depend on tracked snapshots plus command surfaces, not one invisible collector.',
+      'Data reality: mavebot can report current API data now, but deeper trends only become reliable after `/track` has collected snapshots over time.',
+      '',
       'Built now: `/roster status clan:#JY99CJC8` shows tracked members, missing signups, and shallow-history warnings.',
       'Data model: `/shared/clash-history.json` uses tracked.clans, tracked.players, clans, players, wars, and rosters.',
       'Try: `/roster status clan:#JY99CJC8`',
@@ -1290,6 +1296,35 @@ test('finalChannelMessage preserves Clash product-delivery structure', () => {
   assert.match(message, /Still missing: richer roster pages/);
   assert.match(message, /It's live now\./);
   assert.doesNotMatch(message, /npm run check/);
+});
+
+test('finalChannelMessage blocks thin Clash product-discovery success replies', () => {
+  const job = {
+    text: [
+      'research how clashking and clashperk both work in terms of collecting trophies in database',
+      'and past cwl and war stats and create the same data structure so we can start collecting'
+    ].join(' ')
+  };
+  const codexMessage = 'Added the ClashKing/ClashPerk-style backend collector.\n\nDone and live.';
+
+  assert.equal(
+    clashProductReplyGateFailure(codexMessage, job),
+    'thin Clash product-discovery response with backend/live claim'
+  );
+
+  const message = finalChannelMessage({
+    codexMessage,
+    checkOk: true,
+    pushResult: { pushed: true },
+    deployResult: { matched: true },
+    runtime: { botOk: true },
+    job
+  });
+
+  assert.match(message, /I caught myself about to give the same shallow Clash answer again/);
+  assert.match(message, /source\/context audit, data reality, visible command or honest blocker/);
+  assert.doesNotMatch(message, /Added the ClashKing\/ClashPerk-style backend collector/);
+  assert.doesNotMatch(message, /It's live now\./);
 });
 
 test('finalChannelMessage condenses long implementation reports for channels', () => {

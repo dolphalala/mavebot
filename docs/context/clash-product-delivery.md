@@ -75,6 +75,9 @@ Use this shape for broad Clash product replies:
 ```text
 I found the gap: <one sentence>.
 
+What I learned: <sources/context checked and the product lesson>.
+Data reality: <what can be known now, what starts collecting now, what cannot be backfilled>.
+
 Built now: <visible command or honest blocker>.
 Data model: <store/files/buckets>.
 Try: </command example>.
@@ -85,6 +88,18 @@ Still missing: <next slice, if any>.
 
 Keep it human. Do not paste raw logs, commit hashes, or test dumps unless
 something failed.
+
+## Wrapper Gate
+
+The server wrapper rejects thin Clash product-discovery answers before posting
+them as successful. A final answer is incomplete when it lacks the required
+shape above, especially if it says only that a backend collector, data
+structure, or ClashKing-style foundation was added.
+
+If the worker catches itself in this state, it should not call the job done.
+It must rerun the actual delivery pass: read the source and context, check the
+public competitor/API facts when relevant, build the next visible command slice
+or state an honest blocker, update tests/docs, and give the command/demo answer.
 
 ## Anti-Patterns
 

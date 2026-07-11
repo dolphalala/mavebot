@@ -463,6 +463,68 @@ export function humanizeWorkerChannelMessage(text) {
   return takeLeadSentences(noBulletDump || firstParagraph);
 }
 
+function normalizedReplyForGate(text) {
+  return stripRoutineReportSections(stripChatLinks(text))
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function clashProductReplyHasRequiredStructure(text) {
+  const normalized = normalizedReplyForGate(text);
+  if (!normalized) {
+    return false;
+  }
+
+  const requirements = [
+    /\bi found the gap\b|\bwhat i learned\b|\bwhat was checked\b|\bwhat i checked\b/,
+    /\bdata reality\b|\bapi reality\b|\bofficial api\b/,
+    /\bbuilt now\b|\bcurrent visible slice\b|\bvisible command\b|\bhonest blocker\b|\bwhat changed now\b/,
+    /\bdata model\b|\bcommand\/data model\b|\bstore buckets?\b|\bshared\/clash-history\.json\b/,
+    /\btry\s*:|\bdemo\b|\bnext command\b|\bexample command\b/,
+    /\bstill missing\b|\bremaining\b|\bnext slice\b/
+  ];
+  return requirements.every((pattern) => pattern.test(normalized));
+}
+
+export function clashProductReplyGateFailure(codexMessage, job = {}) {
+  if (!activeRequestNeedsClashProductDiscovery(job)) {
+    return '';
+  }
+
+  const normalized = normalizedReplyForGate(codexMessage);
+  if (!normalized) {
+    return 'empty Clash product-discovery response';
+  }
+
+  if (clashProductReplyHasRequiredStructure(codexMessage)) {
+    return '';
+  }
+
+  const forbiddenThinClaim =
+    /\b(?:backend collector|added (?:the )?(?:backend|collector|data structure)|made it like clashking|done and live|it(?:'|’)s live now|this is live)\b/;
+  if (forbiddenThinClaim.test(normalized)) {
+    return 'thin Clash product-discovery response with backend/live claim';
+  }
+
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  if (wordCount < 55) {
+    return 'thin Clash product-discovery response without the required delivery shape';
+  }
+
+  return 'Clash product-discovery response is missing the required delivery shape';
+}
+
+function clashProductGateMessage(reason) {
+  return [
+    'I caught myself about to give the same shallow Clash answer again, so I am not calling this done.',
+    '',
+    `Blocked reason: ${reason}.`,
+    '',
+    'This needs a real Clash delivery pass: source/context audit, data reality, visible command or honest blocker, command/data model, demo or next command, and verification.'
+  ].join('\n');
+}
+
 export function isCodexAuthError(value) {
   const text = errorDiagnosticText(value);
   return /access token could not be refreshed/i.test(text) ||
@@ -1843,6 +1905,7 @@ function promptHeader(job) {
     '- ClashKing, ClashPerk, roster, CWL, war history, activity, or "same data structure" requests are product-discovery plus implementation work. Read docs/context/clash-product-delivery.md, docs/context/clash-competitor-research.md, and docs/context/clash-database-guidance.md, inspect current source, and use public sources when internet is available.',
     '- Clash product-discovery requests must pass the docs/context/clash-product-delivery.md completion gate: source/context audit, API/data reality, visible command or honest blocker, command/data model, demo or next command, and verification.',
     '- For Clash competitor-inspired requests, do not answer with only "done", "added the backend", "backend collector", or "live". Include what you learned, what mavebot should build, what changed now, and a concrete demo or next command.',
+    '- For Clash product-discovery final answers, use these exact labels unless there is a real blocker: I found the gap, What I learned, Data reality, Built now, Data model, Try, What it shows, Still missing. If those sections are missing, the wrapper treats the answer as incomplete.',
     '- If the user asks to start collecting or create the same data structure, update storage/collector/docs/tests when feasible and prefer the next missing user-visible command. Backend-only work is incomplete unless a real blocker prevents a command; say that blocker plainly.',
     '- If recent Discord context or worker history shows the user complained about skipped plan/demo, half-done Clash work, or no commands added, audit the prior miss first and fix the process/docs/code path that allowed it.',
     '- The current Clash data-collection entry point is /track player, /track clan, and /track status backed by /shared/clash-history.json. /history player, /roster plan, /roster signup, /roster status, /warstats, /activity, and /summary are the first reporting/enrollment surfaces on that store. Future richer roster/player pages, exports, config/default-clan setup, player linking, and deeper war/activity pages should build from the same store before adding parallel state.',
@@ -1872,7 +1935,7 @@ function promptHeader(job) {
     '',
     'Active request response mode:',
     needsClashProductDiscovery
-      ? '- The active request is Clash product-discovery work. Preserve useful structure: What I learned, Data reality, What mavebot should build, Current visible slice, Data model/commands, Demo/next command, and Still missing. Before final answer, self-check against docs/context/clash-product-delivery.md. Prefer the next missing user-visible command slice over backend-only work. Do not answer with only an acknowledgement, "backend collector added", or a bare live claim.'
+      ? '- The active request is Clash product-discovery work. Preserve the exact delivery shape: I found the gap, What I learned, Data reality, Built now, Data model, Try, What it shows, and Still missing. Before final answer, self-check against docs/context/clash-product-delivery.md. Prefer the next missing user-visible command slice over backend-only work. Do not answer with only an acknowledgement, "backend collector added", or a bare live claim.'
       : needsDetailedAnswer
       ? '- The active request asks for a plan/demo/how-it-works answer. Do not answer with only an acknowledgement. Preserve useful structure in the final answer: a compact plan, a concrete demo/example, and what will happen next.'
       : '- The active request does not explicitly ask for a plan/demo. Keep the final answer compact after handling the work.',
@@ -2343,9 +2406,12 @@ async function runCodex(job, contextSnapshot) {
 
 export function finalChannelMessage({ codexMessage, checkOk, pushResult, deployResult, runtime, job = {} }) {
   const lines = [];
-  const cleaned = activeRequestNeedsDetailedAnswer(job)
-    ? detailedWorkerChannelMessage(codexMessage)
-    : humanizeWorkerChannelMessage(codexMessage);
+  const gateFailure = clashProductReplyGateFailure(codexMessage, job);
+  const cleaned = gateFailure
+    ? clashProductGateMessage(gateFailure)
+    : activeRequestNeedsDetailedAnswer(job)
+      ? detailedWorkerChannelMessage(codexMessage)
+      : humanizeWorkerChannelMessage(codexMessage);
   if (cleaned) {
     lines.push(cleaned);
   }
@@ -2354,6 +2420,9 @@ export function finalChannelMessage({ codexMessage, checkOk, pushResult, deployR
   const runtimeOk = Boolean(runtime?.botOk);
 
   if (checkOk && deployOk && runtimeOk) {
+    if (gateFailure) {
+      return truncate(lines.filter(Boolean).join('\n\n'), 1900);
+    }
     if (pushResult.pushed) {
       lines.push("It's live now.");
     } else if (!lines.length) {
