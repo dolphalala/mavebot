@@ -19,8 +19,8 @@ Remote worker prompts include context in this order:
 9. `discord-session.md`.
 10. Extra focused context files, currently prioritized as:
     `remote-codex-session.md`, `local-codex-parity.md`, `code-map.md`,
-    `clash-competitor-research.md`, `clash-database-guidance.md`,
-    `clash-ui-guidance.md`.
+    `clash-product-delivery.md`, `clash-competitor-research.md`,
+    `clash-database-guidance.md`, `clash-ui-guidance.md`.
 11. Current source code and tests.
 
 The active request wins over older memory. Source code and tests are the final
@@ -38,6 +38,8 @@ authority when docs are stale.
 - `local-codex-parity.md`: checklist for making remote jobs match the quality
   of this local Codex Desktop session.
 - `code-map.md`: source-file map and feature change recipes.
+- `clash-product-delivery.md`: acceptance contract for broad ClashKing,
+  ClashPerk, roster, CWL, war-history, and scheduled-collection asks.
 - `clash-competitor-research.md`: ClashKing/ClashPerk public-source research
   notes, product roadmap expectations, and response requirements for broad
   competitor-style asks.

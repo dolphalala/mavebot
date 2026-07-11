@@ -489,7 +489,13 @@ test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product disc
     contextIndex: '',
     runtimeSnapshot: '',
     operatingMemory: '',
-    repoContextBundle: '## clash-competitor-research.md\nUse competitor research.',
+    repoContextBundle: [
+      '## clash-product-delivery.md',
+      'Use the completion gate.',
+      '',
+      '## clash-competitor-research.md',
+      'Use competitor research.'
+    ].join('\n'),
     workerJobHistory: ''
   });
 
@@ -497,15 +503,21 @@ test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product disc
   assert.equal(activeRequestNeedsDetailedAnswer(job), true);
   assert.match(prompt, /product-discovery/);
   assert.match(prompt, /ClashKing, ClashPerk, roster, CWL, war history, activity/);
+  assert.match(prompt, /docs\/context\/clash-product-delivery\.md/);
   assert.match(prompt, /docs\/context\/clash-competitor-research\.md/);
+  assert.match(prompt, /completion gate/);
+  assert.match(prompt, /source\/context audit/);
+  assert.match(prompt, /visible command or honest blocker/);
   assert.match(prompt, /what you learned, what mavebot should build, what changed now, and a concrete demo/i);
+  assert.match(prompt, /backend collector/i);
   assert.match(prompt, /If the user asks to start collecting or create the same data structure/);
+  assert.match(prompt, /Backend-only work is incomplete/);
   assert.match(prompt, /current Clash data-collection entry point is \/track player, \/track clan, and \/track status/);
   assert.match(prompt, /\/history player and \/roster plan are the first reporting surfaces on that store/);
   assert.match(prompt, /Future \/roster signup\/status, \/warstats, \/activity, and \/summary work should build from the same store/);
-  assert.match(prompt, /What I learned, What mavebot should build, Data model\/commands, Current slice, and Demo\/next command/);
+  assert.match(prompt, /What I learned, Data reality, What mavebot should build, Current visible slice, Data model\/commands, Demo\/next command, and Still missing/);
   assert.match(prompt, /Prefer the next missing user-visible command slice over backend-only work/);
-  assert.match(prompt, /Do not answer with only an acknowledgement or a bare live claim/);
+  assert.match(prompt, /Do not answer with only an acknowledgement, "backend collector added", or a bare live claim/);
 });
 
 test('buildCodexWorkerPrompt includes recent worker job history for follow-up audits', () => {
@@ -1081,6 +1093,39 @@ test('finalChannelMessage preserves longer plan answers when requested', () => {
   );
 });
 
+test('finalChannelMessage preserves Clash product-delivery structure', () => {
+  const message = finalChannelMessage({
+    codexMessage: [
+      'I found the gap: the old ClashKing/ClashPerk answer only added storage and skipped the user-visible command.',
+      '',
+      'Built now: `/roster status clan:#JY99CJC8` shows tracked members, missing signups, and shallow-history warnings.',
+      'Data model: `/shared/clash-history.json` uses tracked.clans, tracked.players, clans, players, wars, and rosters.',
+      'Try: `/roster status clan:#JY99CJC8`',
+      'What it shows: a CWL pool summary, top accounts, bench/watch list, and what still needs more snapshots.',
+      '',
+      'Still missing: `/roster signup` is the next slice for member opt-in notes.',
+      '',
+      'Checks:',
+      '- npm run check'
+    ].join('\n'),
+    checkOk: true,
+    pushResult: { pushed: true },
+    deployResult: { matched: true },
+    runtime: { botOk: true },
+    job: {
+      text: 'research how clashking and clashperk collect trophies and past cwl and war stats and create the same data structure'
+    }
+  });
+
+  assert.match(message, /I found the gap/);
+  assert.match(message, /Built now: `\/roster status clan:#JY99CJC8`/);
+  assert.match(message, /Data model: `\/shared\/clash-history\.json`/);
+  assert.match(message, /Try: `\/roster status clan:#JY99CJC8`/);
+  assert.match(message, /Still missing: `\/roster signup`/);
+  assert.match(message, /It's live now\./);
+  assert.doesNotMatch(message, /npm run check/);
+});
+
 test('finalChannelMessage condenses long implementation reports for channels', () => {
   assert.equal(
     finalChannelMessage({
@@ -1318,6 +1363,7 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   await writeFile(path.join(dir, 'remote-codex-session.md'), '# Remote Contract\nAct like a session.');
   await writeFile(path.join(dir, 'local-codex-parity.md'), '# Local Parity\nMatch local Codex.');
   await writeFile(path.join(dir, 'code-map.md'), '# Code Map\nUpdate index and commands.');
+  await writeFile(path.join(dir, 'clash-product-delivery.md'), '# Clash Delivery\nUse delivery gates.');
   await writeFile(path.join(dir, 'clash-competitor-research.md'), '# Clash Competitors\nBuild real product plans.');
   await writeFile(path.join(dir, 'clash-database-guidance.md'), '# Clash DB\nUse polling snapshots.');
   await writeFile(path.join(dir, 'z-extra.md'), '# Extra\nLess important.');
@@ -1333,8 +1379,12 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
     'local parity contract should be loaded before source map'
   );
   assert.ok(
-    bundle.indexOf('## code-map.md') < bundle.indexOf('## clash-database-guidance.md'),
-    'source map should be loaded before Clash guidance'
+    bundle.indexOf('## code-map.md') < bundle.indexOf('## clash-product-delivery.md'),
+    'source map should be loaded before Clash delivery guidance'
+  );
+  assert.ok(
+    bundle.indexOf('## clash-product-delivery.md') < bundle.indexOf('## clash-competitor-research.md'),
+    'Clash delivery guidance should be loaded before competitor research'
   );
   assert.ok(
     bundle.indexOf('## clash-competitor-research.md') < bundle.indexOf('## clash-database-guidance.md'),
@@ -1347,6 +1397,8 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   assert.match(bundle, /Act like a session/);
   assert.match(bundle, /Match local Codex/);
   assert.match(bundle, /Update index and commands/);
+  assert.match(bundle, /## clash-product-delivery\.md/);
+  assert.match(bundle, /Use delivery gates/);
   assert.match(bundle, /## clash-competitor-research\.md/);
   assert.match(bundle, /Build real product plans/);
   assert.match(bundle, /## clash-ui-guidance\.md/);

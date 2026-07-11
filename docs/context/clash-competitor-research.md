@@ -2,8 +2,9 @@
 
 This file is durable context for requests like "look into ClashKing and
 ClashPerk", "build it like ClashKing", or "create the same data structure".
-Read it with `clash-database-guidance.md` before answering broad Clash product
-or data-collection asks.
+Read it with `clash-product-delivery.md` and
+`clash-database-guidance.md` before answering broad Clash product or
+data-collection asks.
 
 ## Public Sources To Check
 
@@ -67,8 +68,9 @@ mavebot should become a focused clan-operations bot first:
 
 When a Discord user asks to research ClashKing/ClashPerk, build the same data
 structure, create a roster/war/activity system, or design a competitor-style
-feature, the worker must not give a tiny "done" answer. It should do the local
-Codex equivalent:
+feature, the worker must pass the delivery gate in
+`clash-product-delivery.md`. It must not give a tiny "done" answer. It should
+do the local Codex equivalent:
 
 1. Inspect the current mavebot source and context docs.
 2. Check public competitor docs/source when internet is available.
@@ -76,7 +78,8 @@ Codex equivalent:
 4. State what mavebot can and cannot know from the official Clash API.
 5. Give the command/data model roadmap.
 6. Implement the safe first slice when the request asks to build, create, or
-   start collecting. If only a plan is safe, explain why and name the exact
+   start collecting. Prefer the next missing visible slash-command slice over
+   backend-only work. If only a plan is safe, explain why and name the exact
    next slice.
 7. Update docs/context when the product decision should survive future turns.
 8. Add or update tests for code changes.
@@ -85,11 +88,14 @@ Codex equivalent:
 Bad answer patterns to avoid:
 
 - "Added the ClashKing/ClashPerk backend collector. Done and live."
+- "The backend is ready" when no user-visible command or demo exists.
 - "I made it like ClashKing" without schema, commands, collection schedule, and
   verification.
 - "Use `/roster`" without saying what setup is required, what data exists now,
   and what history starts collecting from this point forward.
 - Ignoring plan/demo questions after doing code.
+- Researching competitors and then ending with no command, no plan, and no
+  explicit blocker.
 
 ## Practical First Slices
 
