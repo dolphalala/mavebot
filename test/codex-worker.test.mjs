@@ -162,6 +162,70 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
       channel: '1523893930993778698',
       jobId: 'discord-only-smoke-1783589874735',
       text: 'Discord-only worker smoke test after bridge removal. Do not change files.'
+    },
+    {
+      at: '2026-07-09T08:40:06.133Z',
+      role: 'user',
+      user: 'dolphala',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'research how clashking and clashperk both work in terms of collecting trophies in database and past cwl and war stats and create the same data structure so we can start collecitng on schedule all the necessary data about all players we ever care about'
+    },
+    {
+      at: '2026-07-09T08:49:59.844Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'Added the ClashKing/ClashPerk-style backend collector.\n\nDone and live.'
+    },
+    {
+      at: '2026-07-09T21:34:18.198Z',
+      role: 'user',
+      user: 'Codex desktop verification',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'Live latency check from Codex desktop. Reply exactly: fast path works. Do not change files.'
+    },
+    {
+      at: '2026-07-09T21:34:39.225Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'fast path works.'
+    },
+    {
+      at: '2026-07-09T21:35:20.671Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'warm fast path works.'
+    },
+    {
+      at: '2026-07-09T22:05:24.319Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'progress diagnostics smoke works'
+    },
+    {
+      at: '2026-07-09T22:10:43.335Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'Plan was docs-only: add one durable note and leave app code untouched.\n\nNo app code changed.'
+    },
+    {
+      at: '2026-07-10T23:24:02.086Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'Discord worker verification is ok. Context loaded, no files changed.'
     }
   ];
 
@@ -176,6 +240,14 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.equal(isLowSignalTranscriptRow(rows[8]), true);
   assert.equal(isLowSignalTranscriptRow(rows[9]), true);
   assert.equal(isLowSignalTranscriptRow(rows[10]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[11]), false);
+  assert.equal(isLowSignalTranscriptRow(rows[12]), false);
+  assert.equal(isLowSignalTranscriptRow(rows[13]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[14]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[15]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[16]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[17]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[18]), true);
 
   const snapshot = compactTranscriptRows(rows, {
     recentLimit: 5,
@@ -184,6 +256,8 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   });
 
   assert.match(snapshot.recent, /make \/player show better army cards/);
+  assert.match(snapshot.recent, /research how clashking and clashperk/);
+  assert.match(snapshot.recent, /Added the ClashKing\/ClashPerk-style backend collector/);
   assert.doesNotMatch(snapshot.recent, /Smoke test from the local Codex app/);
   assert.doesNotMatch(snapshot.recent, /Discord worker path is live/);
   assert.doesNotMatch(snapshot.recent, /Memory compaction is clean/);
@@ -191,7 +265,11 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.doesNotMatch(snapshot.recent, /attached image file/);
   assert.doesNotMatch(snapshot.recent, /Auth smoke test/);
   assert.doesNotMatch(snapshot.recent, /Discord-only worker smoke/);
-  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 10/);
+  assert.doesNotMatch(snapshot.recent, /fast path works/);
+  assert.doesNotMatch(snapshot.recent, /progress diagnostics smoke/);
+  assert.doesNotMatch(snapshot.recent, /Plan was docs-only/);
+  assert.doesNotMatch(snapshot.recent, /Discord worker verification is ok/);
+  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 16/);
 });
 
 test('compactTranscriptRows strips worker handoff boilerplate from retained memory', () => {
@@ -321,12 +399,40 @@ test('pruneTranscriptRowsForStorage removes low-signal rows from durable storage
       channel: '1523893930993778698',
       jobId: '1523893930993778698-codex-desktop-parity-123',
       text: 'Confirmed: I can read the attached image file and post a normal Discord channel reply.'
+    },
+    {
+      at: '2026-07-09T21:34:39.225Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'fast path works.'
+    },
+    {
+      at: '2026-07-09T22:10:43.335Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'Plan was docs-only: add one durable note and leave app code untouched.'
+    },
+    {
+      at: '2026-07-09T08:49:59.844Z',
+      role: 'assistant',
+      user: 'mavebot',
+      source: 'discord',
+      channel: '1523893930993778698',
+      text: 'Added the ClashKing/ClashPerk-style backend collector.'
     }
   ];
 
   assert.deepEqual(
     pruneTranscriptRowsForStorage(rows).map((row) => row.text),
-    ['make /player show better army cards', 'Added `/player` pages.']
+    [
+      'make /player show better army cards',
+      'Added `/player` pages.',
+      'Added the ClashKing/ClashPerk-style backend collector.'
+    ]
   );
 });
 
@@ -515,6 +621,8 @@ test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product disc
   assert.match(prompt, /current Clash data-collection entry point is \/track player, \/track clan, and \/track status/);
   assert.match(prompt, /\/history player, \/roster plan, \/roster signup, and \/roster status are the first reporting\/enrollment surfaces/);
   assert.match(prompt, /Future \/warstats, \/activity, \/summary, and richer roster pages should build from the same store/);
+  assert.match(prompt, /Use actual command names from src\/commands\.mjs and src\/index\.mjs/);
+  assert.match(prompt, /Do not invent roster names such as \/roster enroll or \/roster build/);
   assert.match(prompt, /What I learned, Data reality, What mavebot should build, Current visible slice, Data model\/commands, Demo\/next command, and Still missing/);
   assert.match(prompt, /Prefer the next missing user-visible command slice over backend-only work/);
   assert.match(prompt, /Do not answer with only an acknowledgement, "backend collector added", or a bare live claim/);
@@ -1045,8 +1153,8 @@ test('detailedWorkerChannelMessage preserves requested plan and demo structure',
   const message = detailedWorkerChannelMessage(
     [
       'Plan:',
-      '- Enroll a clan with `/roster enroll clan:#JY99CJC8`.',
-      '- Track members over time.',
+      '- Track a clan with `/track clan tag:#JY99CJC8`.',
+      '- Let members opt into CWL with `/roster signup player:#TAG clan:#JY99CJC8 note:available`.',
       '',
       'Demo:',
       'A sample roster would show TH16 anchors, reliable two-star attackers, and bench candidates.',
@@ -1060,7 +1168,8 @@ test('detailedWorkerChannelMessage preserves requested plan and demo structure',
   );
 
   assert.match(message, /Plan:/);
-  assert.match(message, /\/roster enroll/);
+  assert.match(message, /\/track clan/);
+  assert.match(message, /\/roster signup/);
   assert.match(message, /Demo:/);
   assert.doesNotMatch(message, /npm run check|health ok/);
 });
@@ -1070,8 +1179,8 @@ test('finalChannelMessage preserves longer plan answers when requested', () => {
     finalChannelMessage({
       codexMessage: [
         'Plan:',
-        '- `/roster enroll clan:#JY99CJC8` saves the clan and starts snapshots.',
-        '- `/signup player:#PLAYER` lets members opt into CWL.',
+        '- `/track clan tag:#JY99CJC8` saves the clan and starts snapshots.',
+        '- `/roster signup player:#PLAYER clan:#JY99CJC8 note:available` lets members opt into CWL.',
         '',
         'Demo:',
         'For Crystal CWL, the bot would rank top accounts by TH, heroes, war stars, donations, activity, and tracked hit reliability.'
@@ -1084,8 +1193,8 @@ test('finalChannelMessage preserves longer plan answers when requested', () => {
     }),
     [
       'Plan:',
-      '- `/roster enroll clan:#JY99CJC8` saves the clan and starts snapshots.',
-      '- `/signup player:#PLAYER` lets members opt into CWL.',
+      '- `/track clan tag:#JY99CJC8` saves the clan and starts snapshots.',
+      '- `/roster signup player:#PLAYER clan:#JY99CJC8 note:available` lets members opt into CWL.',
       '',
       'Demo:',
       'For Crystal CWL, the bot would rank top accounts by TH, heroes, war stars, donations, activity, and tracked hit reliability.'
@@ -1103,7 +1212,7 @@ test('finalChannelMessage preserves Clash product-delivery structure', () => {
       'Try: `/roster status clan:#JY99CJC8`',
       'What it shows: a CWL pool summary, top accounts, bench/watch list, and what still needs more snapshots.',
       '',
-      'Still missing: `/roster signup` is the next slice for member opt-in notes.',
+      'Still missing: `/warstats clan` is the next slice once current-war and CWL rows are deep enough.',
       '',
       'Checks:',
       '- npm run check'
@@ -1121,7 +1230,7 @@ test('finalChannelMessage preserves Clash product-delivery structure', () => {
   assert.match(message, /Built now: `\/roster status clan:#JY99CJC8`/);
   assert.match(message, /Data model: `\/shared\/clash-history\.json`/);
   assert.match(message, /Try: `\/roster status clan:#JY99CJC8`/);
-  assert.match(message, /Still missing: `\/roster signup`/);
+  assert.match(message, /Still missing: `\/warstats clan`/);
   assert.match(message, /It's live now\./);
   assert.doesNotMatch(message, /npm run check/);
 });

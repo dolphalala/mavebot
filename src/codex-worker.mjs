@@ -1254,7 +1254,11 @@ export function isLowSignalTranscriptRow(row) {
     return true;
   }
 
-  if (user.includes('codex desktop') && text.includes('verification')) {
+  const combined = `${user} ${text}`;
+  if (
+    user.includes('codex desktop') &&
+    /\b(?:verification|verify|smoke|latency|responsiveness|smooth)\b/.test(combined)
+  ) {
     return true;
   }
 
@@ -1284,6 +1288,18 @@ export function isLowSignalTranscriptRow(row) {
     /can read the attached image file and post a normal discord channel reply/,
     /remote codex memory contract is live/,
     /memory compaction is clean/,
+    /^fast path works\.?$/,
+    /^warm fast path works\.?$/,
+    /^final fast path works\.?$/,
+    /^progress diagnostics smoke works\.?$/,
+    /^worker path still works\.?$/,
+    /^ready now\.?$/,
+    /^smooth path verified\.?$/,
+    /^post-clean discord context is ok\.?$/,
+    /^discord worker verification is ok\.? context loaded, no files changed\.?$/,
+    /^confirmed: the discord `?#codex`? worker can run\b.*\bno files changed\b/i,
+    /^plan was docs-only:/,
+    /^added the memory model bullet without changing app code/,
     /^(mavebot vision|final vision) \d+$/,
     /i hit a real blocker while running this on the server/
   ].some((pattern) => pattern.test(text));
@@ -1806,6 +1822,8 @@ function promptHeader(job) {
     '- If the user asks to start collecting or create the same data structure, update storage/collector/docs/tests when feasible and prefer the next missing user-visible command. Backend-only work is incomplete unless a real blocker prevents a command; say that blocker plainly.',
     '- If recent Discord context or worker history shows the user complained about skipped plan/demo, half-done Clash work, or no commands added, audit the prior miss first and fix the process/docs/code path that allowed it.',
     '- The current Clash data-collection entry point is /track player, /track clan, and /track status backed by /shared/clash-history.json. /history player, /roster plan, /roster signup, and /roster status are the first reporting/enrollment surfaces on that store. Future /warstats, /activity, /summary, and richer roster pages should build from the same store before adding parallel state.',
+    '- Use actual command names from src/commands.mjs and src/index.mjs. Do not invent roster names such as /roster enroll or /roster build unless you are also implementing and registering them in this run.',
+    '- When a prior answer promised a command name that does not exist, correct the user-visible plan to the commands that actually exist and build the next missing command instead of repeating the stale promise.',
     '- If the user asks for a command family such as roster, history, warstats, activity, track, or CWL, update slash command registration plus runtime handling or give a clear phased command plan when one run cannot safely build all of it.',
     '- Discord command changes must update both src/commands.mjs and src/index.mjs.',
     '- Discord command changes must be verified with tests and command registration/runtime checks whenever the request touches slash commands.',

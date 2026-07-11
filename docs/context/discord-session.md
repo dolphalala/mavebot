@@ -153,6 +153,10 @@ long-lived server state.
   like "research how ClashKing and ClashPerk work and create the same data
   structure" should produce a researched plan plus a concrete code/docs/test
   slice, or a clear blocker and next slice.
+- The current source of truth for roster command names is `/track clan`,
+  `/roster plan`, `/roster signup`, and `/roster status`. Older Discord replies
+  mentioned `/roster enroll` and `/roster build`; treat those as stale examples
+  unless a future run actually implements and registers them.
 - Keep Discord file/screenshot intake reliable: attachments should be
   downloaded to `/shared/codex-worker/context/discord-files/` and supported
   images should be passed to `codex exec` with `--image`.

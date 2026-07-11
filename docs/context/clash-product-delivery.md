@@ -15,6 +15,13 @@ API limits, did not show a command, and gave no demo.
 
 Future jobs must treat that as the known failure pattern.
 
+The same day also exposed the roster-planning version of the bug. The channel
+asked for a `/roster` build plan, a demo, signup/enrollment thinking, and
+context/process improvements. mavebot first answered with only a tiny status
+reply, then later described non-existent commands like `/roster enroll` and
+`/roster build`. Future jobs must correct stale plans against the actual source
+before repeating them.
+
 ## Completion Gate
 
 A broad Clash product job is not done until the final answer can honestly cover
@@ -49,6 +56,9 @@ all of this:
   `/roster signup`, and `/roster status`.
 - The next missing visible surfaces are `/warstats clan`, `/activity clan`,
   `/summary clan`, and richer paged roster views.
+- Use command names that actually exist in `src/commands.mjs` and
+  `src/index.mjs`. Do not promise `/roster enroll` or `/roster build` unless
+  the same run implements, registers, and tests those exact commands.
 - If a user asks for "ClashKing/ClashPerk style" without naming a command,
   infer the next useful leadership workflow: setup, tracking, signup, roster
   planning, war/CWL reliability, activity, exports.
@@ -82,4 +92,6 @@ something failed.
 - Backend-only changes when a visible command slice was feasible.
 - Saying "use `/roster`" without explaining setup, tracked history, and what
   data is still shallow.
+- Repeating stale command names from older Discord answers instead of checking
+  the current source.
 - Ignoring a previous Discord complaint that the plan/demo was skipped.
