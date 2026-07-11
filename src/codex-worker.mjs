@@ -1324,7 +1324,30 @@ function normalizeTranscriptText(row) {
       ? detailedWorkerChannelMessage(row?.text, { maxChars: 1200 })
       : humanizeWorkerChannelMessage(row?.text)
     : stripChatLinks(row?.text);
-  return text.trim();
+  return annotateKnownStaleMemoryText(text, row).trim();
+}
+
+function annotateKnownStaleMemoryText(text, row = {}) {
+  const raw = String(text || '');
+  if (row?.role !== 'assistant') {
+    return raw;
+  }
+  if (!/\/(?:roster\s+(?:enroll|build)|signup\s+player)\b/i.test(raw)) {
+    return raw;
+  }
+
+  const annotated = raw
+    .replace(/`\/roster\s+enroll[^`]*`/gi, '`[stale roster-enroll example]`')
+    .replace(/`\/roster\s+build[^`]*`/gi, '`[stale roster-build example]`')
+    .replace(/`\/signup\s+player[^`]*`/gi, '`[stale signup example; current command is /roster signup]`')
+    .replace(/\/roster\s+enroll\b/gi, '[stale roster-enroll]')
+    .replace(/\/roster\s+build\b/gi, '[stale roster-build]')
+    .replace(/\/signup\s+player\b/gi, '[stale signup-player]');
+
+  return [
+    'Stale prior answer warning: this old assistant message mentioned roster command names that do not exist now. Current source uses /track clan, /roster plan, /roster signup, and /roster status unless a future run implements more.',
+    annotated
+  ].join('\n');
 }
 
 export function compactTranscriptRows(rows, options = {}) {

@@ -312,6 +312,39 @@ test('compactTranscriptRows strips worker handoff boilerplate from retained memo
   assert.doesNotMatch(snapshot.recent, /Ready for the worker/);
 });
 
+test('compactTranscriptRows labels stale roster command examples in old assistant memory', () => {
+  const snapshot = compactTranscriptRows(
+    [
+      {
+        at: '2026-07-09T07:17:57.305Z',
+        role: 'assistant',
+        user: 'mavebot',
+        source: 'discord',
+        channel: '1523893930993778698',
+        text: [
+          'Plan:',
+          '1. `/roster enroll clan:#JY99CJC8` saves the clan and starts snapshotting members.',
+          '2. `/signup player:#TAG` links a Discord user to a CoC account for upcoming CWL.',
+          '3. `/roster build size:15` ranks the signed-up pool.'
+        ].join('\n')
+      }
+    ],
+    {
+      recentLimit: 5,
+      summaryLimit: 5,
+      generatedAt: '2026-07-09T07:20:00.000Z'
+    }
+  );
+
+  assert.match(snapshot.recent, /Stale prior answer warning/);
+  assert.match(snapshot.recent, /Current source uses \/track clan, \/roster plan, \/roster signup, and \/roster status/);
+  assert.match(snapshot.recent, /\[stale roster-enroll example\]/);
+  assert.match(snapshot.recent, /\[stale roster-build example\]/);
+  assert.match(snapshot.recent, /\[stale signup example; current command is \/roster signup\]/);
+  assert.doesNotMatch(snapshot.recent, /\/roster enroll clan:#JY99CJC8/);
+  assert.doesNotMatch(snapshot.recent, /\/roster build size:15/);
+});
+
 test('compactTranscriptRows condenses long assistant reports for prompt memory', () => {
   const snapshot = compactTranscriptRows(
     [
