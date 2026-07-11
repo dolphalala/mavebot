@@ -159,6 +159,51 @@ export const commands = [
             ]
           }
         ]
+      },
+      {
+        name: 'signup',
+        description: 'Sign a Discord member up for a Clash roster with their player tag.',
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: 'player',
+            description: 'Player tag to add to the roster, with or without #.',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+            min_length: 3,
+            max_length: 20
+          },
+          {
+            name: 'clan',
+            description: 'Clan tag for this roster. Defaults to the latest tracked clan.',
+            type: ApplicationCommandOptionType.String,
+            required: false,
+            min_length: 3,
+            max_length: 20
+          },
+          {
+            name: 'note',
+            description: 'Optional roster note, such as availability, army, or role.',
+            type: ApplicationCommandOptionType.String,
+            required: false,
+            max_length: 120
+          }
+        ]
+      },
+      {
+        name: 'status',
+        description: 'Show roster signups, missing clan members, and data readiness.',
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: 'clan',
+            description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+            type: ApplicationCommandOptionType.String,
+            required: false,
+            min_length: 3,
+            max_length: 20
+          }
+        ]
       }
     ]
   },

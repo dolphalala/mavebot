@@ -127,8 +127,12 @@ long-lived server state.
   tracked snapshot.
 - `/roster plan clan:<tag> size:<5-50> style:<balanced|safe|growth>` reads
   from `/shared/clash-history.json`, seeds a passed clan if needed, and gives a
-  first lineup/bench/data-quality plan. Future `/roster signup/status`,
-  `/warstats`, `/activity`, and `/summary` work should build on that store.
+  first lineup/bench/data-quality plan.
+- `/roster signup player:<tag> clan:<tag> note:<text>` and
+  `/roster status clan:<tag>` read/write roster enrollment under
+  `/shared/clash-history.json` so leaders can see signed players, missing clan
+  members, notes, and data-readiness warnings. Future `/warstats`, `/activity`,
+  and `/summary` work should build on that store.
 - `/pictionary` is a Clash of Clans picture guessing game using Clash-style
   assets, difficulty settings, chat guesses, and a durable guild leaderboard.
 - `/elder`, `/mute`, and `/bench` use `/shared/elder-votes.json`; Discord role

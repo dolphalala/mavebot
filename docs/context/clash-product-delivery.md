@@ -45,9 +45,10 @@ all of this:
 - Prefer a small working command over a large invisible foundation.
 - Build from the current `/shared/clash-history.json` store unless there is a
   concrete reason to add a new durable file.
-- Current entry points are `/track`, `/history player`, and `/roster plan`.
-- The next missing visible surfaces are `/roster signup`, `/roster status`,
-  `/warstats clan`, `/activity clan`, and `/summary clan`.
+- Current entry points are `/track`, `/history player`, `/roster plan`,
+  `/roster signup`, and `/roster status`.
+- The next missing visible surfaces are `/warstats clan`, `/activity clan`,
+  `/summary clan`, and richer paged roster views.
 - If a user asks for "ClashKing/ClashPerk style" without naming a command,
   infer the next useful leadership workflow: setup, tracking, signup, roster
   planning, war/CWL reliability, activity, exports.
@@ -82,4 +83,3 @@ something failed.
 - Saying "use `/roster`" without explaining setup, tracked history, and what
   data is still shallow.
 - Ignoring a previous Discord complaint that the plan/demo was skipped.
-

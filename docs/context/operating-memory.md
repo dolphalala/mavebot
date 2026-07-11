@@ -31,6 +31,11 @@ workflow.
     hero/equipment totals, activity, and collected war/CWL rows. If a clan tag
     is passed and not tracked yet, it seeds the first clan snapshot and explains
     that the first plan is based on limited data.
+  - `/roster signup player:<tag> clan:<tag> note:<text>` and
+    `/roster status clan:<tag>`: store Discord-member roster enrollment in
+    `/shared/clash-history.json`, then show signed players, missing clan
+    members, notes, and data-readiness warnings from the same Clash history
+    store.
   - `/pictionary`: starts a Clash of Clans picture guessing game in the current
     channel.
   - `/elder`: lets a server admin or existing elder grant elder status to a
@@ -95,10 +100,11 @@ workflow.
 - `/track` is the user-visible enrollment entry point for this store. Roster,
   history, activity, and war/CWL commands should read from the same store rather
   than creating parallel tracking files.
-- `/history player` and `/roster plan` are the first reporting commands on top
-  of the store. Future history/roster improvements should add pages/buttons,
-  signup/status flows, notes, and richer summaries to these command families
-  before creating competing reporting surfaces.
+- `/history player`, `/roster plan`, `/roster signup`, and `/roster status` are
+  the first reporting/enrollment commands on top of the store. Future
+  history/roster improvements should add pages/buttons, richer bench state, and
+  generated lineup snapshots to these command families before creating
+  competing reporting surfaces.
 
 ## Discord Command Registration
 

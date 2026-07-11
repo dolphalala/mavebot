@@ -37,8 +37,9 @@ It is a map, not a replacement for reading the current source.
   war-log rows, and derived per-player war stats under
   `/shared/clash-history.json`; `/track` uses this module to seed player/clan
   tracking before scheduled polling deepens the history, `/history player`
-  formats player history from that store, and `/roster plan` formats the first
-  roster/CWL planning view from the same data.
+  formats player history from that store, `/roster plan` formats the first
+  roster/CWL planning view, and `/roster signup/status` stores and reports
+  Discord-member roster enrollment from the same data.
 - `src/moderation-store.mjs`: `/elder`, `/mute`, and `/bench` durable vote and
   permanent-record storage.
 - `src/pictionary-game.mjs`: `/pictionary` topic pool, difficulty settings,

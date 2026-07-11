@@ -111,8 +111,9 @@ once:
   tracked members, TH levels, heroes, equipment, activity, and collected
   war/CWL rows. It also calls out data quality so users understand when the
   first snapshot is still shallow.
-- Next, add `/roster signup` and `/roster status` so Discord members can join a
-  CWL/event pool and leaders can see missing players, notes, and bench state.
+- `/roster signup` and `/roster status` now exist so Discord members can join a
+  CWL/event pool and leaders can see missing players, notes, and shallow data
+  warnings from the same store.
 - Add `/warstats clan` after current-war/CWL collection has enough real rows to
   summarize attacks and missed hits without misleading users.
 - Add exports after the data model is stable.

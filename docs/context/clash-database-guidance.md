@@ -67,13 +67,14 @@ long-term player/clan tracking commands.
 - `/history player:<tag>` is the first user-visible reporting surface for that
   store. It should be expanded with pages/buttons before adding a competing
   history command.
-- `/roster plan clan:<tag> size:<5-50> style:<balanced|safe|growth>` is the
-  first roster reporting surface on the same store. It should be expanded with
-  signup/status, notes, pages/buttons, and persistent roster definitions before
-  adding another roster store.
+- `/roster plan clan:<tag> size:<5-50> style:<balanced|safe|growth>`,
+  `/roster signup player:<tag> clan:<tag> note:<text>`, and
+  `/roster status clan:<tag>` are the first roster surfaces on the same store.
+  They should be expanded with pages/buttons, richer bench state, and generated
+  lineup snapshots before adding another roster store.
 - Useful next command families:
-  - `/roster signup` and `/roster status` for event enrollment, role notes,
-    missing players, bench candidates, generated CWL lineups, and status pages.
+  - More `/roster` pages/buttons for event enrollment, role notes, missing
+    players, bench candidates, generated CWL lineups, and status pages.
   - `/warstats` for collected attack/defense results from tracked wars.
   - `/activity` for clan/member movement, donation deltas, and stale accounts.
   - `/summary` and `/export` commands only after the source data is stable

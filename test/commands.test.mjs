@@ -146,49 +146,96 @@ test('history command exposes player history lookup', () => {
   ]);
 });
 
-test('roster command exposes planning options', () => {
+test('roster command exposes plan, signup, and status options', () => {
   const roster = commands.find((command) => command.name === 'roster');
 
   assert.ok(roster);
   assert.match(roster.description, /roster planning/i);
   assert.deepEqual(roster.integration_types, [0]);
   assert.deepEqual(roster.contexts, [0]);
-  assert.deepEqual(roster.options, [
-    {
-      name: 'plan',
-      description: 'Suggest a CWL or war lineup from tracked clan and player history.',
-      type: ApplicationCommandOptionType.Subcommand,
-      options: [
-        {
-          name: 'clan',
-          description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
-          type: ApplicationCommandOptionType.String,
-          required: false,
-          min_length: 3,
-          max_length: 20
-        },
-        {
-          name: 'size',
-          description: 'Roster size to plan for.',
-          type: ApplicationCommandOptionType.Integer,
-          required: false,
-          min_value: 5,
-          max_value: 50
-        },
-        {
-          name: 'style',
-          description: 'How aggressive the roster recommendation should be.',
-          type: ApplicationCommandOptionType.String,
-          required: false,
-          choices: [
-            { name: 'Balanced', value: 'balanced' },
-            { name: 'Safe', value: 'safe' },
-            { name: 'Growth', value: 'growth' }
-          ]
-        }
-      ]
-    }
-  ]);
+  assert.deepEqual(
+    roster.options.map((option) => option.name),
+    ['plan', 'signup', 'status']
+  );
+  assert.deepEqual(roster.options[0], {
+    name: 'plan',
+    description: 'Suggest a CWL or war lineup from tracked clan and player history.',
+    type: ApplicationCommandOptionType.Subcommand,
+    options: [
+      {
+        name: 'clan',
+        description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        min_length: 3,
+        max_length: 20
+      },
+      {
+        name: 'size',
+        description: 'Roster size to plan for.',
+        type: ApplicationCommandOptionType.Integer,
+        required: false,
+        min_value: 5,
+        max_value: 50
+      },
+      {
+        name: 'style',
+        description: 'How aggressive the roster recommendation should be.',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        choices: [
+          { name: 'Balanced', value: 'balanced' },
+          { name: 'Safe', value: 'safe' },
+          { name: 'Growth', value: 'growth' }
+        ]
+      }
+    ]
+  });
+  assert.deepEqual(roster.options[1], {
+    name: 'signup',
+    description: 'Sign a Discord member up for a Clash roster with their player tag.',
+    type: ApplicationCommandOptionType.Subcommand,
+    options: [
+      {
+        name: 'player',
+        description: 'Player tag to add to the roster, with or without #.',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        min_length: 3,
+        max_length: 20
+      },
+      {
+        name: 'clan',
+        description: 'Clan tag for this roster. Defaults to the latest tracked clan.',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        min_length: 3,
+        max_length: 20
+      },
+      {
+        name: 'note',
+        description: 'Optional roster note, such as availability, army, or role.',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        max_length: 120
+      }
+    ]
+  });
+  assert.deepEqual(roster.options[2], {
+    name: 'status',
+    description: 'Show roster signups, missing clan members, and data readiness.',
+    type: ApplicationCommandOptionType.Subcommand,
+    options: [
+      {
+        name: 'clan',
+        description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        min_length: 3,
+        max_length: 20
+      }
+    ]
+  });
 });
 
 test('pictionary command is guild-install only and allows round settings', () => {

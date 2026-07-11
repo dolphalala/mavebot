@@ -38,9 +38,11 @@ import {
   DEFAULT_CLASH_HISTORY_WAR_INTERVAL_MS,
   buildClashPlayerHistoryText,
   buildClashRosterPlanText,
+  buildClashRosterStatusText,
   clashHistoryStorePath,
   readClashHistoryStore,
   recordClashPlayerSnapshot,
+  signupClashRoster,
   startClashHistoryCollector,
   trackClashHistoryClan,
   trackClashHistoryPlayer
@@ -2400,53 +2402,96 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await interaction.deferReply();
 
     try {
-      if (subcommand !== 'plan') {
-        await interaction.editReply('I do not know that `/roster` subcommand yet.');
+      if (subcommand === 'plan') {
+        const clan = interaction.options.getString('clan');
+        const size = interaction.options.getInteger('size') || 15;
+        const style = interaction.options.getString('style') || 'balanced';
+        let store = await readClashHistoryStore(clashHistoryStorePath());
+        let normalizedClanTag = null;
+        let seeded = false;
+
+        if (clan) {
+          normalizedClanTag = normalizeClanTag(clan);
+          if (!store.clans?.[normalizedClanTag]?.current) {
+            const result = await trackClashHistoryClan(normalizedClanTag, {
+              storePath: clashHistoryStorePath(),
+              source: `discord:${interaction.user.id}`,
+              clanIntervalMs: clashHistoryClanIntervalMs
+            });
+            store = result.store;
+            seeded = true;
+          }
+        }
+
+        const text = buildClashRosterPlanText(store, {
+          clanTag: normalizedClanTag,
+          size,
+          style
+        });
+
+        await interaction.editReply(
+          [
+            seeded
+              ? 'I started tracking this clan now, so the roster plan is based on the first snapshot.'
+              : null,
+            text ||
+              'Track a clan first with `/track clan tag:#CLAN`, or pass a clan tag to `/roster plan clan:#CLAN`.'
+          ]
+            .filter(Boolean)
+            .join('\n\n')
+        );
         return;
       }
 
-      const clan = interaction.options.getString('clan');
-      const size = interaction.options.getInteger('size') || 15;
-      const style = interaction.options.getString('style') || 'balanced';
-      let store = await readClashHistoryStore(clashHistoryStorePath());
-      let normalizedClanTag = null;
-      let seeded = false;
+      if (subcommand === 'signup') {
+        const player = interaction.options.getString('player', true);
+        const clan = interaction.options.getString('clan');
+        const note = interaction.options.getString('note');
+        const result = await signupClashRoster({
+          playerTag: player,
+          clanTag: clan,
+          guildId: interaction.guildId,
+          userId: interaction.user.id,
+          username: interaction.user.tag || interaction.user.username,
+          note,
+          storePath: clashHistoryStorePath()
+        });
+        const current = result.record?.current || result.snapshot || {};
+        const title = result.roster?.clanTag
+          ? `${current.name || current.tag} is signed up for ${result.roster.clanTag}.`
+          : `${current.name || current.tag} is signed up.`;
 
-      if (clan) {
-        normalizedClanTag = normalizeClanTag(clan);
-        if (!store.clans?.[normalizedClanTag]?.current) {
-          const result = await trackClashHistoryClan(normalizedClanTag, {
-            storePath: clashHistoryStorePath(),
-            source: `discord:${interaction.user.id}`,
-            clanIntervalMs: clashHistoryClanIntervalMs
-          });
-          store = result.store;
-          seeded = true;
-        }
+        await interaction.editReply(
+          [
+            title,
+            result.signup?.note ? `Note: ${result.signup.note}` : null,
+            'Use `/roster status` to see the full signup board and missing players.'
+          ]
+            .filter(Boolean)
+            .join('\n')
+        );
+        return;
       }
 
-      const text = buildClashRosterPlanText(store, {
-        clanTag: normalizedClanTag,
-        size,
-        style
-      });
+      if (subcommand === 'status') {
+        const clan = interaction.options.getString('clan');
+        const normalizedClanTag = clan ? normalizeClanTag(clan) : null;
+        const store = await readClashHistoryStore(clashHistoryStorePath());
+        const text = buildClashRosterStatusText(store, {
+          clanTag: normalizedClanTag,
+          guildId: interaction.guildId
+        });
 
-      await interaction.editReply(
-        [
-          seeded
-            ? 'I started tracking this clan now, so the roster plan is based on the first snapshot.'
-            : null,
-          text ||
-            'Track a clan first with `/track clan tag:#CLAN`, or pass a clan tag to `/roster plan clan:#CLAN`.'
-        ]
-          .filter(Boolean)
-          .join('\n\n')
-      );
+        await interaction.editReply(text);
+        return;
+      }
+
+      await interaction.editReply('I do not know that `/roster` subcommand yet.');
     } catch (error) {
       const message =
         error instanceof CocApiError
           ? error.message
-          : 'I could not build a Clash roster plan right now.';
+          : 'I could not update the Clash roster right now.';
       await interaction.editReply(message);
       console.error('Clash roster command failed:', error);
     }

@@ -6,8 +6,10 @@ import path from 'node:path';
 import {
   buildClashPlayerHistoryText,
   buildClashRosterPlanText,
+  buildClashRosterStatusText,
   readClashHistoryStore,
   recordClashPlayerSnapshot,
+  signupClashRoster,
   trackClashHistoryClan,
   trackClashHistoryPlayer,
   trackNextClashHistorySubject
@@ -388,6 +390,55 @@ test('buildClashRosterPlanText suggests roster from collected history', async (t
   assert.match(text, /Bench watch/);
   assert.match(text, /No bench candidates outside the selected roster size yet/);
   assert.match(text, /Every listed member has at least one player snapshot/);
+});
+
+test('signupClashRoster stores signups and buildClashRosterStatusText shows missing members', async (t) => {
+  const storePath = await tempStore(t);
+
+  await trackClashHistoryClan('#CLAN1', {
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    source: 'discord:user-1',
+    fetchClanImpl: async () => clan(),
+    fetchCurrentWarImpl: async () => ({ state: 'notInWar' }),
+    fetchCurrentCwlGroupImpl: async () => ({ state: 'notInWar', rounds: [] }),
+    fetchClanWarLogImpl: async () => ({ items: [] })
+  });
+
+  const signup = await signupClashRoster({
+    playerTag: '#AAA111',
+    clanTag: '#CLAN1',
+    guildId: 'guild-1',
+    userId: 'discord-user-1',
+    username: 'Allen',
+    note: 'CWL evenings',
+    storePath,
+    now: new Date('2026-07-01T00:05:00.000Z'),
+    fetchPlayerImpl: async (tag) => player(tag, 5700, { name: 'Alpha', donations: 200 })
+  });
+
+  assert.equal(signup.roster.clanTag, '#CLAN1');
+  assert.equal(signup.signup.playerTag, '#AAA111');
+  assert.equal(signup.signup.note, 'CWL evenings');
+  assert.ok(signup.store.rosters['guild-1:#CLAN1']);
+  assert.deepEqual(signup.store.tracked.players['#AAA111'].sources, [
+    'clan:#CLAN1',
+    'roster:guild-1:discord-user-1'
+  ]);
+
+  const store = await readClashHistoryStore(storePath);
+  const text = buildClashRosterStatusText(store, {
+    clanTag: '#CLAN1',
+    guildId: 'guild-1'
+  });
+
+  assert.match(text, /Mave \(#CLAN1\) status/);
+  assert.match(text, /Signups: 1\. Clan pool: 2\. Signed player snapshots: 1\/1\./);
+  assert.match(text, /Alpha \(#AAA111\) - Allen - TH 16/);
+  assert.match(text, /CWL evenings/);
+  assert.match(text, /Missing from signup/);
+  assert.match(text, /Bravo \(#BBB222\)/);
+  assert.match(text, /Roster status gets smarter/);
 });
 
 test('trackNextClashHistorySubject rotates clan, CWL war, and player work', async (t) => {

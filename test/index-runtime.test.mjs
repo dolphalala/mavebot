@@ -123,3 +123,13 @@ test('Discord Codex runtime answers simple queue status without spawning a worke
     'queue status should be handled through the immediate done-record path before worker enqueue'
   );
 });
+
+test('roster runtime handles signup and status subcommands', async () => {
+  const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
+
+  assert.match(source, /subcommand === 'signup'/);
+  assert.match(source, /subcommand === 'status'/);
+  assert.match(source, /signupClashRoster/);
+  assert.match(source, /buildClashRosterStatusText/);
+  assert.match(source, /interaction\.options\.getString\('player', true\)/);
+});

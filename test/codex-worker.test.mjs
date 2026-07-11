@@ -513,8 +513,8 @@ test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product disc
   assert.match(prompt, /If the user asks to start collecting or create the same data structure/);
   assert.match(prompt, /Backend-only work is incomplete/);
   assert.match(prompt, /current Clash data-collection entry point is \/track player, \/track clan, and \/track status/);
-  assert.match(prompt, /\/history player and \/roster plan are the first reporting surfaces on that store/);
-  assert.match(prompt, /Future \/roster signup\/status, \/warstats, \/activity, and \/summary work should build from the same store/);
+  assert.match(prompt, /\/history player, \/roster plan, \/roster signup, and \/roster status are the first reporting\/enrollment surfaces/);
+  assert.match(prompt, /Future \/warstats, \/activity, \/summary, and richer roster pages should build from the same store/);
   assert.match(prompt, /What I learned, Data reality, What mavebot should build, Current visible slice, Data model\/commands, Demo\/next command, and Still missing/);
   assert.match(prompt, /Prefer the next missing user-visible command slice over backend-only work/);
   assert.match(prompt, /Do not answer with only an acknowledgement, "backend collector added", or a bare live claim/);
