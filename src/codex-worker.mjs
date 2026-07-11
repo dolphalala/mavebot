@@ -587,7 +587,10 @@ export function workerFailureMessage(error) {
   }
 
   const text = String(error?.message || error || '');
-  if (/npm run check exited/i.test(text) || /\btest\b/i.test(text)) {
+  if (/\bafter timeout\b/i.test(text) || /\btimed out\b/i.test(text) || /\btimeout\b/i.test(text)) {
+    return "I hit the server worker timeout before I could finish and verify that. I saved the request, but it is not live yet.";
+  }
+  if (/npm run check exited/i.test(text) || /\b(?:node --test|npm test|tests? failed|check failed|test\/check failure)\b/i.test(text)) {
     return "I found a test/check failure while working on that. I saved the details and will keep it from being marked done until the checks pass.";
   }
   if (isNonFastForwardPushError(error)) {

@@ -1414,6 +1414,16 @@ test('workerFailureMessage keeps channel failures short and non-secret', () => {
   assert.doesNotMatch(message, /SECRET_TOKEN|stack trace|npm run check exited/i);
 });
 
+test('workerFailureMessage reports worker timeouts before test wording', () => {
+  const message = workerFailureMessage(
+    new Error('codex exec exited null after timeout\nPlaywright tests are added, but Chromium cannot launch here.')
+  );
+
+  assert.match(message, /worker timeout/);
+  assert.match(message, /not live yet/);
+  assert.doesNotMatch(message, /test\/check failure/);
+});
+
 test('workerFailureMessage detects Codex auth failures from command output', () => {
   const error = new Error('codex exec exited 1');
   error.result = {

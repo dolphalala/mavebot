@@ -97,6 +97,10 @@ long-lived server state.
   relying on the poll timer.
 - 2026-07-09 live verification: private deploy webhook triggered from the
   worker and the poll timer remained fallback.
+- 2026-07-11 website follow-up audit: a long Codex subprocess timed out after
+  drafting a local preview link, but the worker misreported it as a check
+  failure because the captured output mentioned tests. Timeout failures should
+  say the work is not live and should not present draft local links as usable.
 
 ## Persistent Product Context
 
