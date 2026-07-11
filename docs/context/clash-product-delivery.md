@@ -54,11 +54,11 @@ all of this:
   concrete reason to add a new durable file.
 - Current entry points are `/config clan set`, `/config clan status`,
   `/link player`, `/link status`, `/link remove`, `/track`, `/history player`,
-  `/roster plan`, `/roster signup`, `/roster status`, `/warstats`,
+  `/roster plan`, `/roster signup`, `/roster status`, `/roster export`, `/warstats`,
   `/activity`, and `/summary`.
 - The next missing visible surfaces are richer paged roster/player views,
-  exports, reminders, and deeper war/CWL/activity pages once more scheduled
-  data accumulates.
+  reminders, and deeper war/CWL/activity pages once more scheduled data
+  accumulates.
 - Use command names that actually exist in `src/commands.mjs` and
   `src/index.mjs`. Do not promise `/roster enroll` or `/roster build` unless
   the same run implements, registers, and tests those exact commands.

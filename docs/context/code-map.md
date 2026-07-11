@@ -39,9 +39,10 @@ It is a map, not a replacement for reading the current source.
   and `/link` write the setup layer, `/track` seeds player/clan tracking before
   scheduled polling deepens the history, `/history player` formats player
   history from that store, `/roster plan` formats the first roster/CWL planning
-  view, and `/roster signup/status` stores and reports Discord-member roster
-  enrollment from the same data. `/warstats`, `/activity`, and `/summary`
-  format the first clan-operations reports from the same store.
+  view, `/roster signup/status` stores and reports Discord-member roster
+  enrollment from the same data, and `/roster export` formats text/CSV leader
+  copy output. `/warstats`, `/activity`, and `/summary` format the first
+  clan-operations reports from the same store.
 - `src/moderation-store.mjs`: `/elder`, `/mute`, and `/bench` durable vote and
   permanent-record storage.
 - `src/pictionary-game.mjs`: `/pictionary` topic pool, difficulty settings,

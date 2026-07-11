@@ -213,7 +213,7 @@ test('history command exposes player history lookup', () => {
   ]);
 });
 
-test('roster command exposes plan, signup, and status options', () => {
+test('roster command exposes plan, signup, status, and export options', () => {
   const roster = commands.find((command) => command.name === 'roster');
 
   assert.ok(roster);
@@ -222,7 +222,7 @@ test('roster command exposes plan, signup, and status options', () => {
   assert.deepEqual(roster.contexts, [0]);
   assert.deepEqual(
     roster.options.map((option) => option.name),
-    ['plan', 'signup', 'status']
+    ['plan', 'signup', 'status', 'export']
   );
   assert.deepEqual(roster.options[0], {
     name: 'plan',
@@ -300,6 +300,31 @@ test('roster command exposes plan, signup, and status options', () => {
         required: false,
         min_length: 3,
         max_length: 20
+      }
+    ]
+  });
+  assert.deepEqual(roster.options[3], {
+    name: 'export',
+    description: 'Export roster signups and missing members for leaders to copy.',
+    type: ApplicationCommandOptionType.Subcommand,
+    options: [
+      {
+        name: 'clan',
+        description: "Clan tag, with or without #. Defaults to this server's configured clan.",
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        min_length: 3,
+        max_length: 20
+      },
+      {
+        name: 'format',
+        description: 'Export format.',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        choices: [
+          { name: 'Readable text', value: 'text' },
+          { name: 'CSV', value: 'csv' }
+        ]
       }
     ]
   });

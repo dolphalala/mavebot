@@ -36,6 +36,8 @@ workflow.
     `/shared/clash-history.json`, then show signed players, missing clan
     members, notes, and data-readiness warnings from the same Clash history
     store.
+  - `/roster export clan:<tag> format:<text|csv>`: exports signed players and
+    missing clan members from the same roster store for leader copy/paste.
   - `/warstats clan:<tag>`: summarizes collected war/CWL rows for a tracked
     clan, including public war-log results, attack-level stars/triples/missed
     hits when full current-war/CWL rows exist, and a data-reality note when
@@ -112,11 +114,12 @@ workflow.
   Roster, history, activity, and war/CWL commands should read from the same
   store rather than creating parallel tracking files.
 - `/history player`, `/roster plan`, `/roster signup`, `/roster status`,
+  `/roster export`,
   `/warstats`, `/activity`, and `/summary` are the first reporting/enrollment
   commands on top of the store. Future history/roster/operations improvements
   should add pages/buttons, richer bench state, generated lineup snapshots,
-  exports, reminders, and richer activity/war detail before creating competing
-  reporting surfaces.
+  reminders, and richer activity/war detail before creating competing reporting
+  surfaces.
 
 ## Discord Command Registration
 

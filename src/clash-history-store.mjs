@@ -1489,6 +1489,117 @@ function rosterSignupLine(store, signup, index) {
   return `${index}. ${candidate.name} (${candidate.tag}) - ${signupDisplayName(signup)} - ${rosterReason(candidate)}${note}`;
 }
 
+function rosterExportData(store, { clanTag = null, guildId = null } = {}) {
+  const normalizedClanTag = clanTag ? normalizeClanTag(clanTag) : null;
+  const selectedClanTag = normalizedClanTag || defaultClanTagForGuild(store, guildId);
+  const roster = selectRosterRecord(store, { guildId, clanTag: selectedClanTag });
+  const clan = selectRosterClan(store, selectedClanTag || roster?.clanTag || null);
+  const memberTags = uniqueRosterMemberTags(clan);
+  const signups = Object.values(roster?.signups || {})
+    .filter((signup) => signup?.playerTag)
+    .sort((a, b) => String(a.signedUpAt || '').localeCompare(String(b.signedUpAt || '')));
+  const signupTags = new Set(signups.map((signup) => signup.playerTag));
+  const missingTags = memberTags.filter((tag) => !signupTags.has(tag));
+  const clanName = clan?.name || clan?.current?.name || 'Clan';
+  const displayedClanTag = selectedClanTag || roster?.clanTag || clan?.tag || clan?.current?.tag || null;
+  const signedRows = signups.map((signup, index) => {
+    const candidate = rosterCandidate(store, signup.playerTag, clan?.members?.[signup.playerTag] || null);
+    return {
+      section: 'signed',
+      rank: index + 1,
+      player: candidate.name,
+      tag: candidate.tag,
+      discord: signupDisplayName(signup),
+      townHall: candidate.townHall || null,
+      trophies: candidate.trophies || null,
+      warStars: candidate.warStars || null,
+      heroScore: candidate.heroScore || null,
+      snapshots: candidate.snapshots || 0,
+      warRows: candidate.war.rows || 0,
+      note: signup.note || ''
+    };
+  });
+  const missingRows = missingTags.map((tag, index) => {
+    const candidate = rosterCandidate(store, tag, clan?.members?.[tag] || null);
+    return {
+      section: 'missing',
+      rank: index + 1,
+      player: candidate.name,
+      tag: candidate.tag,
+      discord: '',
+      townHall: candidate.townHall || null,
+      trophies: candidate.trophies || null,
+      warStars: candidate.warStars || null,
+      heroScore: candidate.heroScore || null,
+      snapshots: candidate.snapshots || 0,
+      warRows: candidate.war.rows || 0,
+      note: ''
+    };
+  });
+
+  return {
+    clanName,
+    displayedClanTag,
+    roster,
+    memberCount: memberTags.length,
+    signedRows,
+    missingRows,
+    rows: [...signedRows, ...missingRows]
+  };
+}
+
+function csvCell(value) {
+  const text = String(value ?? '').replace(/\r?\n/g, ' ').trim();
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function rosterExportCsvLine(row) {
+  return [
+    row.section,
+    row.rank,
+    row.player,
+    row.tag,
+    row.discord,
+    row.townHall || '',
+    row.trophies || '',
+    row.warStars || '',
+    row.heroScore || '',
+    row.snapshots,
+    row.warRows,
+    row.note
+  ].map(csvCell).join(',');
+}
+
+function rosterExportCsvText(data) {
+  const header = 'section,rank,player,tag,discord,townHall,trophies,warStars,heroLevels,snapshots,warRows,note';
+  const csvRows = [header, ...data.rows.map(rosterExportCsvLine)];
+  let visibleRows = csvRows.slice(0, 20);
+  let hidden = csvRows.length - visibleRows.length;
+  let text = '';
+
+  do {
+    hidden = csvRows.length - visibleRows.length;
+    text = [
+      `**${data.displayedClanTag ? `${data.clanName} (${data.displayedClanTag})` : 'Roster'} CSV export**`,
+      `Signups: ${data.signedRows.length}. Missing: ${data.missingRows.length}. Clan pool: ${data.memberCount || 'unknown'}.`,
+      hidden > 0 ? `Showing the first ${visibleRows.length - 1} data row${visibleRows.length === 2 ? '' : 's'} to fit Discord.` : null,
+      '',
+      '```csv',
+      ...visibleRows,
+      '```',
+      'Use `/roster status` for the readable board or `/roster plan` for the ranked lineup.'
+    ]
+      .filter(Boolean)
+      .join('\n');
+    if (text.length <= 1900 || visibleRows.length <= 2) {
+      return text.length > 1900 ? `${text.slice(0, 1880)}\n...` : text;
+    }
+    visibleRows = visibleRows.slice(0, -1);
+  } while (visibleRows.length > 1);
+
+  return text;
+}
+
 export async function signupClashRoster({
   playerTag,
   clanTag = null,
@@ -1591,6 +1702,61 @@ export function buildClashRosterStatusText(store, { clanTag = null, guildId = nu
 
   const text = lines.join('\n');
   return text.length > 1900 ? `${text.slice(0, 1880)}\n...` : text;
+}
+
+export function buildClashRosterExportText(
+  store,
+  { clanTag = null, guildId = null, format = 'text' } = {}
+) {
+  const data = rosterExportData(store, { clanTag, guildId });
+  if (String(format || '').toLowerCase() === 'csv') {
+    return rosterExportCsvText(data);
+  }
+
+  const lines = [
+    `**${data.displayedClanTag ? `${data.clanName} (${data.displayedClanTag})` : 'Roster'} export**`,
+    `Signups: ${data.signedRows.length}. Missing: ${data.missingRows.length}. Clan pool: ${data.memberCount || 'unknown'}.`,
+    '',
+    '**Signed players**'
+  ];
+
+  if (data.signedRows.length) {
+    lines.push(
+      ...data.signedRows.slice(0, 15).map((row) => {
+        const note = row.note ? ` | ${row.note}` : '';
+        return `${row.rank}. ${row.player} (${row.tag}) - ${row.discord} - TH ${numberText(row.townHall)} | ${numberText(row.trophies)} trophies | ${numberText(row.warStars)} war stars${note}`;
+      })
+    );
+    if (data.signedRows.length > 15) {
+      lines.push(`...${data.signedRows.length - 15} more signed player${data.signedRows.length === 16 ? '' : 's'} hidden.`);
+    }
+  } else {
+    lines.push('No signups yet. Use `/roster signup player:#TAG note:availability` first.');
+  }
+
+  lines.push('', '**Missing signup**');
+  if (data.missingRows.length) {
+    lines.push(
+      ...data.missingRows.slice(0, 12).map(
+        (row) =>
+          `${row.player} (${row.tag}) - TH ${numberText(row.townHall)} | ${numberText(row.trophies)} trophies | ${numberText(row.warStars)} war stars`
+      )
+    );
+    if (data.missingRows.length > 12) {
+      lines.push(`...${data.missingRows.length - 12} more missing member${data.missingRows.length === 13 ? '' : 's'} hidden.`);
+    }
+  } else if (data.memberCount) {
+    lines.push('Every tracked clan member has signed up.');
+  } else {
+    lines.push('Track a clan with `/track clan tag:#CLAN` to compare signups against current members.');
+  }
+
+  lines.push(
+    '',
+    'For copy/paste rows, run `/roster export format:CSV`. For lineup ranking, run `/roster plan`.'
+  );
+
+  return clippedDiscordText(lines);
 }
 
 export function buildClashRosterPlanText(

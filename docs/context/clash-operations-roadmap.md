@@ -41,6 +41,8 @@ Before promising new command names, inspect `src/commands.mjs` and
   roster planning surface.
 - `/roster signup player:<tag> clan:<tag> note:<text>` and
   `/roster status clan:<tag>`: first signup/status flow.
+- `/roster export clan:<tag> format:<text|csv>`: copy/share output for signed
+  players and missing clan members.
 - `/warstats clan:<tag>`, `/activity clan:<tag>`, `/summary clan:<tag>`: first
   operations reports from the same history store.
 
@@ -52,17 +54,18 @@ the same commit as the command change.
 When the user asks broadly and does not name a specific command, choose the
 first feasible missing slice from this list after checking current source:
 
-1. **Roster pages and exports.** Improve the existing `/roster` subcommands
-   with paged summaries, missing signup views, bench candidates, notes, lineup
-   snapshots, and export/share output.
+1. **Roster pages and lineup snapshots.** Improve the existing `/roster`
+   subcommands with paged summaries, missing signup buttons, bench candidates,
+   notes, and generated lineup snapshots.
 2. **War/CWL detail.** Extend `/warstats` for missed hits, attack rows, defense
    summaries, CWL rounds, and player reliability when full war rows have been
    collected.
 3. **Activity and season summaries.** Extend `/activity` and `/summary` for
    stale accounts, donation/trophy deltas, joins/leaves, season views, clan
    games/capital where available, and leaderboards.
-4. **Leadership exports and reminders.** Add export/reminder/report surfaces
-   only after the underlying data is real enough to avoid misleading users.
+4. **Leadership reminders and scheduled reports.** Add reminder/report
+   surfaces only after the underlying data is real enough to avoid misleading
+   users.
 
 Do not skip directly to a backend-only collector when one of these command
 slices is feasible.
@@ -75,7 +78,7 @@ slices is feasible.
 - If the user says "same data structure", "start collecting", or "track all
   players we care about", verify `/track` and `/shared/clash-history.json`
   first. If those exist, build the next missing visible command, usually richer
-  roster pages, war/CWL detail, exports, or reminders.
+  roster pages, war/CWL detail, reminders, or scheduled reports.
 - If the user asks for `/roster build`, `/roster enroll`, or another stale name,
   correct the plan to the commands that exist, then build or rename the next
   real command in the same run.
@@ -99,14 +102,14 @@ layer before roster and war views feel good. mavebot now has that base.
 Data reality: old detailed war rows cannot be backfilled unless they were
 collected, but current player/clan snapshots can start now.
 
-Built now: richer /roster status pages/buttons.
+Built now: /roster export text and CSV output for leaders.
 Data model: rosters[rosterId], guilds[guildId], links[discordUserId].players,
 players[tag], and clans[tag] in /shared/clash-history.json.
-Try: /roster status
-What it shows: the configured clan's signups, missing members, data quality,
-and next action.
+Try: /roster export format:csv
+What it shows: signed players, missing current clan members, Discord names,
+notes, TH/trophy/war-star context, and copyable rows.
 
-Still missing: exports and deeper war/CWL reliability pages.
+Still missing: richer roster pages/buttons and deeper war/CWL reliability pages.
 ```
 
 Use the exact labels required by `clash-product-delivery.md` unless there is a

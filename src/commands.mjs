@@ -290,6 +290,31 @@ export const commands = [
             max_length: 20
           }
         ]
+      },
+      {
+        name: 'export',
+        description: 'Export roster signups and missing members for leaders to copy.',
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: 'clan',
+            description: "Clan tag, with or without #. Defaults to this server's configured clan.",
+            type: ApplicationCommandOptionType.String,
+            required: false,
+            min_length: 3,
+            max_length: 20
+          },
+          {
+            name: 'format',
+            description: 'Export format.',
+            type: ApplicationCommandOptionType.String,
+            required: false,
+            choices: [
+              { name: 'Readable text', value: 'text' },
+              { name: 'CSV', value: 'csv' }
+            ]
+          }
+        ]
       }
     ]
   },

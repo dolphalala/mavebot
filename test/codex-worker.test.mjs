@@ -338,7 +338,7 @@ test('compactTranscriptRows labels stale roster command examples in old assistan
   );
 
   assert.match(snapshot.recent, /Stale prior answer warning/);
-  assert.match(snapshot.recent, /Current source uses \/config clan set, \/config clan status, \/link player, \/link status, \/link remove, \/track clan, \/roster plan, \/roster signup, and \/roster status/);
+  assert.match(snapshot.recent, /Current source uses \/config clan set, \/config clan status, \/link player, \/link status, \/link remove, \/track clan, \/roster plan, \/roster signup, \/roster status, and \/roster export/);
   assert.match(snapshot.recent, /\[stale roster-enroll example\]/);
   assert.match(snapshot.recent, /\[stale roster-build example\]/);
   assert.match(snapshot.recent, /\[stale signup example; current command is \/roster signup\]/);
@@ -681,11 +681,11 @@ test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product disc
   assert.match(prompt, /current Clash setup and data entry points are \/config clan set, \/config clan status, \/link player, \/link status, \/link remove, \/track player, \/track clan, and \/track status/);
   assert.match(
     prompt,
-    /\/history player, \/roster plan, \/roster signup, \/roster status, \/warstats, \/activity, and \/summary are the first reporting\/enrollment surfaces/,
+    /\/history player, \/roster plan, \/roster signup, \/roster status, \/roster export, \/warstats, \/activity, and \/summary are the first reporting\/enrollment surfaces/,
   );
   assert.match(
     prompt,
-    /Future richer roster\/player pages, exports, reminders, and deeper war\/activity pages should build from the same store/,
+    /Future richer roster\/player pages, reminders, and deeper war\/activity pages should build from the same store/,
   );
   assert.match(prompt, /Use actual command names from src\/commands\.mjs and src\/index\.mjs/);
   assert.match(prompt, /Do not invent roster names such as \/roster enroll or \/roster build/);
@@ -1331,6 +1331,39 @@ test('finalChannelMessage blocks thin Clash product-discovery success replies', 
   assert.match(message, /source\/context audit, data reality, visible command or honest blocker/);
   assert.doesNotMatch(message, /Added the ClashKing\/ClashPerk-style backend collector/);
   assert.doesNotMatch(message, /It's live now\./);
+});
+
+test('finalChannelMessage blocks stale roster command names even in shaped Clash replies', () => {
+  const job = {
+    text: 'first plan and tell me how /roster would work for cwl signup and history'
+  };
+  const codexMessage = [
+    'I found the gap: the roster flow needed visible commands.',
+    'What I learned: roster planning needs setup, signup, and exports.',
+    'Data reality: current API data exists now, history improves after scheduled tracking.',
+    'Built now: `/roster enroll clan:#JY99CJC8` and `/roster build size:15`.',
+    'Data model: `/shared/clash-history.json` stores tracked clans, players, wars, and rosters.',
+    'Try: `/roster build size:15`',
+    'What it shows: a ranked CWL lineup.',
+    'Still missing: reminders.'
+  ].join('\n');
+
+  assert.equal(
+    clashProductReplyGateFailure(codexMessage, job),
+    'stale Clash roster command suggestion'
+  );
+
+  const message = finalChannelMessage({
+    codexMessage,
+    checkOk: true,
+    pushResult: { pushed: true },
+    deployResult: { matched: true },
+    runtime: { botOk: true },
+    job
+  });
+
+  assert.match(message, /Blocked reason: stale Clash roster command suggestion/);
+  assert.doesNotMatch(message, /\/roster build size:15/);
 });
 
 test('finalChannelMessage condenses long implementation reports for channels', () => {

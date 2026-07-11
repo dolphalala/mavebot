@@ -8,6 +8,7 @@ import {
   buildClashGuildConfigText,
   buildClashLinkStatusText,
   buildClashPlayerHistoryText,
+  buildClashRosterExportText,
   buildClashRosterPlanText,
   buildClashRosterStatusText,
   buildClashSummaryText,
@@ -543,6 +544,56 @@ test('signupClashRoster uses the configured guild clan when no clan option is pa
   const text = buildClashRosterStatusText(signup.store, { guildId: 'guild-1' });
   assert.match(text, /Mave \(#CLAN1\) status/);
   assert.match(text, /Alpha \(#AAA111\)/);
+});
+
+test('buildClashRosterExportText creates readable and CSV roster exports', async (t) => {
+  const storePath = await tempStore(t);
+
+  await trackClashHistoryClan('#CLAN1', {
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    source: 'discord:user-1',
+    fetchClanImpl: async () => clan(),
+    fetchCurrentWarImpl: async () => ({ state: 'notInWar' }),
+    fetchCurrentCwlGroupImpl: async () => ({ state: 'notInWar', rounds: [] }),
+    fetchClanWarLogImpl: async () => ({ items: [] })
+  });
+
+  await signupClashRoster({
+    playerTag: '#AAA111',
+    clanTag: '#CLAN1',
+    guildId: 'guild-1',
+    userId: 'discord-user-1',
+    username: 'Allen',
+    note: 'CWL evenings',
+    storePath,
+    now: new Date('2026-07-01T00:05:00.000Z'),
+    fetchPlayerImpl: async (tag) => player(tag, 5700, { name: 'Alpha', donations: 200 })
+  });
+
+  const store = await readClashHistoryStore(storePath);
+  const text = buildClashRosterExportText(store, {
+    clanTag: '#CLAN1',
+    guildId: 'guild-1'
+  });
+
+  assert.match(text, /Mave \(#CLAN1\) export/);
+  assert.match(text, /Signups: 1\. Missing: 1\. Clan pool: 2\./);
+  assert.match(text, /Alpha \(#AAA111\) - Allen - TH 16 \| 5,700 trophies \| 900 war stars \| CWL evenings/);
+  assert.match(text, /Bravo \(#BBB222\) - TH 15 \| 5,200 trophies/);
+  assert.match(text, /\/roster export format:CSV/);
+
+  const csv = buildClashRosterExportText(store, {
+    clanTag: '#CLAN1',
+    guildId: 'guild-1',
+    format: 'csv'
+  });
+
+  assert.match(csv, /Mave \(#CLAN1\) CSV export/);
+  assert.match(csv, /```csv/);
+  assert.match(csv, /section,rank,player,tag,discord,townHall,trophies,warStars,heroLevels,snapshots,warRows,note/);
+  assert.match(csv, /signed,1,Alpha,#AAA111,Allen,16,5700,900,95,1,0,CWL evenings/);
+  assert.match(csv, /missing,1,Bravo,#BBB222,,15,5200,,,0,0,/);
 });
 
 test('buildClashWarStatsText summarizes clan war rows and attack-level details', async (t) => {

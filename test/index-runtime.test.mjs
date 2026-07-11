@@ -124,14 +124,17 @@ test('Discord Codex runtime answers simple queue status without spawning a worke
   );
 });
 
-test('roster runtime handles signup and status subcommands', async () => {
+test('roster runtime handles signup, status, and export subcommands', async () => {
   const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
 
   assert.match(source, /subcommand === 'signup'/);
   assert.match(source, /subcommand === 'status'/);
+  assert.match(source, /subcommand === 'export'/);
   assert.match(source, /signupClashRoster/);
   assert.match(source, /buildClashRosterStatusText/);
+  assert.match(source, /buildClashRosterExportText/);
   assert.match(source, /interaction\.options\.getString\('player', true\)/);
+  assert.match(source, /interaction\.options\.getString\('format'\) \|\| 'text'/);
 });
 
 test('config runtime handles default clan setup and status', async () => {

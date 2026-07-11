@@ -488,6 +488,14 @@ function clashProductReplyHasRequiredStructure(text) {
   return requirements.every((pattern) => pattern.test(normalized));
 }
 
+function hasStaleRosterCommandSuggestion(text) {
+  const normalized = normalizedReplyForGate(text);
+  if (!/\/(?:roster\s+(?:enroll|build)|signup\s+player)\b/i.test(normalized)) {
+    return false;
+  }
+  return !/\b(?:stale|non-?existent|does not exist|do not use|do not invent|old example|wrong command|replaced by)\b/i.test(normalized);
+}
+
 export function clashProductReplyGateFailure(codexMessage, job = {}) {
   if (!activeRequestNeedsClashProductDiscovery(job)) {
     return '';
@@ -496,6 +504,10 @@ export function clashProductReplyGateFailure(codexMessage, job = {}) {
   const normalized = normalizedReplyForGate(codexMessage);
   if (!normalized) {
     return 'empty Clash product-discovery response';
+  }
+
+  if (hasStaleRosterCommandSuggestion(codexMessage)) {
+    return 'stale Clash roster command suggestion';
   }
 
   if (clashProductReplyHasRequiredStructure(codexMessage)) {
@@ -1408,7 +1420,7 @@ function annotateKnownStaleMemoryText(text, row = {}) {
     .replace(/\/signup\s+player\b/gi, '[stale signup-player]');
 
   return [
-    'Stale prior answer warning: this old assistant message mentioned roster command names that do not exist now. Current source uses /config clan set, /config clan status, /link player, /link status, /link remove, /track clan, /roster plan, /roster signup, and /roster status unless a future run implements more.',
+    'Stale prior answer warning: this old assistant message mentioned roster command names that do not exist now. Current source uses /config clan set, /config clan status, /link player, /link status, /link remove, /track clan, /roster plan, /roster signup, /roster status, and /roster export unless a future run implements more.',
     annotated
   ].join('\n');
 }
@@ -1910,7 +1922,7 @@ function promptHeader(job) {
     '- For Clash product-discovery final answers, use these exact labels unless there is a real blocker: I found the gap, What I learned, Data reality, Built now, Data model, Try, What it shows, Still missing. If those sections are missing, the wrapper treats the answer as incomplete.',
     '- If the user asks to start collecting or create the same data structure, update storage/collector/docs/tests when feasible and prefer the next missing user-visible command. Backend-only work is incomplete unless a real blocker prevents a command; say that blocker plainly.',
     '- If recent Discord context or worker history shows the user complained about skipped plan/demo, half-done Clash work, or no commands added, audit the prior miss first and fix the process/docs/code path that allowed it.',
-    '- The current Clash setup and data entry points are /config clan set, /config clan status, /link player, /link status, /link remove, /track player, /track clan, and /track status backed by /shared/clash-history.json. /history player, /roster plan, /roster signup, /roster status, /warstats, /activity, and /summary are the first reporting/enrollment surfaces on that store. Future richer roster/player pages, exports, reminders, and deeper war/activity pages should build from the same store before adding parallel state.',
+    '- The current Clash setup and data entry points are /config clan set, /config clan status, /link player, /link status, /link remove, /track player, /track clan, and /track status backed by /shared/clash-history.json. /history player, /roster plan, /roster signup, /roster status, /roster export, /warstats, /activity, and /summary are the first reporting/enrollment surfaces on that store. Future richer roster/player pages, reminders, and deeper war/activity pages should build from the same store before adding parallel state.',
     '- Use actual command names from src/commands.mjs and src/index.mjs. Do not invent roster names such as /roster enroll or /roster build unless you are also implementing and registering them in this run.',
     '- When a prior answer promised a command name that does not exist, correct the user-visible plan to the commands that actually exist and build the next missing command instead of repeating the stale promise.',
     '- If the user asks for a command family such as roster, history, warstats, activity, track, or CWL, update slash command registration plus runtime handling or give a clear phased command plan when one run cannot safely build all of it.',

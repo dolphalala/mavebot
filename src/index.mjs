@@ -40,6 +40,7 @@ import {
   buildClashGuildConfigText,
   buildClashLinkStatusText,
   buildClashPlayerHistoryText,
+  buildClashRosterExportText,
   buildClashRosterPlanText,
   buildClashRosterStatusText,
   buildClashSummaryText,
@@ -2609,6 +2610,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const text = buildClashRosterStatusText(store, {
           clanTag: normalizedClanTag,
           guildId: interaction.guildId
+        });
+
+        await interaction.editReply(text);
+        return;
+      }
+
+      if (subcommand === 'export') {
+        const clan = interaction.options.getString('clan');
+        const format = interaction.options.getString('format') || 'text';
+        const normalizedClanTag = clan ? normalizeClanTag(clan) : null;
+        const store = await readClashHistoryStore(clashHistoryStorePath());
+        const text = buildClashRosterExportText(store, {
+          clanTag: normalizedClanTag,
+          guildId: interaction.guildId,
+          format
         });
 
         await interaction.editReply(text);

@@ -136,6 +136,9 @@ long-lived server state.
   `/roster status clan:<tag>` read/write roster enrollment under
   `/shared/clash-history.json` so leaders can see signed players, missing clan
   members, notes, and data-readiness warnings.
+- `/roster export clan:<tag> format:<text|csv>` reads the same roster store and
+  gives leaders readable or copyable CSV rows for signed players and missing
+  clan members.
 - `/warstats clan:<tag>`, `/activity clan:<tag>`, and
   `/summary clan:<tag>` now read from `/shared/clash-history.json` for the
   first ClashKing/ClashPerk-style operations views: war/CWL rows, attack-level
@@ -156,7 +159,7 @@ long-lived server state.
 - Keep the GitHub repository synchronized with live server changes so worker
   jobs and server auto-deploys use the same code.
 - Continue improving Discord commands for Clash of Clans workflows, especially
-  richer roster pages/buttons, exports, reminders, richer war/CWL detail, and
+  richer roster pages/buttons, reminders, richer war/CWL detail, and
   database-backed clan operations.
 - Keep broad Clash product asks from collapsing into tiny replies. A request
   like "research how ClashKing and ClashPerk work and create the same data
@@ -165,9 +168,9 @@ long-lived server state.
 - The current source of truth for Clash setup and roster command names includes
   `/config clan set`, `/config clan status`, `/link player`, `/link status`,
   `/link remove`, `/track clan`, `/roster plan`, `/roster signup`, and
-  `/roster status`. Older Discord replies mentioned `/roster enroll` and
-  `/roster build`; treat those as stale examples unless a future run actually
-  implements and registers them.
+  `/roster status`, and `/roster export`. Older Discord replies mentioned
+  `/roster enroll` and `/roster build`; treat those as stale examples unless a
+  future run actually implements and registers them.
 - Keep Discord file/screenshot intake reliable: attachments should be
   downloaded to `/shared/codex-worker/context/discord-files/` and supported
   images should be passed to `codex exec` with `--image`.
