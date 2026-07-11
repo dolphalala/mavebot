@@ -4,6 +4,7 @@ import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  buildClashPlayerHistoryText,
   readClashHistoryStore,
   recordClashPlayerSnapshot,
   trackClashHistoryClan,
@@ -228,6 +229,72 @@ test('trackClashHistoryClan seeds clan, members, and CWL war tracking', async (t
   assert.ok(result.store.tracked.players['#AAA111']);
   assert.ok(result.store.tracked.players['#BBB222']);
   assert.ok(result.store.tracked.wars['#WAR123']);
+});
+
+test('buildClashPlayerHistoryText explains current stats and collected deltas', async (t) => {
+  const storePath = await tempStore(t);
+  const first = await recordClashPlayerSnapshot(player('#AAA111', 5600), {
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    source: 'lookup'
+  });
+  const second = await recordClashPlayerSnapshot(
+    player('#AAA111', 5632, { donations: 130, donationsReceived: 90 }),
+    {
+      storePath,
+      now: new Date('2026-07-01T00:10:00.000Z'),
+      source: 'lookup'
+    }
+  );
+
+  const text = buildClashPlayerHistoryText(second.record, {
+    tracked: second.store.tracked.players['#AAA111']
+  });
+
+  assert.match(text, /Player #AAA111 \(#AAA111\) history/);
+  assert.match(text, /2 snapshots/);
+  assert.match(text, /Trophies: 5,632 \|\s+\+32 since last/);
+  assert.match(text, /Donations: 130 \|\s+\+30 since last/);
+  assert.match(text, /Mave \(#CLAN1\)/);
+  assert.match(text, /No collected war\/CWL attack rows/);
+  assert.equal(first.record.tag, '#AAA111');
+});
+
+test('buildClashPlayerHistoryText summarizes collected war rows', async (t) => {
+  const storePath = await tempStore(t);
+
+  const clanTick = await trackNextClashHistorySubject({
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    configuredClanTags: ['#CLAN1'],
+    configuredPlayerTags: [],
+    fetchClanImpl: async () => clan(),
+    fetchCurrentWarImpl: async () => ({ state: 'notInWar' }),
+    fetchCurrentCwlGroupImpl: async () => cwlGroup(),
+    fetchClanWarLogImpl: async () => ({ items: [] })
+  });
+  assert.equal(clanTick.type, 'clan');
+
+  await trackNextClashHistorySubject({
+    storePath,
+    now: new Date('2026-07-01T00:00:01.000Z'),
+    configuredClanTags: ['#CLAN1'],
+    configuredPlayerTags: [],
+    fetchCwlWarImpl: async () => war()
+  });
+  await recordClashPlayerSnapshot(player('#AAA111', 5610), {
+    storePath,
+    now: new Date('2026-07-01T00:00:02.000Z'),
+    source: 'history'
+  });
+  const store = await readClashHistoryStore(storePath);
+  const text = buildClashPlayerHistoryText(store.players['#AAA111'], {
+    tracked: store.tracked.players['#AAA111']
+  });
+
+  assert.match(text, /1 war\/CWL row collected/);
+  assert.match(text, /Attacks: 1, stars: 3, triples: 1, missed: 0/);
+  assert.match(text, /Defenses seen: 1/);
 });
 
 test('trackNextClashHistorySubject rotates clan, CWL war, and player work', async (t) => {

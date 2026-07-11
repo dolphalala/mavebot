@@ -120,6 +120,32 @@ test('track command exposes player, clan, and status subcommands', () => {
   });
 });
 
+test('history command exposes player history lookup', () => {
+  const history = commands.find((command) => command.name === 'history');
+
+  assert.ok(history);
+  assert.match(history.description, /collected Clash history/i);
+  assert.deepEqual(history.integration_types, [0]);
+  assert.deepEqual(history.contexts, [0]);
+  assert.deepEqual(history.options, [
+    {
+      name: 'player',
+      description: 'Show trophy, donation, clan, and war history for a player.',
+      type: ApplicationCommandOptionType.Subcommand,
+      options: [
+        {
+          name: 'tag',
+          description: 'Player tag, with or without #.',
+          type: ApplicationCommandOptionType.String,
+          required: true,
+          min_length: 3,
+          max_length: 20
+        }
+      ]
+    }
+  ]);
+});
+
 test('pictionary command is guild-install only and allows round settings', () => {
   const pictionary = commands.find((command) => command.name === 'pictionary');
 

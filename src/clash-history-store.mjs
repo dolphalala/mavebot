@@ -835,6 +835,130 @@ export async function trackClashHistoryClan(
   });
 }
 
+function numberText(value) {
+  return Number.isFinite(value) ? value.toLocaleString('en-US') : '?';
+}
+
+function signedDeltaText(value) {
+  if (!Number.isFinite(value) || value === 0) {
+    return '0';
+  }
+  return value > 0 ? `+${numberText(value)}` : numberText(value);
+}
+
+function dateText(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'unknown';
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+function valueChangeText(label, latest, previous, first) {
+  const value = latest?.[label.key];
+  if (!Number.isFinite(value)) {
+    return `${label.name}: ?`;
+  }
+  const parts = [`${label.name}: ${numberText(value)}`];
+  if (previous && Number.isFinite(previous[label.key])) {
+    parts.push(`${signedDeltaText(value - previous[label.key])} since last`);
+  }
+  if (first && first !== previous && Number.isFinite(first[label.key])) {
+    parts.push(`${signedDeltaText(value - first[label.key])} since first`);
+  }
+  return parts.join(' | ');
+}
+
+function summarizeWarStats(record) {
+  const rows = Object.values(record?.warStats || {});
+  if (!rows.length) {
+    return 'No collected war/CWL attack rows for this player yet.';
+  }
+  const attacks = rows.flatMap((row) => row.attacks || []);
+  const defenses = rows.flatMap((row) => row.defenses || []);
+  const missed = rows.reduce(
+    (total, row) => total + (Number.isFinite(row.missedAttacks) ? row.missedAttacks : 0),
+    0
+  );
+  const stars = attacks.reduce(
+    (total, attack) => total + (Number.isFinite(attack.stars) ? attack.stars : 0),
+    0
+  );
+  const triples = attacks.filter((attack) => attack.stars === 3).length;
+  const latest = rows
+    .slice()
+    .sort((a, b) => String(b.endTime || b.startTime || '').localeCompare(String(a.endTime || a.startTime || '')))
+    .at(0);
+  return [
+    `${rows.length} war/CWL row${rows.length === 1 ? '' : 's'} collected.`,
+    `Attacks: ${attacks.length}, stars: ${stars}, triples: ${triples}, missed: ${missed}.`,
+    `Defenses seen: ${defenses.length}.`,
+    latest ? `Latest: ${latest.warType || 'war'} vs ${latest.opponentTag || 'unknown'} (${latest.state || 'unknown'}).` : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+export function buildClashPlayerHistoryText(record, { tracked = null } = {}) {
+  const current = record?.current || null;
+  if (!current) {
+    return null;
+  }
+  const snapshots = Array.isArray(record.snapshots) ? record.snapshots : [];
+  const latest = snapshots.at(-1) || current;
+  const previous = snapshots.length > 1 ? snapshots.at(-2) : null;
+  const first = snapshots[0] || current;
+  const clanRows = Array.isArray(record.clanHistory) ? record.clanHistory.slice(-4) : [];
+  const lines = [
+    `**${current.name || record.name || 'Player'} (${current.tag || record.tag}) history**`,
+    `Tracking: ${snapshots.length} snapshot${snapshots.length === 1 ? '' : 's'} since ${dateText(record.firstSeenAt || first.at)}. History starts when mavebot first tracks the player.`
+  ];
+
+  if (tracked?.lastCheckedAt || tracked?.nextDueAt) {
+    lines.push(
+      `Collector: last checked ${dateText(tracked.lastCheckedAt)}, next due ${dateText(tracked.nextDueAt)}.`
+    );
+  }
+
+  lines.push(
+    '',
+    '**Current**',
+    `TH ${numberText(current.townHallLevel)} | XP ${numberText(current.expLevel)} | ${current.league?.name || 'Unranked'}`,
+    `Trophies ${numberText(current.trophies)} | Best ${numberText(current.bestTrophies)} | War stars ${numberText(current.warStars)}`,
+    `Donated ${numberText(current.donations)} | Received ${numberText(current.donationsReceived)} | Attacks won ${numberText(current.attackWins)} | Defenses won ${numberText(current.defenseWins)}`
+  );
+
+  if (previous || first !== latest) {
+    lines.push(
+      '',
+      '**Changes**',
+      valueChangeText({ key: 'trophies', name: 'Trophies' }, latest, previous, first),
+      valueChangeText({ key: 'donations', name: 'Donations' }, latest, previous, first),
+      valueChangeText({ key: 'donationsReceived', name: 'Received' }, latest, previous, first),
+      valueChangeText({ key: 'warStars', name: 'War stars' }, latest, previous, first)
+    );
+  } else {
+    lines.push('', '**Changes**', 'Only one snapshot exists so far. The useful deltas appear after more scheduled checks.');
+  }
+
+  lines.push('', '**Clan history**');
+  if (clanRows.length) {
+    lines.push(
+      ...clanRows.map(
+        (row) =>
+          `${row.clanName || row.clanTag || 'No clan'} (${row.clanTag || 'unknown'}) ${dateText(row.firstSeenAt)} -> ${dateText(row.lastSeenAt)}`
+      )
+    );
+  } else {
+    lines.push('No clan movement collected yet.');
+  }
+
+  lines.push('', '**War/CWL**', summarizeWarStats(record));
+
+  const text = lines.join('\n');
+  return text.length > 1900 ? `${text.slice(0, 1880)}\n...` : text;
+}
+
 function isDue(record, now) {
   if (record?.completedAt) {
     return false;

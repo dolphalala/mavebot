@@ -36,7 +36,8 @@ It is a map, not a replacement for reading the current source.
   clan snapshots, CWL groups, full war rows when available, summary public
   war-log rows, and derived per-player war stats under
   `/shared/clash-history.json`; `/track` uses this module to seed player/clan
-  tracking before scheduled polling deepens the history.
+  tracking before scheduled polling deepens the history, and `/history player`
+  formats the first user-facing report from that store.
 - `src/moderation-store.mjs`: `/elder`, `/mute`, and `/bench` durable vote and
   permanent-record storage.
 - `src/pictionary-game.mjs`: `/pictionary` topic pool, difficulty settings,

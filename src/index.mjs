@@ -35,6 +35,7 @@ import {
   DEFAULT_CLASH_HISTORY_INTERVAL_MS,
   DEFAULT_CLASH_HISTORY_PLAYER_INTERVAL_MS,
   DEFAULT_CLASH_HISTORY_WAR_INTERVAL_MS,
+  buildClashPlayerHistoryText,
   clashHistoryStorePath,
   readClashHistoryStore,
   recordClashPlayerSnapshot,
@@ -2336,6 +2337,58 @@ client.on(Events.InteractionCreate, async (interaction) => {
           : 'I could not update Clash tracking right now.';
       await interaction.editReply(message);
       console.error('Clash tracking command failed:', error);
+    }
+    return;
+  }
+
+  if (interaction.commandName === 'history') {
+    const subcommand = interaction.options.getSubcommand(true);
+    await interaction.deferReply();
+
+    try {
+      if (subcommand !== 'player') {
+        await interaction.editReply('I do not know that `/history` subcommand yet.');
+        return;
+      }
+
+      const tag = interaction.options.getString('tag', true);
+      const normalizedTag = normalizePlayerTag(tag);
+      let store = await readClashHistoryStore(clashHistoryStorePath());
+      let record = store.players?.[normalizedTag] || null;
+      let seeded = false;
+
+      if (!record?.current) {
+        const result = await trackClashHistoryPlayer(normalizedTag, {
+          storePath: clashHistoryStorePath(),
+          source: `discord:${interaction.user.id}`,
+          playerIntervalMs: clashHistoryPlayerIntervalMs
+        });
+        store = result.store;
+        record = result.record;
+        seeded = true;
+      }
+
+      const text = buildClashPlayerHistoryText(record, {
+        tracked: store.tracked?.players?.[normalizedTag] || null
+      });
+
+      await interaction.editReply(
+        [
+          seeded
+            ? 'I started tracking this player now, so older detailed history is not available yet.'
+            : null,
+          text || 'I do not have history for that player yet.'
+        ]
+          .filter(Boolean)
+          .join('\n\n')
+      );
+    } catch (error) {
+      const message =
+        error instanceof CocApiError
+          ? error.message
+          : 'I could not read Clash history for that player right now.';
+      await interaction.editReply(message);
+      console.error('Clash history command failed:', error);
     }
     return;
   }

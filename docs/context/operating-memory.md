@@ -22,6 +22,10 @@ workflow.
     ClashKing/ClashPerk-style history snapshot and enroll the subject in
     `/shared/clash-history.json`; `/track status` summarizes tracked players,
     clans, wars/CWL rows, snapshots, and scheduler state.
+  - `/history player:<tag>`: shows collected player history from
+    `/shared/clash-history.json`, including current stats, snapshot deltas,
+    clan movement, and collected war/CWL rows. If the player is not tracked
+    yet, it seeds the first snapshot and explains that history starts now.
   - `/pictionary`: starts a Clash of Clans picture guessing game in the current
     channel.
   - `/elder`: lets a server admin or existing elder grant elder status to a
@@ -86,6 +90,9 @@ workflow.
 - `/track` is the user-visible entry point for this store. Future roster,
   history, activity, and war/CWL commands should read from the same store
   rather than creating parallel tracking files.
+- `/history player` is the first reporting command on top of the store. Future
+  history improvements should add pages/buttons or richer summaries to this
+  command before creating a separate reporting surface.
 
 ## Discord Command Registration
 

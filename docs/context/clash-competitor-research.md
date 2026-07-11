@@ -99,9 +99,9 @@ once:
 - The first slice now exists: `/track player`, `/track clan`, and
   `/track status` enroll records and seed snapshots in
   `/shared/clash-history.json`.
-- Next, add `/history player` for trophy, clan, donation, and Legend deltas
-  from the existing store.
-- Then add `/roster plan` for a read-only CWL planning page from current
+- `/history player` now exists for trophy, clan, donation, current stat, and
+  war/CWL summaries from the existing store.
+- Next, add `/roster plan` for a read-only CWL planning page from current
   tracked members, TH levels, heroes, and manual notes.
 - Add `/roster signup` and `/roster status` once the planning page can explain
   current data quality.

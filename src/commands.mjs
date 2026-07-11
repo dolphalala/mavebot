@@ -98,6 +98,29 @@ export const commands = [
     ]
   },
   {
+    name: 'history',
+    description: 'Shows collected Clash history for a tracked player.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'player',
+        description: 'Show trophy, donation, clan, and war history for a player.',
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: 'tag',
+            description: 'Player tag, with or without #.',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+            min_length: 3,
+            max_length: 20
+          }
+        ]
+      }
+    ]
+  },
+  {
     name: 'pictionary',
     description: 'Starts a Clash of Clans picture guessing game.',
     integration_types: [0],

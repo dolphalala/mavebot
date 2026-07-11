@@ -64,8 +64,10 @@ long-term player/clan tracking commands.
   current user-visible enrollment surface for `/shared/clash-history.json`.
   Use them as the base for future database-backed commands instead of adding
   another tracking store.
+- `/history player:<tag>` is the first user-visible reporting surface for that
+  store. It should be expanded with pages/buttons before adding a competing
+  history command.
 - Useful next command families:
-  - `/history player:<tag>` for trophy, clan, donation, Legend, and war trends.
   - `/roster` commands for setup, signup/enrollment, role notes, TH/hero
     summaries, missing players, bench candidates, generated CWL lineups, and
     status pages.
