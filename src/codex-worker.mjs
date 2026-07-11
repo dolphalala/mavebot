@@ -1802,6 +1802,7 @@ function promptHeader(job) {
     '- ClashKing, ClashPerk, roster, CWL, war history, activity, or "same data structure" requests are product-discovery plus implementation work. Read docs/context/clash-competitor-research.md and docs/context/clash-database-guidance.md, inspect current source, and use public sources when internet is available.',
     '- For Clash competitor-inspired requests, do not answer with only "done", "added the backend", or "live". Include what you learned, what mavebot should build, what changed now, and a concrete demo or next command.',
     '- If the user asks to start collecting or create the same data structure, update storage/collector/docs/tests when feasible. If the safe slice is smaller, name the exact blocker and the next implementation slice.',
+    '- The current Clash data-collection entry point is /track player, /track clan, and /track status backed by /shared/clash-history.json. Future /history, /roster, /warstats, /activity, and /summary work should build from that store before adding parallel state.',
     '- If the user asks for a command family such as roster, history, warstats, activity, track, or CWL, update slash command registration plus runtime handling or give a clear phased command plan when one run cannot safely build all of it.',
     '- Discord command changes must update both src/commands.mjs and src/index.mjs.',
     '- Discord command changes must be verified with tests and command registration/runtime checks whenever the request touches slash commands.',
@@ -1826,7 +1827,7 @@ function promptHeader(job) {
     '',
     'Active request response mode:',
     needsClashProductDiscovery
-      ? '- The active request is Clash product-discovery work. Preserve useful structure: What I learned, What mavebot should build, Data model/commands, Current slice, and Demo/next command. Do not answer with only an acknowledgement or a bare live claim.'
+      ? '- The active request is Clash product-discovery work. Preserve useful structure: What I learned, What mavebot should build, Data model/commands, Current slice, and Demo/next command. Prefer the next missing user-visible command slice over backend-only work. Do not answer with only an acknowledgement or a bare live claim.'
       : needsDetailedAnswer
       ? '- The active request asks for a plan/demo/how-it-works answer. Do not answer with only an acknowledgement. Preserve useful structure in the final answer: a compact plan, a concrete demo/example, and what will happen next.'
       : '- The active request does not explicitly ask for a plan/demo. Keep the final answer compact after handling the work.',

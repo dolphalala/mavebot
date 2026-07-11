@@ -6,6 +6,8 @@ import path from 'node:path';
 import {
   readClashHistoryStore,
   recordClashPlayerSnapshot,
+  trackClashHistoryClan,
+  trackClashHistoryPlayer,
   trackNextClashHistorySubject
 } from '../src/clash-history-store.mjs';
 
@@ -189,6 +191,43 @@ test('recordClashPlayerSnapshot stores current player data and trophy deltas', a
   assert.equal(second.record.snapshots.length, 2);
   assert.equal(second.record.current.heroes[0].name, 'Archer Queen');
   assert.deepEqual(second.store.tracked.players['#AAA111'].sources, ['lookup']);
+});
+
+test('trackClashHistoryPlayer seeds a command-backed player snapshot', async (t) => {
+  const storePath = await tempStore(t);
+
+  const result = await trackClashHistoryPlayer('AAA111', {
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    source: 'discord:user-1',
+    fetchPlayerImpl: async (tag) => player(tag, 5600)
+  });
+
+  assert.equal(result.tag, '#AAA111');
+  assert.equal(result.record.current.trophies, 5600);
+  assert.deepEqual(result.store.tracked.players['#AAA111'].sources, ['discord:user-1']);
+  assert.equal(result.store.tracked.players['#AAA111'].lastError, null);
+});
+
+test('trackClashHistoryClan seeds clan, members, and CWL war tracking', async (t) => {
+  const storePath = await tempStore(t);
+
+  const result = await trackClashHistoryClan('#CLAN1', {
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    source: 'discord:user-1',
+    fetchClanImpl: async () => clan(),
+    fetchCurrentWarImpl: async () => ({ state: 'notInWar' }),
+    fetchCurrentCwlGroupImpl: async () => cwlGroup(),
+    fetchClanWarLogImpl: async () => ({ items: [] })
+  });
+
+  assert.equal(result.tag, '#CLAN1');
+  assert.equal(result.record.current.memberTags.length, 2);
+  assert.deepEqual(result.store.tracked.clans['#CLAN1'].sources, ['discord:user-1']);
+  assert.ok(result.store.tracked.players['#AAA111']);
+  assert.ok(result.store.tracked.players['#BBB222']);
+  assert.ok(result.store.tracked.wars['#WAR123']);
 });
 
 test('trackNextClashHistorySubject rotates clan, CWL war, and player work', async (t) => {

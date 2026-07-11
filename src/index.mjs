@@ -38,7 +38,9 @@ import {
   clashHistoryStorePath,
   readClashHistoryStore,
   recordClashPlayerSnapshot,
-  startClashHistoryCollector
+  startClashHistoryCollector,
+  trackClashHistoryClan,
+  trackClashHistoryPlayer
 } from './clash-history-store.mjs';
 import {
   BENCHED_ROLE_COLOR,
@@ -1623,6 +1625,56 @@ async function rememberClashPlayer(player, source) {
   }
 }
 
+function intervalText(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) {
+    return 'the configured schedule';
+  }
+  const minutes = Math.max(1, Math.round(ms / 60000));
+  if (minutes < 60) {
+    return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+  }
+  const hours = Math.round((minutes / 60) * 10) / 10;
+  return `${hours} hour${hours === 1 ? '' : 's'}`;
+}
+
+function countObjectValues(value) {
+  return value && typeof value === 'object' ? Object.keys(value).length : 0;
+}
+
+function trackedSnapshotCount(records) {
+  return Object.values(records || {}).reduce(
+    (total, record) => total + (Array.isArray(record?.snapshots) ? record.snapshots.length : 0),
+    0
+  );
+}
+
+function trackStatusText(store) {
+  const trackedPlayers = countObjectValues(store.tracked?.players);
+  const trackedClans = countObjectValues(store.tracked?.clans);
+  const trackedWars = countObjectValues(store.tracked?.wars);
+  const playerSnapshots = trackedSnapshotCount(store.players);
+  const clanSnapshots = trackedSnapshotCount(store.clans);
+  const warRecords = countObjectValues(store.wars);
+  const scheduler = store.scheduler || {};
+
+  return [
+    '**Clash tracking status**',
+    `Players: ${trackedPlayers} tracked, ${playerSnapshots} saved snapshot${playerSnapshots === 1 ? '' : 's'}`,
+    `Clans: ${trackedClans} tracked, ${clanSnapshots} saved snapshot${clanSnapshots === 1 ? '' : 's'}`,
+    `Wars/CWL: ${trackedWars} watched, ${warRecords} saved record${warRecords === 1 ? '' : 's'}`,
+    `Schedule: one due subject every ${intervalText(clashHistoryIntervalMs)}; player refresh about every ${intervalText(clashHistoryPlayerIntervalMs)}, clan refresh about every ${intervalText(clashHistoryClanIntervalMs)}, war refresh about every ${intervalText(clashHistoryWarIntervalMs)}.`,
+    `Last collector action: ${scheduler.lastAction || 'not run yet'}.`
+  ].join('\n');
+}
+
+function trackWarningText(warnings = []) {
+  const count = Array.isArray(warnings) ? warnings.length : 0;
+  if (!count) {
+    return '';
+  }
+  return `\nWar/CWL side checks returned ${count} warning${count === 1 ? '' : 's'}; that is normal when there is no active war, CWL is inactive, or the war log is private.`;
+}
+
 function storeLegendsView(view, message) {
   view.message = message;
   legendsViews.set(view.id, view);
@@ -2222,6 +2274,68 @@ client.on(Events.InteractionCreate, async (interaction) => {
           : 'I could not start legends tracking for that player right now.';
       await interaction.editReply(message);
       console.error('Legend tracker command failed:', error);
+    }
+    return;
+  }
+
+  if (interaction.commandName === 'track') {
+    const subcommand = interaction.options.getSubcommand(true);
+    await interaction.deferReply();
+
+    try {
+      if (subcommand === 'status') {
+        const store = await readClashHistoryStore(clashHistoryStorePath());
+        await interaction.editReply(trackStatusText(store));
+        return;
+      }
+
+      const tag = interaction.options.getString('tag', true);
+      const source = `discord:${interaction.user.id}`;
+
+      if (subcommand === 'player') {
+        const result = await trackClashHistoryPlayer(tag, {
+          storePath: clashHistoryStorePath(),
+          source,
+          playerIntervalMs: clashHistoryPlayerIntervalMs
+        });
+        const current = result.record.current || result.snapshot;
+        await interaction.editReply(
+          [
+            `Tracking **${current.name}** (${current.tag}).`,
+            `Seeded the first player snapshot now: TH ${current.townHallLevel || '?'} - ${current.trophies ?? '?'} trophies - ${current.warStars ?? '?'} war stars.`,
+            `mavebot will keep refreshing tracked players about every ${intervalText(clashHistoryPlayerIntervalMs)} when they are due. History starts from this snapshot.`
+          ].join('\n')
+        );
+        return;
+      }
+
+      if (subcommand === 'clan') {
+        const result = await trackClashHistoryClan(tag, {
+          storePath: clashHistoryStorePath(),
+          source,
+          clanIntervalMs: clashHistoryClanIntervalMs
+        });
+        const current = result.record.current || result.snapshot;
+        const memberCount = current.memberTags?.length || 0;
+        await interaction.editReply(
+          [
+            `Tracking **${current.name}** (${current.tag}).`,
+            `Seeded the clan snapshot now: level ${current.level || '?'} - ${memberCount} member${memberCount === 1 ? '' : 's'} - ${current.points ?? '?'} clan trophies.`,
+            `Current members were queued for player history too, and mavebot will keep refreshing tracked clans about every ${intervalText(clashHistoryClanIntervalMs)} when due.${trackWarningText(result.warnings)}`,
+            'History starts from this snapshot; older detailed attacks and trophy movement can only appear if mavebot had already collected them.'
+          ].join('\n')
+        );
+        return;
+      }
+
+      await interaction.editReply('I do not know that `/track` subcommand yet.');
+    } catch (error) {
+      const message =
+        error instanceof CocApiError
+          ? error.message
+          : 'I could not update Clash tracking right now.';
+      await interaction.editReply(message);
+      console.error('Clash tracking command failed:', error);
     }
     return;
   }

@@ -96,16 +96,24 @@ Bad answer patterns to avoid:
 Prefer these incremental slices over trying to build every large-bot feature at
 once:
 
-- Add `/track clan` and `/track player` to enroll records and seed snapshots.
-- Add a poller that stores bounded player/clan snapshots in
+- The first slice now exists: `/track player`, `/track clan`, and
+  `/track status` enroll records and seed snapshots in
   `/shared/clash-history.json`.
-- Add `/history player` for trophy, donation, clan, and Legend deltas.
-- Add `/roster plan` for a read-only CWL planning page from current tracked
-  members, TH levels, heroes, and manual notes.
-- Add `/roster signup` and `/roster status` once setup and storage exist.
-- Add `/warstats clan` after current-war/CWL collection exists.
+- Next, add `/history player` for trophy, clan, donation, and Legend deltas
+  from the existing store.
+- Then add `/roster plan` for a read-only CWL planning page from current
+  tracked members, TH levels, heroes, and manual notes.
+- Add `/roster signup` and `/roster status` once the planning page can explain
+  current data quality.
+- Add `/warstats clan` after current-war/CWL collection has enough real rows to
+  summarize attacks and missed hits without misleading users.
 - Add exports after the data model is stable.
 
 Each slice should leave the Discord user with a working command, a realistic
 demo, or a clear explanation of the exact data that will become useful after
 scheduled snapshots accumulate.
+
+When the user asks for "the same data structure" or "start collecting", first
+check whether `/track` covers the requested enrollment flow. If it does, build
+the next missing visible command from the list above. If it does not, fix
+`/track` before adding deeper reporting.

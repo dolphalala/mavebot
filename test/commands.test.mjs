@@ -72,6 +72,54 @@ test('legends command is guild-install only and requires a player tag option', (
   ]);
 });
 
+test('track command exposes player, clan, and status subcommands', () => {
+  const track = commands.find((command) => command.name === 'track');
+
+  assert.ok(track);
+  assert.match(track.description, /history tracking/i);
+  assert.deepEqual(track.integration_types, [0]);
+  assert.deepEqual(track.contexts, [0]);
+  assert.deepEqual(
+    track.options.map((option) => option.name),
+    ['player', 'clan', 'status']
+  );
+  assert.deepEqual(track.options[0], {
+    name: 'player',
+    description: 'Track a player and seed their first history snapshot.',
+    type: ApplicationCommandOptionType.Subcommand,
+    options: [
+      {
+        name: 'tag',
+        description: 'Player tag, with or without #.',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        min_length: 3,
+        max_length: 20
+      }
+    ]
+  });
+  assert.deepEqual(track.options[1], {
+    name: 'clan',
+    description: 'Track a clan, seed its member list, and watch war/CWL data.',
+    type: ApplicationCommandOptionType.Subcommand,
+    options: [
+      {
+        name: 'tag',
+        description: 'Clan tag, with or without #.',
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        min_length: 3,
+        max_length: 20
+      }
+    ]
+  });
+  assert.deepEqual(track.options[2], {
+    name: 'status',
+    description: 'Show how many Clash players, clans, and wars are tracked.',
+    type: ApplicationCommandOptionType.Subcommand
+  });
+});
+
 test('pictionary command is guild-install only and allows round settings', () => {
   const pictionary = commands.find((command) => command.name === 'pictionary');
 

@@ -55,6 +55,49 @@ export const commands = [
     ]
   },
   {
+    name: 'track',
+    description: 'Starts Clash history tracking for a player or clan.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'player',
+        description: 'Track a player and seed their first history snapshot.',
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: 'tag',
+            description: 'Player tag, with or without #.',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+            min_length: 3,
+            max_length: 20
+          }
+        ]
+      },
+      {
+        name: 'clan',
+        description: 'Track a clan, seed its member list, and watch war/CWL data.',
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: 'tag',
+            description: 'Clan tag, with or without #.',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+            min_length: 3,
+            max_length: 20
+          }
+        ]
+      },
+      {
+        name: 'status',
+        description: 'Show how many Clash players, clans, and wars are tracked.',
+        type: ApplicationCommandOptionType.Subcommand
+      }
+    ]
+  },
+  {
     name: 'pictionary',
     description: 'Starts a Clash of Clans picture guessing game.',
     integration_types: [0],

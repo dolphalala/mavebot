@@ -688,16 +688,17 @@ async function collectPlayer(store, tag, options) {
   const {
     now,
     playerIntervalMs,
+    source = 'collector',
     fetchPlayerImpl = fetchPlayer
   } = options;
   const normalizedTag = normalizePlayerTag(tag);
   const tracked = ensureTrackedSubject(store.tracked.players, normalizedTag, {
-    source: 'collector',
+    source,
     now
   });
   try {
     const player = await fetchPlayerImpl(normalizedTag);
-    const result = recordPlayerSnapshotInStore(store, player, { now, source: 'collector' });
+    const result = recordPlayerSnapshotInStore(store, player, { now, source });
     markTrackedSuccess(tracked, { now, intervalMs: playerIntervalMs });
     return { tracked: true, type: 'player', tag: normalizedTag, ...result };
   } catch (error) {
@@ -710,6 +711,7 @@ async function collectClan(store, tag, options) {
   const {
     now,
     clanIntervalMs,
+    source = 'collector',
     fetchClanImpl = fetchClan,
     fetchCurrentWarImpl = fetchCurrentWar,
     fetchCurrentCwlGroupImpl = fetchCurrentCwlGroup,
@@ -717,12 +719,12 @@ async function collectClan(store, tag, options) {
   } = options;
   const normalizedTag = normalizeClanTag(tag);
   const tracked = ensureTrackedSubject(store.tracked.clans, normalizedTag, {
-    source: 'collector',
+    source,
     now
   });
   try {
     const clan = await fetchClanImpl(normalizedTag);
-    const result = recordClanSnapshotInStore(store, clan, { now, source: 'collector' });
+    const result = recordClanSnapshotInStore(store, clan, { now, source });
     const warnings = [];
     try {
       const currentWar = await fetchCurrentWarImpl(normalizedTag);
@@ -779,6 +781,58 @@ async function collectWar(store, tag, options) {
     markTrackedError(tracked, error, { now, intervalMs: warIntervalMs });
     throw error;
   }
+}
+
+export async function trackClashHistoryPlayer(
+  tag,
+  {
+    storePath = clashHistoryStorePath(),
+    now = new Date(),
+    source = 'command',
+    playerIntervalMs = DEFAULT_CLASH_HISTORY_PLAYER_INTERVAL_MS,
+    fetchPlayerImpl = fetchPlayer
+  } = {}
+) {
+  return withStoreLock(async () => {
+    const store = await readClashHistoryStore(storePath);
+    const result = await collectPlayer(store, tag, {
+      now,
+      source,
+      playerIntervalMs,
+      fetchPlayerImpl
+    });
+    await writeClashHistoryStore(store, storePath);
+    return { store, ...result };
+  });
+}
+
+export async function trackClashHistoryClan(
+  tag,
+  {
+    storePath = clashHistoryStorePath(),
+    now = new Date(),
+    source = 'command',
+    clanIntervalMs = DEFAULT_CLASH_HISTORY_CLAN_INTERVAL_MS,
+    fetchClanImpl = fetchClan,
+    fetchCurrentWarImpl = fetchCurrentWar,
+    fetchCurrentCwlGroupImpl = fetchCurrentCwlGroup,
+    fetchClanWarLogImpl = fetchClanWarLog
+  } = {}
+) {
+  return withStoreLock(async () => {
+    const store = await readClashHistoryStore(storePath);
+    const result = await collectClan(store, tag, {
+      now,
+      source,
+      clanIntervalMs,
+      fetchClanImpl,
+      fetchCurrentWarImpl,
+      fetchCurrentCwlGroupImpl,
+      fetchClanWarLogImpl
+    });
+    await writeClashHistoryStore(store, storePath);
+    return { store, ...result };
+  });
 }
 
 function isDue(record, now) {

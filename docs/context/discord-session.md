@@ -120,6 +120,10 @@ long-lived server state.
   army/equipment data.
 - `/legends player:<tag>` tracks Legend League trophy snapshots in
   `/shared/legends-tracking.json`.
+- `/track player:<tag>`, `/track clan:<tag>`, and `/track status` seed and
+  report the Clash history store at `/shared/clash-history.json`. Future
+  `/history`, `/roster`, `/warstats`, `/activity`, and `/summary` work should
+  build on that store.
 - `/pictionary` is a Clash of Clans picture guessing game using Clash-style
   assets, difficulty settings, chat guesses, and a durable guild leaderboard.
 - `/elder`, `/mute`, and `/bench` use `/shared/elder-votes.json`; Discord role

@@ -500,7 +500,10 @@ test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product disc
   assert.match(prompt, /docs\/context\/clash-competitor-research\.md/);
   assert.match(prompt, /what you learned, what mavebot should build, what changed now, and a concrete demo/i);
   assert.match(prompt, /If the user asks to start collecting or create the same data structure/);
+  assert.match(prompt, /current Clash data-collection entry point is \/track player, \/track clan, and \/track status/);
+  assert.match(prompt, /Future \/history, \/roster, \/warstats, \/activity, and \/summary work should build from that store/);
   assert.match(prompt, /What I learned, What mavebot should build, Data model\/commands, Current slice, and Demo\/next command/);
+  assert.match(prompt, /Prefer the next missing user-visible command slice over backend-only work/);
   assert.match(prompt, /Do not answer with only an acknowledgement or a bare live claim/);
 });
 

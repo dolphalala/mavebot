@@ -60,8 +60,11 @@ long-term player/clan tracking commands.
 ## Command Direction
 
 - `/player` and `/legends` lookups should seed player tracking when safe.
+- `/track player:<tag>`, `/track clan:<tag>`, and `/track status` are the
+  current user-visible enrollment surface for `/shared/clash-history.json`.
+  Use them as the base for future database-backed commands instead of adding
+  another tracking store.
 - Useful next command families:
-  - `/track player:<tag>` and `/track clan:<tag>` for explicit enrollment.
   - `/history player:<tag>` for trophy, clan, donation, Legend, and war trends.
   - `/roster` commands for setup, signup/enrollment, role notes, TH/hero
     summaries, missing players, bench candidates, generated CWL lineups, and

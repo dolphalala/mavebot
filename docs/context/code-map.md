@@ -34,7 +34,9 @@ It is a map, not a replacement for reading the current source.
 - `src/clash-history-store.mjs`: ClashKing/ClashPerk-style polling foundation
   for roster-grade data. Stores tracked players/clans/CWL wars, player and
   clan snapshots, CWL groups, full war rows when available, summary public
-  war-log rows, and derived per-player war stats under `/shared/clash-history.json`.
+  war-log rows, and derived per-player war stats under
+  `/shared/clash-history.json`; `/track` uses this module to seed player/clan
+  tracking before scheduled polling deepens the history.
 - `src/moderation-store.mjs`: `/elder`, `/mute`, and `/bench` durable vote and
   permanent-record storage.
 - `src/pictionary-game.mjs`: `/pictionary` topic pool, difficulty settings,

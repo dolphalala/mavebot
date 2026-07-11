@@ -18,6 +18,10 @@ workflow.
     CoC API token, then presents compact button pages plus a rendered army
     image card with Clash Wiki/Fandom item icons when available.
   - `/legends`: starts or views Legend League trophy tracking for a player tag.
+  - `/track player:<tag>` and `/track clan:<tag>`: seed the first
+    ClashKing/ClashPerk-style history snapshot and enroll the subject in
+    `/shared/clash-history.json`; `/track status` summarizes tracked players,
+    clans, wars/CWL rows, snapshots, and scheduler state.
   - `/pictionary`: starts a Clash of Clans picture guessing game in the current
     channel.
   - `/elder`: lets a server admin or existing elder grant elder status to a
@@ -79,6 +83,9 @@ workflow.
   `CLASH_HISTORY_PLAYER_TAGS`, `CLASH_HISTORY_INTERVAL_MS`,
   `CLASH_HISTORY_PLAYER_INTERVAL_MS`, `CLASH_HISTORY_CLAN_INTERVAL_MS`, and
   `CLASH_HISTORY_WAR_INTERVAL_MS`.
+- `/track` is the user-visible entry point for this store. Future roster,
+  history, activity, and war/CWL commands should read from the same store
+  rather than creating parallel tracking files.
 
 ## Discord Command Registration
 
