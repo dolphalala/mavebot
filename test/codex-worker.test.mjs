@@ -164,6 +164,14 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
       text: 'Discord-only worker smoke test after bridge removal. Do not change files.'
     },
     {
+      at: '2026-07-09T12:28:58.864Z',
+      role: 'user',
+      user: 'codex-desktop-smoke',
+      source: 'discord',
+      channel: '0',
+      text: 'Auth-blocked queue smoke test. Do not change files. Reply OK only.'
+    },
+    {
       at: '2026-07-09T08:40:06.133Z',
       role: 'user',
       user: 'dolphala',
@@ -240,14 +248,15 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.equal(isLowSignalTranscriptRow(rows[8]), true);
   assert.equal(isLowSignalTranscriptRow(rows[9]), true);
   assert.equal(isLowSignalTranscriptRow(rows[10]), true);
-  assert.equal(isLowSignalTranscriptRow(rows[11]), false);
+  assert.equal(isLowSignalTranscriptRow(rows[11]), true);
   assert.equal(isLowSignalTranscriptRow(rows[12]), false);
-  assert.equal(isLowSignalTranscriptRow(rows[13]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[13]), false);
   assert.equal(isLowSignalTranscriptRow(rows[14]), true);
   assert.equal(isLowSignalTranscriptRow(rows[15]), true);
   assert.equal(isLowSignalTranscriptRow(rows[16]), true);
   assert.equal(isLowSignalTranscriptRow(rows[17]), true);
   assert.equal(isLowSignalTranscriptRow(rows[18]), true);
+  assert.equal(isLowSignalTranscriptRow(rows[19]), true);
 
   const snapshot = compactTranscriptRows(rows, {
     recentLimit: 5,
@@ -264,12 +273,13 @@ test('compactTranscriptRows suppresses low-signal smoke rows from prompt memory'
   assert.doesNotMatch(snapshot.recent, /working acknowledgements/);
   assert.doesNotMatch(snapshot.recent, /attached image file/);
   assert.doesNotMatch(snapshot.recent, /Auth smoke test/);
+  assert.doesNotMatch(snapshot.recent, /Auth-blocked queue smoke test/);
   assert.doesNotMatch(snapshot.recent, /Discord-only worker smoke/);
   assert.doesNotMatch(snapshot.recent, /fast path works/);
   assert.doesNotMatch(snapshot.recent, /progress diagnostics smoke/);
   assert.doesNotMatch(snapshot.recent, /Plan was docs-only/);
   assert.doesNotMatch(snapshot.recent, /Discord worker verification is ok/);
-  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 16/);
+  assert.match(snapshot.session, /Low-signal smoke\/verification turns suppressed from prompt memory: 17/);
 });
 
 test('compactTranscriptRows strips worker handoff boilerplate from retained memory', () => {
@@ -399,6 +409,14 @@ test('pruneTranscriptRowsForStorage removes low-signal rows from durable storage
       channel: '1523893930993778698',
       jobId: '1523893930993778698-codex-desktop-parity-123',
       text: 'Confirmed: I can read the attached image file and post a normal Discord channel reply.'
+    },
+    {
+      at: '2026-07-09T12:28:58.864Z',
+      role: 'user',
+      user: 'codex-desktop-smoke',
+      source: 'discord',
+      channel: '0',
+      text: 'Auth-blocked queue smoke test. Do not change files. Reply OK only.'
     },
     {
       at: '2026-07-09T21:34:39.225Z',

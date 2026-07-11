@@ -1272,6 +1272,7 @@ export function isLowSignalTranscriptRow(row) {
   return [
     /worker verification task/,
     /auth smoke test/,
+    /auth-blocked queue smoke test/,
     /discord-only worker smoke test/,
     /live verification only/,
     /live verification only ok/,
