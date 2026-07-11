@@ -464,6 +464,12 @@ export function humanizeWorkerChannelMessage(text) {
   return takeLeadSentences(noBulletDump || firstParagraph);
 }
 
+function hasExplicitNotLiveClaim(text) {
+  return /\b(?:not live yet|not actually live|never actually live|no deployed .*link exists|isn[’']t usable|could not verify .*live|not verified live)\b/i.test(
+    String(text || '')
+  );
+}
+
 function normalizedReplyForGate(text) {
   return stripRoutineReportSections(stripChatLinks(text))
     .replace(/\s+/g, ' ')
@@ -2440,7 +2446,7 @@ export function finalChannelMessage({ codexMessage, checkOk, pushResult, deployR
     if (gateFailure) {
       return truncate(lines.filter(Boolean).join('\n\n'), 1900);
     }
-    if (pushResult.pushed) {
+    if (pushResult.pushed && !hasExplicitNotLiveClaim(codexMessage)) {
       lines.push("It's live now.");
     } else if (!lines.length) {
       lines.push('I checked that. No code changes were needed.');

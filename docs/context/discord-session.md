@@ -101,6 +101,10 @@ long-lived server state.
   drafting a local preview link, but the worker misreported it as a check
   failure because the captured output mentioned tests. Timeout failures should
   say the work is not live and should not present draft local links as usable.
+  The follow-up runner fix also exposed a final-message bug: the wrapper
+  appended "It's live now" for the runner-fix deploy even though the answer said
+  no website link existed. Final replies must not add live suffixes to explicit
+  not-live audit answers.
 
 ## Persistent Product Context
 

@@ -1405,6 +1405,24 @@ test('finalChannelMessage removes premature live claims when deploy is not verif
   );
 });
 
+test('finalChannelMessage does not append live suffix to explicit not-live audit answers', () => {
+  const message = finalChannelMessage({
+    codexMessage: [
+      'Your link is not usable because the website job timed out before it could commit, deploy, or verify.',
+      '',
+      'Right now: no deployed website link exists yet.'
+    ].join('\n'),
+    checkOk: true,
+    pushResult: { pushed: true },
+    deployResult: { matched: true },
+    runtime: { botOk: true },
+    job: { text: 'what happened wheres my link' }
+  });
+
+  assert.match(message, /no deployed website link exists yet/);
+  assert.doesNotMatch(message, /It's live now\./);
+});
+
 test('workerFailureMessage keeps channel failures short and non-secret', () => {
   const message = workerFailureMessage(
     new Error('npm run check exited 1\nSECRET_TOKEN=abc123\nfull stack trace')
