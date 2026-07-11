@@ -11,6 +11,9 @@ long-term player/clan tracking commands.
   time: members, rosters, Legend movement, donations, war/CWL rows, and activity.
 - Keep data useful for Discord users first. Prefer clear commands and compact
   paged output over trying to mirror every large bot feature at once.
+- Broad "make it like ClashKing/ClashPerk" asks require product discovery plus
+  implementation. Read `clash-competitor-research.md`, inspect public sources,
+  then produce a command/data model roadmap and build the safe first slice.
 
 ## Data Reality
 
@@ -33,11 +36,21 @@ long-term player/clan tracking commands.
   initialization, `1000:1000` ownership, and corrupt JSON backup behavior.
 - The current Clash history store is `/shared/clash-history.json`.
 - Use normalized top-level buckets:
+  - `guilds[guildId]` for server-specific config: default clan tags, channel
+    settings, enabled collectors, retention settings, and command preferences.
   - `tracked.players` and `tracked.clans` for enrollment/config.
+  - `links[discordUserId].players[]` for Discord-user-to-player associations
+    once account linking exists.
   - `players[tag].snapshots[]` for point-in-time player state.
   - `clans[tag].snapshots[]` for point-in-time clan state.
+  - `events[]` or per-clan event buckets for derived join/leave, donation,
+    trophy, TH, hero, league, and name-change deltas from consecutive snapshots.
   - `wars[warKey]` for current/CWL war detail when available.
   - `cwlGroups[groupKey]` for CWL group metadata and war tags.
+  - `rosters[rosterId]` for CWL/event roster definitions, signup state,
+    manual notes, player pools, bench state, and generated lineup snapshots.
+  - `leaderboards` or derived views for quick display only; rebuild from source
+    snapshots when possible.
   - Derived summaries for quick command output, rebuilt from snapshots when
     possible instead of duplicating fragile one-off values.
 - Keep records bounded. Add compaction before a store can grow without limit:
@@ -50,12 +63,27 @@ long-term player/clan tracking commands.
 - Useful next command families:
   - `/track player:<tag>` and `/track clan:<tag>` for explicit enrollment.
   - `/history player:<tag>` for trophy, clan, donation, Legend, and war trends.
-  - `/roster` commands for signup/enrollment, role notes, TH/hero summaries,
-    and CWL roster planning.
+  - `/roster` commands for setup, signup/enrollment, role notes, TH/hero
+    summaries, missing players, bench candidates, generated CWL lineups, and
+    status pages.
   - `/warstats` for collected attack/defense results from tracked wars.
   - `/activity` for clan/member movement, donation deltas, and stale accounts.
+  - `/summary` and `/export` commands only after the source data is stable
+    enough to avoid misleading users.
 - Commands that depend on data collected over time should say "tracking starts
   now" when history is not yet available, not imply old data exists.
+
+## Response Standard For Data Requests
+
+For requests about ClashKing/ClashPerk-style data, roster planning, CWL/war
+history, collecting trophies, or "all players we care about", the worker must:
+
+- Explain the API/history reality before promising results.
+- Name the exact store buckets or command handlers it changed.
+- Show a concrete example command and what the first response should look like.
+- If no command was added, say so plainly and provide the next command to build.
+- Never post "backend collector added" without schema, schedule, command usage,
+  and verification.
 
 ## Implementation Rules
 

@@ -49,6 +49,10 @@ long-lived server state.
 - If Allen, Lana, or another user asks for a plan, demo, explanation, design,
   review, screenshot analysis, database model, or "how this works," preserve
   enough structure in the final answer to actually answer it.
+- If Allen asks to research ClashKing/ClashPerk or build a competitor-style
+  Clash feature, treat it as product-discovery plus implementation. Do not
+  answer with a half-line "done" message; include what was learned, command
+  roadmap, data model, current slice, and a demo/next command.
 - For broad multi-part asks, keep an internal checklist and continue through
   obvious next steps. Do not make the user repeat the same instruction.
 - If a worker job contains multiple Discord `contextMessages`, answer every
@@ -103,6 +107,8 @@ long-lived server state.
 - The Discord bot is Clash of Clans focused and uses the official Clash of
   Clans API from server-side environment variables.
 - Clash UI and icon-source guidance lives in `docs/context/clash-ui-guidance.md`.
+- ClashKing/ClashPerk public-source research and product-discovery response
+  rules live in `docs/context/clash-competitor-research.md`.
 - ClashKing/ClashPerk-style database and collector guidance lives in
   `docs/context/clash-database-guidance.md`.
 - `/ping` is no longer a public Discord slash command.
@@ -130,6 +136,10 @@ long-lived server state.
   jobs and server auto-deploys use the same code.
 - Continue improving Discord commands for Clash of Clans workflows, especially
   roster, history, war/CWL, and database-backed clan operations.
+- Keep broad Clash product asks from collapsing into tiny replies. A request
+  like "research how ClashKing and ClashPerk work and create the same data
+  structure" should produce a researched plan plus a concrete code/docs/test
+  slice, or a clear blocker and next slice.
 - Keep Discord file/screenshot intake reliable: attachments should be
   downloaded to `/shared/codex-worker/context/discord-files/` and supported
   images should be passed to `codex exec` with `--image`.

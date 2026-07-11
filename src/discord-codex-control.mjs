@@ -759,6 +759,11 @@ function inferDiscordTurnLanes(text, { hasFiles = false } = {}) {
   add('memory', /\b(?:context|memory|md files?|docs?|remember|forget|summari[sz]e|compact)\b/);
   add('visual', hasFiles || /\b(?:screenshot|image|photo|picture|attachment|attached|see this|look at this)\b/.test(normalized));
   add('domain-research', /\b(?:clashking|clashperk|clash of clans|coc|league|fandom|wiki|icons?|assets?)\b/);
+  add(
+    'product-discovery',
+    /\b(?:clashking|clashperk|same data structure|collect(?:ing)? trophies?|past cwl|past wars?|war stats|cwl stats|tracked players|players we ever care about|clash operations|roster)\b/.test(normalized) &&
+      /\b(?:research|look into|read into|how .*work|same data structure|build|create|plan|design|database|collector|commands?|roadmap|schema|store|poll|schedule|track|tracking|history|stats|roster|war|cwl)\b/.test(normalized)
+  );
 
   return lanes;
 }

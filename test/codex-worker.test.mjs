@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  activeRequestNeedsClashProductDiscovery,
   activeRequestNeedsDetailedAnswer,
   authBlockedJobExtra,
   buildCodexExecArgs,
@@ -457,6 +458,50 @@ test('buildCodexWorkerPrompt marks plan and demo requests for detailed answers',
   assert.match(prompt, /Suggested working lanes/);
   assert.match(prompt, /planning lane/);
   assert.match(prompt, /This looks multi-step/);
+});
+
+test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product discovery', () => {
+  const text = [
+    'research how clashking and clashperk both work in terms of collecting trophies in database',
+    'and past cwl and war stats and create the same data structure so we can start collecting',
+    'on schedule all the necessary data about all players we ever care about'
+  ].join(' ');
+  const job = {
+    source: 'discord',
+    user: 'UACTIVE',
+    username: 'Allen',
+    channel: '1523893930993778698',
+    ts: '2026-07-10T00:00:00.000Z',
+    text,
+    turn: {
+      activeMessageCount: 1,
+      activeUserCount: 1,
+      lanes: ['implementation', 'domain-research', 'product-discovery'],
+      multiStepLikely: true,
+      multiAgentHelpful: true
+    }
+  };
+  const prompt = buildCodexWorkerPrompt({
+    job,
+    summary: '',
+    recent: '',
+    repoInstructions: '',
+    contextIndex: '',
+    runtimeSnapshot: '',
+    operatingMemory: '',
+    repoContextBundle: '## clash-competitor-research.md\nUse competitor research.',
+    workerJobHistory: ''
+  });
+
+  assert.equal(activeRequestNeedsClashProductDiscovery(job), true);
+  assert.equal(activeRequestNeedsDetailedAnswer(job), true);
+  assert.match(prompt, /product-discovery/);
+  assert.match(prompt, /ClashKing, ClashPerk, roster, CWL, war history, activity/);
+  assert.match(prompt, /docs\/context\/clash-competitor-research\.md/);
+  assert.match(prompt, /what you learned, what mavebot should build, what changed now, and a concrete demo/i);
+  assert.match(prompt, /If the user asks to start collecting or create the same data structure/);
+  assert.match(prompt, /What I learned, What mavebot should build, Data model\/commands, Current slice, and Demo\/next command/);
+  assert.match(prompt, /Do not answer with only an acknowledgement or a bare live claim/);
 });
 
 test('buildCodexWorkerPrompt includes recent worker job history for follow-up audits', () => {
@@ -1269,6 +1314,7 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   await writeFile(path.join(dir, 'remote-codex-session.md'), '# Remote Contract\nAct like a session.');
   await writeFile(path.join(dir, 'local-codex-parity.md'), '# Local Parity\nMatch local Codex.');
   await writeFile(path.join(dir, 'code-map.md'), '# Code Map\nUpdate index and commands.');
+  await writeFile(path.join(dir, 'clash-competitor-research.md'), '# Clash Competitors\nBuild real product plans.');
   await writeFile(path.join(dir, 'clash-database-guidance.md'), '# Clash DB\nUse polling snapshots.');
   await writeFile(path.join(dir, 'z-extra.md'), '# Extra\nLess important.');
 
@@ -1284,7 +1330,11 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   );
   assert.ok(
     bundle.indexOf('## code-map.md') < bundle.indexOf('## clash-database-guidance.md'),
-    'source map should be loaded before database guidance'
+    'source map should be loaded before Clash guidance'
+  );
+  assert.ok(
+    bundle.indexOf('## clash-competitor-research.md') < bundle.indexOf('## clash-database-guidance.md'),
+    'competitor research should be loaded before database guidance'
   );
   assert.ok(
     bundle.indexOf('## clash-database-guidance.md') < bundle.indexOf('## clash-ui-guidance.md'),
@@ -1293,6 +1343,8 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   assert.match(bundle, /Act like a session/);
   assert.match(bundle, /Match local Codex/);
   assert.match(bundle, /Update index and commands/);
+  assert.match(bundle, /## clash-competitor-research\.md/);
+  assert.match(bundle, /Build real product plans/);
   assert.match(bundle, /## clash-ui-guidance\.md/);
   assert.match(bundle, /## clash-database-guidance\.md/);
   assert.match(bundle, /Use icon cards/);

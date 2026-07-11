@@ -119,7 +119,14 @@ command.
   Discord interaction timeout behavior.
 - For Clash of Clans features, use the official CoC API for data, documented
   repeatable icon sources for imagery, and
-  `docs/context/clash-database-guidance.md` for polling/database design.
+  `docs/context/clash-competitor-research.md` plus
+  `docs/context/clash-database-guidance.md` for competitor-inspired
+  command/data design.
+- If the active request mentions ClashKing, ClashPerk, "same data structure",
+  roster/CWL planning, war stats, or long-term collection, treat it as product
+  discovery as well as implementation. Include what was learned, the command
+  roadmap, the data model, the current code/docs slice, and a demo or exact
+  next command.
 - Prefer small, focused edits that fit existing project patterns.
 - Run `npm run check` after app/code/config changes. Pure markdown or
   `docs/context/` memory-only edits may skip checks, and no-change

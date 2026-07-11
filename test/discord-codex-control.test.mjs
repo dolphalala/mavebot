@@ -706,6 +706,31 @@ test('analyzeDiscordCodexTurn summarizes lanes and multi-step shape', () => {
   assert.ok(turn.lanes.includes('memory'));
 });
 
+test('analyzeDiscordCodexTurn classifies ClashKing and ClashPerk data asks as product discovery', () => {
+  const rows = [
+    buildDiscordMessageRow({
+      id: 'm1',
+      channelId: '1523893930993778698',
+      guildId: 'guild-1',
+      createdTimestamp: Date.parse('2026-07-10T10:00:00.000Z'),
+      content: [
+        'research how clashking and clashperk both work in terms of collecting trophies in database',
+        'and past cwl and war stats and create the same data structure so we can start collecting',
+        'on schedule all the necessary data about all players we ever care about'
+      ].join(' '),
+      author: { id: 'allen', username: 'Allen', bot: false }
+    })
+  ];
+  const turn = analyzeDiscordCodexTurn(rows);
+
+  assert.deepEqual(turn.activeUsers, ['Allen']);
+  assert.ok(turn.lanes.includes('implementation'));
+  assert.ok(turn.lanes.includes('domain-research'));
+  assert.ok(turn.lanes.includes('product-discovery'));
+  assert.equal(turn.multiStepLikely, true);
+  assert.equal(turn.multiAgentHelpful, true);
+});
+
 test('discordImmediateStatusReplyText only fast-paths short connectivity checks', () => {
   assert.equal(discordImmediateStatusKind('hello is this working now'), 'connectivity');
   assert.equal(discordImmediateStatusKind('test is this working?'), 'connectivity');

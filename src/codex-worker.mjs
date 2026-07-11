@@ -142,6 +142,7 @@ const repoContextPriority = [
   'remote-codex-session.md',
   'local-codex-parity.md',
   'code-map.md',
+  'clash-competitor-research.md',
   'clash-database-guidance.md',
   'clash-ui-guidance.md'
 ];
@@ -267,6 +268,36 @@ function isMalformedLeadSentence(sentence) {
   return /^[\w.-]+`\s+\w/i.test(text);
 }
 
+function jobTextForDetailedAnalysis(job = {}) {
+  const contextMessages = Array.isArray(job?.contextMessages) ? job.contextMessages : [];
+  const nearbyContextMessages = Array.isArray(job?.nearbyContextMessages)
+    ? job.nearbyContextMessages
+    : [];
+  const contextText = contextMessages.map((row) => row?.text || '').join('\n');
+  const nearbyContextText = nearbyContextMessages.map((row) => row?.text || '').join('\n');
+  return `${String(job?.text || '')}\n${contextText}\n${String(job?.nearbyText || '')}\n${nearbyContextText}`.toLowerCase();
+}
+
+export function activeRequestNeedsClashProductDiscovery(job = {}) {
+  const text = jobTextForDetailedAnalysis(job);
+  const productMarkers = [
+    /\bclashking\b/,
+    /\bclashperk\b/,
+    /\bcompetitor\b.*\bclash\b/,
+    /\bsame data structure\b/,
+    /\bcollect(?:ing)? trophies?\b/,
+    /\bpast (?:cwl|wars?|war)\b/,
+    /\b(?:cwl|war) stats\b/,
+    /\btracked players\b/,
+    /\bplayers we ever care about\b/,
+    /\broster\b.*\b(?:cwl|signup|plan|manage|database|collector|history|war|stats)\b/,
+    /\b(?:build|create|design|research|look into|read into)\b.*\b(?:roster|history|activity|warstats|cwl|collector|database)\b/
+  ];
+  const actionMarker =
+    /\b(?:research|look into|read into|how .*work|build|create|same data structure|database|collector|plan|demo|commands?|roadmap|schema|store|poll|schedule|track|tracking|history)\b/;
+  return productMarkers.some((pattern) => pattern.test(text)) && actionMarker.test(text);
+}
+
 export function activeRequestNeedsDetailedAnswer(job = {}) {
   const contextMessages = Array.isArray(job?.contextMessages) ? job.contextMessages : [];
   if (job?.source === 'discord' && contextMessages.length > 1) {
@@ -275,11 +306,11 @@ export function activeRequestNeedsDetailedAnswer(job = {}) {
   if (Array.isArray(job?.files) && job.files.length > 0) {
     return true;
   }
-  const contextText = Array.isArray(job?.contextMessages)
-    ? job.contextMessages.map((row) => row?.text || '').join('\n')
-    : '';
+  if (activeRequestNeedsClashProductDiscovery(job)) {
+    return true;
+  }
   const activeText = String(job?.text || '').toLowerCase();
-  const text = `${activeText}\n${contextText}`.toLowerCase();
+  const text = jobTextForDetailedAnalysis(job);
   const questionCount = (text.match(/\?/g) || []).length;
   if (questionCount > 1) {
     return true;
@@ -293,6 +324,8 @@ export function activeRequestNeedsDetailedAnswer(job = {}) {
     /\bscreenshot\b/,
     /\bimage\b/,
     /\bcompare\b/,
+    /\bresearch\b/,
+    /\broadmap\b/,
     /\breview\b/,
     /\bwhat (?:are|were) you doing\b/,
     /\bwhat (?:did|changed|happened|went wrong)\b/,
@@ -309,6 +342,17 @@ export function activeRequestNeedsDetailedAnswer(job = {}) {
     /\bdatabase\b/,
     /\bcollector\b/,
     /\broster\b/,
+    /\bclashking\b/,
+    /\bclashperk\b/,
+    /\bcompetitor\b/,
+    /\bsame data structure\b/,
+    /\bpast cwl\b/,
+    /\bpast wars?\b/,
+    /\bwar stats\b/,
+    /\bcwl stats\b/,
+    /\bcollect(?:ing)? trophies?\b/,
+    /\btracked players\b/,
+    /\bplayers we ever care about\b/,
     /\binvestigate\b/,
     /\banaly[sz]e\b/,
     /\bassess\b/,
@@ -1250,7 +1294,7 @@ function shouldPreserveDetailedMemoryText(text) {
     return false;
   }
   return (
-    /(?:^|\n)\s*(?:Plan|Demo|Strategy|Architecture|What changed|How it works|Next steps|Database|Collector)\s*:/i.test(cleaned) ||
+    /(?:^|\n)\s*(?:Plan|Demo|Strategy|Architecture|Research|Roadmap|What I learned|What changed|What mavebot should build|How it works|Next steps|Command plan|Data model|Database|Collector|Sources|Current slice)\s*:/i.test(cleaned) ||
     (/\b(?:plan|demo|strategy|architecture|database|collector|roster|legends|clashking|clashperk)\b/i.test(cleaned) &&
       /\n\s*[-*]\s+/.test(cleaned))
   );
@@ -1327,7 +1371,7 @@ export function compactTranscriptRows(rows, options = {}) {
     '',
     '- Discord #codex is the user-facing control surface for the mavebot coding session.',
     '- docs/context/discord-session.md is the canonical remote session memory file.',
-    '- Worker jobs should read repo docs/context/operating-memory.md, docs/context/discord-session.md, docs/context/remote-codex-session.md, docs/context/local-codex-parity.md, docs/context/clash-database-guidance.md, and relevant docs/context/*.md before acting.',
+    '- Worker jobs should read repo docs/context/operating-memory.md, docs/context/discord-session.md, docs/context/remote-codex-session.md, docs/context/local-codex-parity.md, docs/context/clash-competitor-research.md, docs/context/clash-database-guidance.md, and relevant docs/context/*.md before acting.',
     '- Code changes should be tested, committed, pushed to main, then verified on the server.',
     '- Final answers should read like normal mavebot chat, not CI logs.',
     '',
@@ -1681,7 +1725,8 @@ function formatActiveTurnWorkingGuidance(turn = {}) {
     planning: 'planning lane: answer design/how-it-works questions with a concrete plan or example, not only code',
     memory: 'memory/docs lane: update or compact docs/context when durable behavior or preferences changed',
     visual: 'visual lane: inspect attached or nearby images before reasoning about screenshots or UI examples',
-    'domain-research': 'domain lane: use durable Clash guidance and reputable sources before adding game-specific behavior'
+    'domain-research': 'domain lane: use durable Clash guidance and reputable sources before adding game-specific behavior',
+    'product-discovery': 'product lane: turn broad ClashKing/ClashPerk-style requests into researched capability notes, command roadmap, data model, implementation slice, and demo'
   };
 
   const lines = [
@@ -1715,6 +1760,7 @@ function formatActiveTurnWorkingGuidance(turn = {}) {
 function promptHeader(job) {
   const source = job.source === 'discord' || !job.source ? 'Discord' : 'Remote';
   const needsDetailedAnswer = activeRequestNeedsDetailedAnswer(job);
+  const needsClashProductDiscovery = activeRequestNeedsClashProductDiscovery(job);
   const turnGuidance = formatActiveTurnWorkingGuidance(job.turn || {});
   return [
     'You are the server-side mavebot Codex runner.',
@@ -1753,6 +1799,10 @@ function promptHeader(job) {
     '- Before code changes, read docs/context/operating-memory.md, docs/context/discord-session.md, docs/context/remote-codex-session.md, and relevant docs/context/*.md.',
     '- Keep context docs useful: compact stale details, restructure bloated sections, and delete obsolete duplicated notes when the durable facts are captured elsewhere.',
     '- If context docs are getting noisy, improve their structure as part of the task instead of appending another vague bullet.',
+    '- ClashKing, ClashPerk, roster, CWL, war history, activity, or "same data structure" requests are product-discovery plus implementation work. Read docs/context/clash-competitor-research.md and docs/context/clash-database-guidance.md, inspect current source, and use public sources when internet is available.',
+    '- For Clash competitor-inspired requests, do not answer with only "done", "added the backend", or "live". Include what you learned, what mavebot should build, what changed now, and a concrete demo or next command.',
+    '- If the user asks to start collecting or create the same data structure, update storage/collector/docs/tests when feasible. If the safe slice is smaller, name the exact blocker and the next implementation slice.',
+    '- If the user asks for a command family such as roster, history, warstats, activity, track, or CWL, update slash command registration plus runtime handling or give a clear phased command plan when one run cannot safely build all of it.',
     '- Discord command changes must update both src/commands.mjs and src/index.mjs.',
     '- Discord command changes must be verified with tests and command registration/runtime checks whenever the request touches slash commands.',
     '- Discord moderation, role, timeout, or permission features must call out remaining live Discord limits, especially role hierarchy, in the final answer.',
@@ -1775,7 +1825,9 @@ function promptHeader(job) {
     '- Do not say the work is ready for the worker to commit, push, deploy, or verify. The worker adds live status after verification.',
     '',
     'Active request response mode:',
-    needsDetailedAnswer
+    needsClashProductDiscovery
+      ? '- The active request is Clash product-discovery work. Preserve useful structure: What I learned, What mavebot should build, Data model/commands, Current slice, and Demo/next command. Do not answer with only an acknowledgement or a bare live claim.'
+      : needsDetailedAnswer
       ? '- The active request asks for a plan/demo/how-it-works answer. Do not answer with only an acknowledgement. Preserve useful structure in the final answer: a compact plan, a concrete demo/example, and what will happen next.'
       : '- The active request does not explicitly ask for a plan/demo. Keep the final answer compact after handling the work.',
     ''
