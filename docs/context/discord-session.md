@@ -120,6 +120,10 @@ long-lived server state.
   army/equipment data.
 - `/legends player:<tag>` tracks Legend League trophy snapshots in
   `/shared/legends-tracking.json`.
+- `/config clan set tag:<tag>` and `/config clan status` store/read this
+  Discord server's default Clash clan in `/shared/clash-history.json`.
+- `/link player tag:<tag>`, `/link status`, and `/link remove tag:<tag>`
+  store/read Discord-user-to-Clash-player links in `/shared/clash-history.json`.
 - `/track player:<tag>`, `/track clan:<tag>`, and `/track status` seed and
   report the Clash history store at `/shared/clash-history.json`.
 - `/history player:<tag>` reads from `/shared/clash-history.json`, seeds a
@@ -152,16 +156,18 @@ long-lived server state.
 - Keep the GitHub repository synchronized with live server changes so worker
   jobs and server auto-deploys use the same code.
 - Continue improving Discord commands for Clash of Clans workflows, especially
-  richer roster pages/buttons, account linking/config, exports, richer
-  war/CWL detail, and database-backed clan operations.
+  richer roster pages/buttons, exports, reminders, richer war/CWL detail, and
+  database-backed clan operations.
 - Keep broad Clash product asks from collapsing into tiny replies. A request
   like "research how ClashKing and ClashPerk work and create the same data
   structure" should produce a researched plan plus a concrete code/docs/test
   slice, or a clear blocker and next slice.
-- The current source of truth for roster command names is `/track clan`,
-  `/roster plan`, `/roster signup`, and `/roster status`. Older Discord replies
-  mentioned `/roster enroll` and `/roster build`; treat those as stale examples
-  unless a future run actually implements and registers them.
+- The current source of truth for Clash setup and roster command names includes
+  `/config clan set`, `/config clan status`, `/link player`, `/link status`,
+  `/link remove`, `/track clan`, `/roster plan`, `/roster signup`, and
+  `/roster status`. Older Discord replies mentioned `/roster enroll` and
+  `/roster build`; treat those as stale examples unless a future run actually
+  implements and registers them.
 - Keep Discord file/screenshot intake reliable: attachments should be
   downloaded to `/shared/codex-worker/context/discord-files/` and supported
   images should be passed to `codex exec` with `--image`.

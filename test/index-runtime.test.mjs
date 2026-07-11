@@ -134,6 +134,26 @@ test('roster runtime handles signup and status subcommands', async () => {
   assert.match(source, /interaction\.options\.getString\('player', true\)/);
 });
 
+test('config runtime handles default clan setup and status', async () => {
+  const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
+
+  assert.match(source, /interaction\.commandName === 'config'/);
+  assert.match(source, /getSubcommandGroup\(false\)/);
+  assert.match(source, /setClashGuildDefaultClan/);
+  assert.match(source, /buildClashGuildConfigText/);
+  assert.match(source, /this server's default clan/);
+});
+
+test('link runtime handles player linking, status, and removal', async () => {
+  const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
+
+  assert.match(source, /interaction\.commandName === 'link'/);
+  assert.match(source, /linkClashPlayerToDiscord/);
+  assert.match(source, /buildClashLinkStatusText/);
+  assert.match(source, /removeClashPlayerLink/);
+  assert.match(source, /This helps roster, activity, and future reminder features understand who is who/);
+});
+
 test('Clash operations report commands are handled at runtime', async () => {
   const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
 
@@ -144,5 +164,6 @@ test('Clash operations report commands are handled at runtime', async () => {
   assert.match(source, /buildClashActivityText/);
   assert.match(source, /buildClashSummaryText/);
   assert.match(source, /interaction\.options\.getString\('clan'\)/);
+  assert.match(source, /guildId: interaction\.guildId/);
   assert.match(source, /I started tracking this clan now/);
 });

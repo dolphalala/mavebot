@@ -107,15 +107,16 @@ workflow.
   `CLASH_HISTORY_PLAYER_TAGS`, `CLASH_HISTORY_INTERVAL_MS`,
   `CLASH_HISTORY_PLAYER_INTERVAL_MS`, `CLASH_HISTORY_CLAN_INTERVAL_MS`, and
   `CLASH_HISTORY_WAR_INTERVAL_MS`.
-- `/track` is the user-visible enrollment entry point for this store. Roster,
-  history, activity, and war/CWL commands should read from the same store rather
-  than creating parallel tracking files.
+- `/config clan set/status`, `/link player/status/remove`, and `/track` are the
+  user-visible setup, linking, and enrollment entry points for this store.
+  Roster, history, activity, and war/CWL commands should read from the same
+  store rather than creating parallel tracking files.
 - `/history player`, `/roster plan`, `/roster signup`, `/roster status`,
   `/warstats`, `/activity`, and `/summary` are the first reporting/enrollment
   commands on top of the store. Future history/roster/operations improvements
   should add pages/buttons, richer bench state, generated lineup snapshots,
-  exports, config/linking, and richer activity/war detail before creating
-  competing reporting surfaces.
+  exports, reminders, and richer activity/war detail before creating competing
+  reporting surfaces.
 
 ## Discord Command Registration
 

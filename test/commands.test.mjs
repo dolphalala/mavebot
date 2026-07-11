@@ -72,6 +72,73 @@ test('legends command is guild-install only and requires a player tag option', (
   ]);
 });
 
+test('config command exposes default-clan setup', () => {
+  const config = commands.find((command) => command.name === 'config');
+
+  assert.ok(config);
+  assert.match(config.description, /sets up/i);
+  assert.deepEqual(config.integration_types, [0]);
+  assert.deepEqual(config.contexts, [0]);
+  assert.deepEqual(config.options, [
+    {
+      name: 'clan',
+      description: 'Configure the default Clash clan for this server.',
+      type: ApplicationCommandOptionType.SubcommandGroup,
+      options: [
+        {
+          name: 'set',
+          description: 'Set the default clan used by summary, roster, war, and activity commands.',
+          type: ApplicationCommandOptionType.Subcommand,
+          options: [
+            {
+              name: 'tag',
+              description: 'Clan tag, with or without #.',
+              type: ApplicationCommandOptionType.String,
+              required: true,
+              min_length: 3,
+              max_length: 20
+            }
+          ]
+        },
+        {
+          name: 'status',
+          description: 'Show the configured clan, tracking counts, and next useful commands.',
+          type: ApplicationCommandOptionType.Subcommand
+        }
+      ]
+    }
+  ]);
+});
+
+test('link command exposes player account linking', () => {
+  const link = commands.find((command) => command.name === 'link');
+
+  assert.ok(link);
+  assert.match(link.description, /links Discord users/i);
+  assert.deepEqual(link.integration_types, [0]);
+  assert.deepEqual(link.contexts, [0]);
+  assert.deepEqual(
+    link.options.map((option) => option.name),
+    ['player', 'status', 'remove']
+  );
+  assert.equal(link.options[0].type, ApplicationCommandOptionType.Subcommand);
+  assert.deepEqual(link.options[0].options[0], {
+    name: 'tag',
+    description: 'Player tag, with or without #.',
+    type: ApplicationCommandOptionType.String,
+    required: true,
+    min_length: 3,
+    max_length: 20
+  });
+  assert.deepEqual(link.options[1].options[0], {
+    name: 'user',
+    description: 'Discord user to check. Defaults to you.',
+    type: ApplicationCommandOptionType.User,
+    required: false
+  });
+  assert.equal(link.options[2].type, ApplicationCommandOptionType.Subcommand);
+});
+
 test('track command exposes player, clan, and status subcommands', () => {
   const track = commands.find((command) => command.name === 'track');
 
@@ -164,7 +231,7 @@ test('roster command exposes plan, signup, and status options', () => {
     options: [
       {
         name: 'clan',
-        description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+        description: "Clan tag, with or without #. Defaults to this server's configured clan.",
         type: ApplicationCommandOptionType.String,
         required: false,
         min_length: 3,
@@ -206,7 +273,7 @@ test('roster command exposes plan, signup, and status options', () => {
       },
       {
         name: 'clan',
-        description: 'Clan tag for this roster. Defaults to the latest tracked clan.',
+        description: "Clan tag for this roster. Defaults to this server's configured clan.",
         type: ApplicationCommandOptionType.String,
         required: false,
         min_length: 3,
@@ -228,7 +295,7 @@ test('roster command exposes plan, signup, and status options', () => {
     options: [
       {
         name: 'clan',
-        description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+        description: "Clan tag, with or without #. Defaults to this server's configured clan.",
         type: ApplicationCommandOptionType.String,
         required: false,
         min_length: 3,
@@ -248,7 +315,7 @@ test('Clash operations commands expose optional clan tags', () => {
     assert.deepEqual(command.options, [
       {
         name: 'clan',
-        description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+        description: "Clan tag, with or without #. Defaults to this server's configured clan.",
         type: ApplicationCommandOptionType.String,
         required: false,
         min_length: 3,

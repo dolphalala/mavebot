@@ -37,14 +37,19 @@ import {
   DEFAULT_CLASH_HISTORY_PLAYER_INTERVAL_MS,
   DEFAULT_CLASH_HISTORY_WAR_INTERVAL_MS,
   buildClashActivityText,
+  buildClashGuildConfigText,
+  buildClashLinkStatusText,
   buildClashPlayerHistoryText,
   buildClashRosterPlanText,
   buildClashRosterStatusText,
   buildClashSummaryText,
   buildClashWarStatsText,
   clashHistoryStorePath,
+  linkClashPlayerToDiscord,
   readClashHistoryStore,
   recordClashPlayerSnapshot,
+  removeClashPlayerLink,
+  setClashGuildDefaultClan,
   signupClashRoster,
   startClashHistoryCollector,
   trackClashHistoryClan,
@@ -1663,10 +1668,16 @@ function trackStatusText(store) {
   const playerSnapshots = trackedSnapshotCount(store.players);
   const clanSnapshots = trackedSnapshotCount(store.clans);
   const warRecords = countObjectValues(store.wars);
+  const configuredGuilds = countObjectValues(store.guilds);
+  const linkedPlayers = Object.values(store.links || {}).reduce(
+    (total, link) => total + countObjectValues(link?.players),
+    0
+  );
   const scheduler = store.scheduler || {};
 
   return [
     '**Clash tracking status**',
+    `Setup: ${configuredGuilds} Discord server${configuredGuilds === 1 ? '' : 's'} configured, ${linkedPlayers} linked player${linkedPlayers === 1 ? '' : 's'}`,
     `Players: ${trackedPlayers} tracked, ${playerSnapshots} saved snapshot${playerSnapshots === 1 ? '' : 's'}`,
     `Clans: ${trackedClans} tracked, ${clanSnapshots} saved snapshot${clanSnapshots === 1 ? '' : 's'}`,
     `Wars/CWL: ${trackedWars} watched, ${warRecords} saved record${warRecords === 1 ? '' : 's'}`,
@@ -2286,6 +2297,120 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
+  if (interaction.commandName === 'config') {
+    const group = interaction.options.getSubcommandGroup(false);
+    const subcommand = interaction.options.getSubcommand(true);
+    await interaction.deferReply();
+
+    try {
+      if (!interaction.guildId) {
+        await interaction.editReply('Use `/config` inside a Discord server so mavebot knows which server to configure.');
+        return;
+      }
+
+      if (group === 'clan' && subcommand === 'set') {
+        const tag = interaction.options.getString('tag', true);
+        const result = await setClashGuildDefaultClan({
+          guildId: interaction.guildId,
+          clanTag: tag,
+          actorId: interaction.user.id,
+          actorName: interaction.user.tag || interaction.user.username,
+          storePath: clashHistoryStorePath()
+        });
+        const current = result.record?.current || result.snapshot;
+        const memberCount = current.memberTags?.length || current.members || 0;
+        await interaction.editReply(
+          [
+            `Saved **${current.name}** (${current.tag}) as this server's default clan.`,
+            `Seeded a clan snapshot now: level ${current.level || '?'} - ${memberCount} member${memberCount === 1 ? '' : 's'}.`,
+            'Now `/summary`, `/activity`, `/warstats`, and `/roster plan` can work without repeating the clan tag.'
+          ].join('\n')
+        );
+        return;
+      }
+
+      if (group === 'clan' && subcommand === 'status') {
+        const store = await readClashHistoryStore(clashHistoryStorePath());
+        await interaction.editReply(buildClashGuildConfigText(store, { guildId: interaction.guildId }));
+        return;
+      }
+
+      await interaction.editReply('I do not know that `/config` subcommand yet.');
+    } catch (error) {
+      const message =
+        error instanceof CocApiError
+          ? error.message
+          : 'I could not update this server setup right now.';
+      await interaction.editReply(message);
+      console.error('Clash config command failed:', error);
+    }
+    return;
+  }
+
+  if (interaction.commandName === 'link') {
+    const subcommand = interaction.options.getSubcommand(true);
+    await interaction.deferReply();
+
+    try {
+      if (subcommand === 'player') {
+        const tag = interaction.options.getString('tag', true);
+        const result = await linkClashPlayerToDiscord({
+          playerTag: tag,
+          guildId: interaction.guildId,
+          userId: interaction.user.id,
+          username: interaction.user.tag || interaction.user.username,
+          storePath: clashHistoryStorePath()
+        });
+        const current = result.player?.current || result.snapshot;
+        await interaction.editReply(
+          [
+            `Linked **${current.name}** (${current.tag}) to ${interaction.user}.`,
+            `Seeded a player snapshot now: TH ${current.townHallLevel || '?'} - ${current.trophies ?? '?'} trophies - ${current.warStars ?? '?'} war stars.`,
+            'This helps roster, activity, and future reminder features understand who is who.'
+          ].join('\n')
+        );
+        return;
+      }
+
+      if (subcommand === 'status') {
+        const targetUser = interaction.options.getUser('user') || interaction.user;
+        const store = await readClashHistoryStore(clashHistoryStorePath());
+        await interaction.editReply(
+          buildClashLinkStatusText(store, {
+            userId: targetUser.id,
+            username: targetUser.tag || targetUser.username
+          })
+        );
+        return;
+      }
+
+      if (subcommand === 'remove') {
+        const tag = interaction.options.getString('tag', true);
+        const result = await removeClashPlayerLink({
+          playerTag: tag,
+          userId: interaction.user.id,
+          storePath: clashHistoryStorePath()
+        });
+        await interaction.editReply(
+          result.removed
+            ? `Removed ${result.playerTag} from your linked Clash players.`
+            : `${result.playerTag} was not linked to you.`
+        );
+        return;
+      }
+
+      await interaction.editReply('I do not know that `/link` subcommand yet.');
+    } catch (error) {
+      const message =
+        error instanceof CocApiError
+          ? error.message
+          : 'I could not update that player link right now.';
+      await interaction.editReply(message);
+      console.error('Clash link command failed:', error);
+    }
+    return;
+  }
+
   if (interaction.commandName === 'track') {
     const subcommand = interaction.options.getSubcommand(true);
     await interaction.deferReply();
@@ -2429,7 +2554,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const text = buildClashRosterPlanText(store, {
           clanTag: normalizedClanTag,
           size,
-          style
+          style,
+          guildId: interaction.guildId
         });
 
         await interaction.editReply(
@@ -2526,10 +2652,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const text =
         interaction.commandName === 'warstats'
-          ? buildClashWarStatsText(store, { clanTag: normalizedClanTag })
+          ? buildClashWarStatsText(store, { clanTag: normalizedClanTag, guildId: interaction.guildId })
           : interaction.commandName === 'activity'
-            ? buildClashActivityText(store, { clanTag: normalizedClanTag })
-            : buildClashSummaryText(store, { clanTag: normalizedClanTag });
+            ? buildClashActivityText(store, { clanTag: normalizedClanTag, guildId: interaction.guildId })
+            : buildClashSummaryText(store, { clanTag: normalizedClanTag, guildId: interaction.guildId });
 
       await interaction.editReply(
         [

@@ -52,12 +52,13 @@ all of this:
 - Prefer a small working command over a large invisible foundation.
 - Build from the current `/shared/clash-history.json` store unless there is a
   concrete reason to add a new durable file.
-- Current entry points are `/track`, `/history player`, `/roster plan`,
-  `/roster signup`, `/roster status`, `/warstats`, `/activity`, and
-  `/summary`.
+- Current entry points are `/config clan set`, `/config clan status`,
+  `/link player`, `/link status`, `/link remove`, `/track`, `/history player`,
+  `/roster plan`, `/roster signup`, `/roster status`, `/warstats`,
+  `/activity`, and `/summary`.
 - The next missing visible surfaces are richer paged roster/player views,
-  exports, `/config` or default-clan setup, player linking, and deeper
-  war/CWL/activity pages once more scheduled data accumulates.
+  exports, reminders, and deeper war/CWL/activity pages once more scheduled
+  data accumulates.
 - Use command names that actually exist in `src/commands.mjs` and
   `src/index.mjs`. Do not promise `/roster enroll` or `/roster build` unless
   the same run implements, registers, and tests those exact commands.

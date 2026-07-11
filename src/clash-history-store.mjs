@@ -43,6 +43,8 @@ function textOrNull(value) {
 function emptyStore() {
   return {
     version: 1,
+    guilds: {},
+    links: {},
     tracked: {
       players: {},
       clans: {},
@@ -62,6 +64,10 @@ function emptyStore() {
   };
 }
 
+function objectMap(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
 function normalizeStore(parsed) {
   const store = {
     ...emptyStore(),
@@ -77,9 +83,38 @@ function normalizeStore(parsed) {
     store.tracked.clans && typeof store.tracked.clans === 'object' ? store.tracked.clans : {};
   store.tracked.wars =
     store.tracked.wars && typeof store.tracked.wars === 'object' ? store.tracked.wars : {};
-  store.players = store.players && typeof store.players === 'object' ? store.players : {};
-  store.clans = store.clans && typeof store.clans === 'object' ? store.clans : {};
-  store.wars = store.wars && typeof store.wars === 'object' ? store.wars : {};
+  store.guilds = objectMap(store.guilds);
+  for (const [guildId, guild] of Object.entries(store.guilds)) {
+    if (!guild || typeof guild !== 'object' || Array.isArray(guild)) {
+      delete store.guilds[guildId];
+      continue;
+    }
+    guild.guildId = compactText(guild.guildId || guildId, 80) || guildId;
+    guild.defaultClanTag = normalizeMaybeClanTag(guild.defaultClanTag);
+    guild.defaultClanName = compactText(guild.defaultClanName, 120);
+    guild.updatedBy = compactText(guild.updatedBy, 120);
+    guild.createdAt = guild.createdAt || null;
+    guild.updatedAt = guild.updatedAt || null;
+  }
+  store.links = objectMap(store.links);
+  for (const [userId, link] of Object.entries(store.links)) {
+    if (!link || typeof link !== 'object' || Array.isArray(link)) {
+      delete store.links[userId];
+      continue;
+    }
+    link.userId = compactText(link.userId || userId, 80) || userId;
+    link.username = compactText(link.username, 120);
+    link.primaryPlayerTag = normalizeMaybePlayerTag(link.primaryPlayerTag);
+    link.players = normalizeLinkPlayers(link.players);
+    if (!link.primaryPlayerTag || !link.players[link.primaryPlayerTag]) {
+      link.primaryPlayerTag = Object.keys(link.players)[0] || null;
+    }
+    link.createdAt = link.createdAt || null;
+    link.updatedAt = link.updatedAt || null;
+  }
+  store.players = objectMap(store.players);
+  store.clans = objectMap(store.clans);
+  store.wars = objectMap(store.wars);
   store.cwlGroups =
     store.cwlGroups && typeof store.cwlGroups === 'object' ? store.cwlGroups : {};
   store.rosters = store.rosters && typeof store.rosters === 'object' ? store.rosters : {};
@@ -1093,6 +1128,270 @@ function compactText(value, max = 120) {
   return text.length > max ? text.slice(0, Math.max(0, max - 1)).trimEnd() : text;
 }
 
+function normalizeLinkPlayers(players) {
+  const entries = Array.isArray(players)
+    ? players.map((player) => [player?.playerTag || player?.tag || player, player])
+    : Object.entries(objectMap(players));
+  const normalized = {};
+  for (const [key, player] of entries) {
+    const playerTag = normalizeMaybePlayerTag(player?.playerTag || player?.tag || key);
+    if (!playerTag) {
+      continue;
+    }
+    normalized[playerTag] = {
+      playerTag,
+      name: compactText(player?.name, 120),
+      guildId: compactText(player?.guildId, 80),
+      linkedAt: player?.linkedAt || null,
+      updatedAt: player?.updatedAt || null
+    };
+  }
+  return normalized;
+}
+
+function guildKeyFor(guildId = null) {
+  return compactText(guildId, 80) || 'global';
+}
+
+function userKeyFor(userId = null) {
+  return compactText(userId, 80) || 'unknown';
+}
+
+function ensureGuildConfig(store, { guildId = null, now = new Date() } = {}) {
+  store.guilds = objectMap(store.guilds);
+  const guildKey = guildKeyFor(guildId);
+  const at = isoDate(now);
+  const record = {
+    guildId: guildKey,
+    defaultClanTag: null,
+    defaultClanName: null,
+    createdAt: at,
+    updatedAt: at,
+    ...(store.guilds[guildKey] || {})
+  };
+  record.guildId = guildKey;
+  record.createdAt = record.createdAt || at;
+  record.updatedAt = at;
+  record.defaultClanTag = normalizeMaybeClanTag(record.defaultClanTag);
+  record.defaultClanName = compactText(record.defaultClanName, 120);
+  record.updatedBy = compactText(record.updatedBy, 120);
+  store.guilds[guildKey] = record;
+  return record;
+}
+
+function ensureUserLink(store, { userId = null, username = null, now = new Date() } = {}) {
+  store.links = objectMap(store.links);
+  const userKey = userKeyFor(userId);
+  const at = isoDate(now);
+  const record = {
+    userId: userKey,
+    username: compactText(username, 120),
+    primaryPlayerTag: null,
+    players: {},
+    createdAt: at,
+    updatedAt: at,
+    ...(store.links[userKey] || {})
+  };
+  record.userId = userKey;
+  record.username = compactText(username, 120) || compactText(record.username, 120);
+  record.players = normalizeLinkPlayers(record.players);
+  record.primaryPlayerTag = normalizeMaybePlayerTag(record.primaryPlayerTag);
+  record.createdAt = record.createdAt || at;
+  record.updatedAt = at;
+  if (!record.primaryPlayerTag || !record.players[record.primaryPlayerTag]) {
+    record.primaryPlayerTag = Object.keys(record.players)[0] || null;
+  }
+  store.links[userKey] = record;
+  return record;
+}
+
+function defaultClanTagForGuild(store, guildId = null) {
+  const tag = store.guilds?.[guildKeyFor(guildId)]?.defaultClanTag;
+  return normalizeMaybeClanTag(tag);
+}
+
+export async function setClashGuildDefaultClan({
+  guildId,
+  clanTag,
+  actorId = null,
+  actorName = null,
+  storePath = clashHistoryStorePath(),
+  now = new Date(),
+  fetchClanImpl = fetchClan
+} = {}) {
+  const normalizedClanTag = normalizeClanTag(clanTag);
+  const guildKey = guildKeyFor(guildId);
+  const clan = await fetchClanImpl(normalizedClanTag);
+
+  return withStoreLock(async () => {
+    const store = await readClashHistoryStore(storePath);
+    const clanResult = recordClanSnapshotInStore(store, clan, {
+      now,
+      source: `config:${guildKey}`
+    });
+    const guild = ensureGuildConfig(store, { guildId: guildKey, now });
+    guild.defaultClanTag = clanResult.snapshot.tag;
+    guild.defaultClanName = clanResult.snapshot.name;
+    guild.updatedBy = compactText(actorName || actorId, 120);
+    guild.updatedById = compactText(actorId, 80);
+    guild.updatedAt = isoDate(now);
+    await writeClashHistoryStore(store, storePath);
+    return {
+      store,
+      guild,
+      record: clanResult.record,
+      snapshot: clanResult.snapshot,
+      appended: clanResult.appended
+    };
+  });
+}
+
+export function buildClashGuildConfigText(store, { guildId = null } = {}) {
+  const guildKey = guildKeyFor(guildId);
+  const guild = store.guilds?.[guildKey] || null;
+  const defaultTag = defaultClanTagForGuild(store, guildKey);
+  const clan = defaultTag ? store.clans?.[defaultTag] || null : null;
+  const linkedPlayers = Object.values(store.links || {}).reduce(
+    (total, link) =>
+      total +
+      Object.values(link?.players || {}).filter((player) => player?.guildId === guildKey).length,
+    0
+  );
+
+  if (!defaultTag) {
+    return clippedDiscordText([
+      '**Clash setup**',
+      'No default clan is configured for this Discord server yet.',
+      '',
+      '**Start here**',
+      'Use `/config clan set tag:#CLAN` so `/summary`, `/activity`, `/warstats`, and `/roster plan` know which clan to use by default.',
+      'Then use `/link player tag:#PLAYER` to connect Discord members to their Clash accounts.'
+    ]);
+  }
+
+  return clippedDiscordText([
+    `**${clan?.name || guild?.defaultClanName || 'Configured clan'} (${defaultTag}) setup**`,
+    `Default clan: ${clan?.name || guild?.defaultClanName || 'Clan'} (${defaultTag}).`,
+    `Tracking: ${Object.keys(store.tracked?.players || {}).length} players, ${Object.keys(store.tracked?.clans || {}).length} clans, ${Object.keys(store.tracked?.wars || {}).length} war/CWL tags.`,
+    `Linked players in this server: ${linkedPlayers}.`,
+    guild?.updatedAt ? `Last updated ${comparableDateText(guild.updatedAt)}${guild.updatedBy ? ` by ${guild.updatedBy}` : ''}.` : null,
+    '',
+    '**Useful next commands**',
+    '`/summary` - command center for this clan.',
+    '`/roster signup player:#TAG` - add yourself to CWL/war planning.',
+    '`/roster plan size:15` - build a first roster from tracked data.',
+    '`/link player tag:#TAG` - connect a Discord user to a Clash account.'
+  ]);
+}
+
+export async function linkClashPlayerToDiscord({
+  playerTag,
+  guildId = null,
+  userId = null,
+  username = null,
+  storePath = clashHistoryStorePath(),
+  now = new Date(),
+  fetchPlayerImpl = fetchPlayer
+} = {}) {
+  const normalizedPlayerTag = normalizePlayerTag(playerTag);
+  const guildKey = guildKeyFor(guildId);
+  const userKey = userKeyFor(userId);
+  const player = await fetchPlayerImpl(normalizedPlayerTag);
+
+  return withStoreLock(async () => {
+    const store = await readClashHistoryStore(storePath);
+    const playerResult = recordPlayerSnapshotInStore(store, player, {
+      now,
+      source: `link:${guildKey}:${userKey}`
+    });
+    const link = ensureUserLink(store, { userId: userKey, username, now });
+    link.players[normalizedPlayerTag] = {
+      playerTag: normalizedPlayerTag,
+      name: playerResult.snapshot.name,
+      guildId: guildKey,
+      linkedAt: link.players[normalizedPlayerTag]?.linkedAt || isoDate(now),
+      updatedAt: isoDate(now)
+    };
+    link.primaryPlayerTag = link.primaryPlayerTag || normalizedPlayerTag;
+    link.updatedAt = isoDate(now);
+    await writeClashHistoryStore(store, storePath);
+    return {
+      store,
+      link,
+      player: playerResult.record,
+      snapshot: playerResult.snapshot,
+      appended: playerResult.appended
+    };
+  });
+}
+
+export async function removeClashPlayerLink({
+  playerTag,
+  userId = null,
+  storePath = clashHistoryStorePath(),
+  now = new Date()
+} = {}) {
+  const normalizedPlayerTag = normalizePlayerTag(playerTag);
+  const userKey = userKeyFor(userId);
+
+  return withStoreLock(async () => {
+    const store = await readClashHistoryStore(storePath);
+    if (!store.links?.[userKey]) {
+      return {
+        store,
+        link: null,
+        playerTag: normalizedPlayerTag,
+        removed: false
+      };
+    }
+    const link = ensureUserLink(store, { userId: userKey, now });
+    const removed = Boolean(link.players[normalizedPlayerTag]);
+    delete link.players[normalizedPlayerTag];
+    if (link.primaryPlayerTag === normalizedPlayerTag) {
+      link.primaryPlayerTag = Object.keys(link.players)[0] || null;
+    }
+    link.updatedAt = isoDate(now);
+    await writeClashHistoryStore(store, storePath);
+    return {
+      store,
+      link,
+      playerTag: normalizedPlayerTag,
+      removed
+    };
+  });
+}
+
+export function buildClashLinkStatusText(store, { userId = null, username = null } = {}) {
+  const userKey = userKeyFor(userId);
+  const link = store.links?.[userKey] || null;
+  const displayName = compactText(username || link?.username, 80) || 'This Discord user';
+  const players = Object.values(link?.players || {}).sort((a, b) =>
+    String(a.linkedAt || '').localeCompare(String(b.linkedAt || ''))
+  );
+
+  if (!players.length) {
+    return clippedDiscordText([
+      `**${displayName} has no linked Clash players yet**`,
+      'Use `/link player tag:#PLAYER` to connect a Discord member to a Clash account.',
+      'Linked players let roster, activity, and future reminders understand who is who.'
+    ]);
+  }
+
+  return clippedDiscordText([
+    `**${displayName} linked Clash players**`,
+    ...players.slice(0, 12).map((player, index) => {
+      const record = store.players?.[player.playerTag] || null;
+      const current = record?.current || null;
+      const primary = link?.primaryPlayerTag === player.playerTag ? ' primary' : '';
+      const clan = current?.clan?.name ? ` | ${current.clan.name}` : '';
+      return `${index + 1}. ${current?.name || player.name || 'Player'} (${player.playerTag})${primary} - TH ${numberText(current?.townHallLevel)} | ${numberText(current?.trophies)} trophies${clan}`;
+    }),
+    players.length > 12 ? `...${players.length - 12} more linked player${players.length - 12 === 1 ? '' : 's'} hidden.` : null,
+    '',
+    'Use `/link remove tag:#PLAYER` if a linked account is wrong.'
+  ]);
+}
+
 function rosterIdFor({ guildId = null, clanTag = null } = {}) {
   const guildKey = compactText(guildId, 80) || 'global';
   const clanKey = clanTag ? normalizeClanTag(clanTag) : 'unassigned';
@@ -1111,9 +1410,13 @@ function playerCurrentClanTag(record) {
   }
 }
 
-function resolveRosterClanTag(store, { clanTag = null, playerRecord = null } = {}) {
+function resolveRosterClanTag(store, { clanTag = null, playerRecord = null, guildId = null } = {}) {
   if (clanTag) {
     return normalizeClanTag(clanTag);
+  }
+  const defaultClanTag = defaultClanTagForGuild(store, guildId);
+  if (defaultClanTag) {
+    return defaultClanTag;
   }
   const selectedClan = selectRosterClan(store);
   if (selectedClan?.tag || selectedClan?.current?.tag) {
@@ -1208,7 +1511,8 @@ export async function signupClashRoster({
     });
     const resolvedClanTag = resolveRosterClanTag(store, {
       clanTag,
-      playerRecord: playerResult.record
+      playerRecord: playerResult.record,
+      guildId
     });
     const roster = ensureRosterRecord(store, {
       guildId,
@@ -1237,8 +1541,9 @@ export async function signupClashRoster({
 
 export function buildClashRosterStatusText(store, { clanTag = null, guildId = null } = {}) {
   const normalizedClanTag = clanTag ? normalizeClanTag(clanTag) : null;
-  const roster = selectRosterRecord(store, { guildId, clanTag: normalizedClanTag });
-  const clan = selectRosterClan(store, normalizedClanTag || roster?.clanTag || null);
+  const selectedClanTag = normalizedClanTag || defaultClanTagForGuild(store, guildId);
+  const roster = selectRosterRecord(store, { guildId, clanTag: selectedClanTag });
+  const clan = selectRosterClan(store, selectedClanTag || roster?.clanTag || null);
   const memberTags = uniqueRosterMemberTags(clan);
   const signups = Object.values(roster?.signups || {})
     .filter((signup) => signup?.playerTag)
@@ -1247,7 +1552,7 @@ export function buildClashRosterStatusText(store, { clanTag = null, guildId = nu
   const missing = memberTags.filter((tag) => !signupTags.has(tag)).slice(0, 8);
   const signedWithSnapshots = signups.filter((signup) => store.players?.[signup.playerTag]?.current).length;
   const clanName = clan?.name || clan?.current?.name || 'Clan';
-  const displayedClanTag = normalizedClanTag || roster?.clanTag || clan?.tag || clan?.current?.tag || null;
+  const displayedClanTag = selectedClanTag || roster?.clanTag || clan?.tag || clan?.current?.tag || null;
   const lines = [
     `**${displayedClanTag ? `${clanName} (${displayedClanTag})` : 'Roster'} status**`,
     `Signups: ${signups.length}. Clan pool: ${memberTags.length || 'unknown'}. Signed player snapshots: ${signedWithSnapshots}/${signups.length}.`,
@@ -1290,9 +1595,10 @@ export function buildClashRosterStatusText(store, { clanTag = null, guildId = nu
 
 export function buildClashRosterPlanText(
   store,
-  { clanTag = null, size = 15, style = 'balanced' } = {}
+  { clanTag = null, size = 15, style = 'balanced', guildId = null } = {}
 ) {
-  const clan = selectRosterClan(store, clanTag);
+  const selectedClanTag = clanTag || defaultClanTagForGuild(store, guildId);
+  const clan = selectRosterClan(store, selectedClanTag);
   if (!clan?.current) {
     return null;
   }
@@ -1393,9 +1699,13 @@ function normalizeMaybePlayerTag(tag) {
   }
 }
 
-function selectReportClanTag(store, clanTag = null) {
+function selectReportClanTag(store, { clanTag = null, guildId = null } = {}) {
   if (clanTag) {
     return normalizeClanTag(clanTag);
+  }
+  const defaultClanTag = defaultClanTagForGuild(store, guildId);
+  if (defaultClanTag) {
+    return defaultClanTag;
   }
   const clan = selectRosterClan(store);
   if (clan?.tag || clan?.current?.tag) {
@@ -1553,8 +1863,8 @@ function topWarAttackers(store, clanTag, limit = 5) {
     .slice(0, limit);
 }
 
-export function buildClashWarStatsText(store, { clanTag = null } = {}) {
-  const selectedClanTag = selectReportClanTag(store, clanTag);
+export function buildClashWarStatsText(store, { clanTag = null, guildId = null } = {}) {
+  const selectedClanTag = selectReportClanTag(store, { clanTag, guildId });
   if (!selectedClanTag) {
     return null;
   }
@@ -1644,8 +1954,8 @@ function deltaLine(row, key, label) {
   return `${row.name} (${row.tag}) ${label} ${signedDeltaText(row[key])}`;
 }
 
-export function buildClashActivityText(store, { clanTag = null } = {}) {
-  const selectedClanTag = selectReportClanTag(store, clanTag);
+export function buildClashActivityText(store, { clanTag = null, guildId = null } = {}) {
+  const selectedClanTag = selectReportClanTag(store, { clanTag, guildId });
   if (!selectedClanTag) {
     return null;
   }
@@ -1723,8 +2033,8 @@ function rosterSummaryCounts(store, clanTag) {
   };
 }
 
-export function buildClashSummaryText(store, { clanTag = null } = {}) {
-  const selectedClanTag = selectReportClanTag(store, clanTag);
+export function buildClashSummaryText(store, { clanTag = null, guildId = null } = {}) {
+  const selectedClanTag = selectReportClanTag(store, { clanTag, guildId });
   if (!selectedClanTag) {
     return clippedDiscordText([
       '**Clash operations summary**',

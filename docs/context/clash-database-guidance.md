@@ -41,8 +41,9 @@ long-term player/clan tracking commands.
   - `guilds[guildId]` for server-specific config: default clan tags, channel
     settings, enabled collectors, retention settings, and command preferences.
   - `tracked.players` and `tracked.clans` for enrollment/config.
-  - `links[discordUserId].players[]` for Discord-user-to-player associations
-    once account linking exists.
+  - `links[discordUserId].players[tag]` for Discord-user-to-player
+    associations. `/link player` seeds player tracking and stores the linked
+    tag, name, guild, and timestamps.
   - `players[tag].snapshots[]` for point-in-time player state.
   - `clans[tag].snapshots[]` for point-in-time clan state.
   - `events[]` or per-clan event buckets for derived join/leave, donation,
@@ -62,10 +63,15 @@ long-term player/clan tracking commands.
 ## Command Direction
 
 - `/player` and `/legends` lookups should seed player tracking when safe.
+- `/config clan set tag:<tag>` and `/config clan status` store the server
+  default clan in `guilds[guildId]` so users can run roster, war, activity, and
+  summary commands without repeating the clan tag.
+- `/link player tag:<tag>`, `/link status`, and `/link remove tag:<tag>` store
+  Discord-user-to-player mappings in `links[discordUserId].players[tag]`.
 - `/track player:<tag>`, `/track clan:<tag>`, and `/track status` are the
-  current user-visible enrollment surface for `/shared/clash-history.json`.
-  Use them as the base for future database-backed commands instead of adding
-  another tracking store.
+  user-visible enrollment surface for `/shared/clash-history.json`. Use them as
+  the base for future database-backed commands instead of adding another
+  tracking store.
 - `/history player:<tag>` is the first user-visible reporting surface for that
   store. It should be expanded with pages/buttons before adding a competing
   history command.
@@ -76,8 +82,8 @@ long-term player/clan tracking commands.
   lineup snapshots before adding another roster store.
 - `/warstats clan:<tag>`, `/activity clan:<tag>`, and `/summary clan:<tag>` are
   the first operations reports on the same store. They should be expanded with
-  pages/buttons, exports, default-clan config, and deeper war/activity detail
-  before creating separate stores or duplicate reporting commands.
+  pages/buttons, exports, reminders, and deeper war/activity detail before
+  creating separate stores or duplicate reporting commands.
 - Useful next command families:
   - More `/roster` pages/buttons for event enrollment, role notes, missing
     players, bench candidates, generated CWL lineups, and status pages.
@@ -85,8 +91,8 @@ long-term player/clan tracking commands.
     rounds as full war rows accumulate.
   - More `/activity` pages for stale accounts, role/TH movement, and season
     summaries.
-  - `/export`, `/config`, and player-linking commands after the source data is
-    stable enough to avoid misleading users.
+  - `/export` and reminder commands after the source data is stable enough to
+    avoid misleading users.
 - Commands that depend on data collected over time should say "tracking starts
   now" when history is not yet available, not imply old data exists.
 

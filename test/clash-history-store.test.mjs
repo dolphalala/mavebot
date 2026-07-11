@@ -5,13 +5,18 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   buildClashActivityText,
+  buildClashGuildConfigText,
+  buildClashLinkStatusText,
   buildClashPlayerHistoryText,
   buildClashRosterPlanText,
   buildClashRosterStatusText,
   buildClashSummaryText,
   buildClashWarStatsText,
+  linkClashPlayerToDiscord,
   readClashHistoryStore,
   recordClashPlayerSnapshot,
+  removeClashPlayerLink,
+  setClashGuildDefaultClan,
   signupClashRoster,
   trackClashHistoryClan,
   trackClashHistoryPlayer,
@@ -239,6 +244,71 @@ test('trackClashHistoryClan seeds clan, members, and CWL war tracking', async (t
   assert.ok(result.store.tracked.wars['#WAR123']);
 });
 
+test('setClashGuildDefaultClan stores server setup and seeds clan tracking', async (t) => {
+  const storePath = await tempStore(t);
+
+  const result = await setClashGuildDefaultClan({
+    guildId: 'guild-1',
+    clanTag: 'CLAN1',
+    actorId: 'discord-user-1',
+    actorName: 'Allen',
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    fetchClanImpl: async () => clan()
+  });
+
+  assert.equal(result.guild.defaultClanTag, '#CLAN1');
+  assert.equal(result.guild.defaultClanName, 'Mave');
+  assert.equal(result.store.guilds['guild-1'].updatedBy, 'Allen');
+  assert.deepEqual(result.store.tracked.clans['#CLAN1'].sources, ['config:guild-1']);
+  assert.ok(result.store.tracked.players['#AAA111']);
+
+  const text = buildClashGuildConfigText(result.store, { guildId: 'guild-1' });
+  assert.match(text, /Mave \(#CLAN1\) setup/);
+  assert.match(text, /\/summary/);
+  assert.match(text, /\/link player/);
+});
+
+test('linkClashPlayerToDiscord stores player links and supports removal', async (t) => {
+  const storePath = await tempStore(t);
+
+  const linked = await linkClashPlayerToDiscord({
+    playerTag: 'AAA111',
+    guildId: 'guild-1',
+    userId: 'discord-user-1',
+    username: 'Allen',
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    fetchPlayerImpl: async (tag) => player(tag, 5600, { name: 'Alpha' })
+  });
+
+  assert.equal(linked.link.primaryPlayerTag, '#AAA111');
+  assert.equal(linked.link.players['#AAA111'].name, 'Alpha');
+  assert.equal(linked.link.players['#AAA111'].guildId, 'guild-1');
+  assert.deepEqual(linked.store.tracked.players['#AAA111'].sources, ['link:guild-1:discord-user-1']);
+
+  const status = buildClashLinkStatusText(linked.store, {
+    userId: 'discord-user-1',
+    username: 'Allen'
+  });
+  assert.match(status, /Alpha \(#AAA111\).*primary/);
+  assert.match(status, /TH 16/);
+
+  const removed = await removeClashPlayerLink({
+    playerTag: '#AAA111',
+    userId: 'discord-user-1',
+    storePath,
+    now: new Date('2026-07-01T00:05:00.000Z')
+  });
+
+  assert.equal(removed.removed, true);
+  assert.equal(removed.link.primaryPlayerTag, null);
+  assert.match(
+    buildClashLinkStatusText(removed.store, { userId: 'discord-user-1', username: 'Allen' }),
+    /no linked Clash players/i
+  );
+});
+
 test('buildClashPlayerHistoryText explains current stats and collected deltas', async (t) => {
   const storePath = await tempStore(t);
   const first = await recordClashPlayerSnapshot(player('#AAA111', 5600), {
@@ -444,6 +514,35 @@ test('signupClashRoster stores signups and buildClashRosterStatusText shows miss
   assert.match(text, /Missing from signup/);
   assert.match(text, /Bravo \(#BBB222\)/);
   assert.match(text, /Roster status gets smarter/);
+});
+
+test('signupClashRoster uses the configured guild clan when no clan option is passed', async (t) => {
+  const storePath = await tempStore(t);
+
+  await setClashGuildDefaultClan({
+    guildId: 'guild-1',
+    clanTag: '#CLAN1',
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    fetchClanImpl: async () => clan()
+  });
+
+  const signup = await signupClashRoster({
+    playerTag: '#AAA111',
+    guildId: 'guild-1',
+    userId: 'discord-user-1',
+    username: 'Allen',
+    storePath,
+    now: new Date('2026-07-01T00:05:00.000Z'),
+    fetchPlayerImpl: async (tag) => player(tag, 5700, { name: 'Alpha' })
+  });
+
+  assert.equal(signup.roster.clanTag, '#CLAN1');
+  assert.ok(signup.store.rosters['guild-1:#CLAN1']);
+
+  const text = buildClashRosterStatusText(signup.store, { guildId: 'guild-1' });
+  assert.match(text, /Mave \(#CLAN1\) status/);
+  assert.match(text, /Alpha \(#AAA111\)/);
 });
 
 test('buildClashWarStatsText summarizes clan war rows and attack-level details', async (t) => {

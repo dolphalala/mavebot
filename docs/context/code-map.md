@@ -33,15 +33,15 @@ It is a map, not a replacement for reading the current source.
   and page formatting.
 - `src/clash-history-store.mjs`: ClashKing/ClashPerk-style polling foundation
   for roster-grade data. Stores tracked players/clans/CWL wars, player and
-  clan snapshots, CWL groups, full war rows when available, summary public
-  war-log rows, and derived per-player war stats under
-  `/shared/clash-history.json`; `/track` uses this module to seed player/clan
-  tracking before scheduled polling deepens the history, `/history player`
-  formats player history from that store, `/roster plan` formats the first
-  roster/CWL planning view, and `/roster signup/status` stores and reports
-  Discord-member roster enrollment from the same data. `/warstats`,
-  `/activity`, and `/summary` format the first clan-operations reports from the
-  same store.
+  clan snapshots, guild default clan config, Discord-user-to-player links, CWL
+  groups, full war rows when available, summary public war-log rows, and
+  derived per-player war stats under `/shared/clash-history.json`; `/config`
+  and `/link` write the setup layer, `/track` seeds player/clan tracking before
+  scheduled polling deepens the history, `/history player` formats player
+  history from that store, `/roster plan` formats the first roster/CWL planning
+  view, and `/roster signup/status` stores and reports Discord-member roster
+  enrollment from the same data. `/warstats`, `/activity`, and `/summary`
+  format the first clan-operations reports from the same store.
 - `src/moderation-store.mjs`: `/elder`, `/mute`, and `/bench` durable vote and
   permanent-record storage.
 - `src/pictionary-game.mjs`: `/pictionary` topic pool, difficulty settings,

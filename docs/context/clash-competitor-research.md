@@ -125,9 +125,12 @@ once:
   first Clash operations reports on the same store. They are honest about
   summary-only public war-log rows versus full attack-level current-war/CWL
   rows.
-- Next useful slices are richer paged output, default-clan config, player
-  linking, roster exports, war/activity exports, reminders, and deeper
-  attack/missed-hit pages once scheduled data accumulates.
+- `/config clan set/status` and `/link player/status/remove` now exist so the
+  server can remember its default clan and Discord members can connect Clash
+  accounts before roster/report workflows.
+- Next useful slices are richer paged output, roster exports, war/activity
+  exports, reminders, and deeper attack/missed-hit pages once scheduled data
+  accumulates.
 
 Each slice should leave the Discord user with a working command, a realistic
 demo, or a clear explanation of the exact data that will become useful after

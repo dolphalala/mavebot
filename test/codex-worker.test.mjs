@@ -338,7 +338,7 @@ test('compactTranscriptRows labels stale roster command examples in old assistan
   );
 
   assert.match(snapshot.recent, /Stale prior answer warning/);
-  assert.match(snapshot.recent, /Current source uses \/track clan, \/roster plan, \/roster signup, and \/roster status/);
+  assert.match(snapshot.recent, /Current source uses \/config clan set, \/config clan status, \/link player, \/link status, \/link remove, \/track clan, \/roster plan, \/roster signup, and \/roster status/);
   assert.match(snapshot.recent, /\[stale roster-enroll example\]/);
   assert.match(snapshot.recent, /\[stale roster-build example\]/);
   assert.match(snapshot.recent, /\[stale signup example; current command is \/roster signup\]/);
@@ -678,14 +678,14 @@ test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product disc
   assert.match(prompt, /backend collector/i);
   assert.match(prompt, /If the user asks to start collecting or create the same data structure/);
   assert.match(prompt, /Backend-only work is incomplete/);
-  assert.match(prompt, /current Clash data-collection entry point is \/track player, \/track clan, and \/track status/);
+  assert.match(prompt, /current Clash setup and data entry points are \/config clan set, \/config clan status, \/link player, \/link status, \/link remove, \/track player, \/track clan, and \/track status/);
   assert.match(
     prompt,
     /\/history player, \/roster plan, \/roster signup, \/roster status, \/warstats, \/activity, and \/summary are the first reporting\/enrollment surfaces/,
   );
   assert.match(
     prompt,
-    /Future richer roster\/player pages, exports, config\/default-clan setup, player linking, and deeper war\/activity pages should build from the same store/,
+    /Future richer roster\/player pages, exports, reminders, and deeper war\/activity pages should build from the same store/,
   );
   assert.match(prompt, /Use actual command names from src\/commands\.mjs and src\/index\.mjs/);
   assert.match(prompt, /Do not invent roster names such as \/roster enroll or \/roster build/);
@@ -1281,7 +1281,7 @@ test('finalChannelMessage preserves Clash product-delivery structure', () => {
       'Try: `/roster status clan:#JY99CJC8`',
       'What it shows: a CWL pool summary, top accounts, bench/watch list, and what still needs more snapshots.',
       '',
-      'Still missing: richer roster pages, exports, default-clan config, and deeper war/activity pages as scheduled data accumulates.',
+      'Still missing: richer roster pages, exports, reminders, and deeper war/activity pages as scheduled data accumulates.',
       '',
       'Checks:',
       '- npm run check'

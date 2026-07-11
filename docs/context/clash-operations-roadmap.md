@@ -29,6 +29,11 @@ Before promising new command names, inspect `src/commands.mjs` and
 
 - `/player tag:<tag>`: live player lookup.
 - `/legends player:<tag>`: Legend-oriented player view.
+- `/config clan set tag:<tag>` and `/config clan status`: server default-clan
+  setup under `guilds[guildId]`, used by roster and operations reports when a
+  clan option is omitted.
+- `/link player tag:<tag>`, `/link status`, `/link remove tag:<tag>`:
+  Discord-user-to-player linking under `links[discordUserId].players`.
 - `/track player:<tag>`, `/track clan:<tag>`, `/track status`: enrollment and
   snapshot seeding for `/shared/clash-history.json`.
 - `/history player:<tag>`: player history from stored snapshots.
@@ -47,23 +52,16 @@ the same commit as the command change.
 When the user asks broadly and does not name a specific command, choose the
 first feasible missing slice from this list after checking current source:
 
-1. **Server setup/default clan.** Build `/config clan set`, `/config clan
-   status`, and any needed guild settings in `guilds[guildId]`. This reduces
-   repeated clan tags and makes every later command feel server-aware.
-2. **Player linking.** Build `/link player`, `/link status`, and `/link remove`
-   using `links[discordUserId].players[]`. Linking should seed tracking and let
-   roster/signup commands resolve a Discord member without repeatedly typing a
-   tag.
-3. **Roster pages and exports.** Improve the existing `/roster` subcommands
+1. **Roster pages and exports.** Improve the existing `/roster` subcommands
    with paged summaries, missing signup views, bench candidates, notes, lineup
    snapshots, and export/share output.
-4. **War/CWL detail.** Extend `/warstats` for missed hits, attack rows, defense
+2. **War/CWL detail.** Extend `/warstats` for missed hits, attack rows, defense
    summaries, CWL rounds, and player reliability when full war rows have been
    collected.
-5. **Activity and season summaries.** Extend `/activity` and `/summary` for
+3. **Activity and season summaries.** Extend `/activity` and `/summary` for
    stale accounts, donation/trophy deltas, joins/leaves, season views, clan
    games/capital where available, and leaderboards.
-6. **Leadership exports and reminders.** Add export/reminder/report surfaces
+4. **Leadership exports and reminders.** Add export/reminder/report surfaces
    only after the underlying data is real enough to avoid misleading users.
 
 Do not skip directly to a backend-only collector when one of these command
@@ -76,8 +74,8 @@ slices is feasible.
   slice.
 - If the user says "same data structure", "start collecting", or "track all
   players we care about", verify `/track` and `/shared/clash-history.json`
-  first. If those exist, build the next missing visible command, usually setup
-  or linking.
+  first. If those exist, build the next missing visible command, usually richer
+  roster pages, war/CWL detail, exports, or reminders.
 - If the user asks for `/roster build`, `/roster enroll`, or another stale name,
   correct the plan to the commands that exist, then build or rename the next
   real command in the same run.
@@ -93,20 +91,22 @@ slices is feasible.
 For broad product work, the final answer should feel like this:
 
 ```text
-I found the gap: the bot had tracking, but no server setup/linking flow, so
-leaders still had to type tags everywhere.
+I found the gap: the bot had setup/linking and tracking, but the next roster
+view still made leaders read too much plain text.
 
 What I learned: ClashKing/ClashPerk-style bots make setup and linking the base
-layer before roster and war views feel good.
+layer before roster and war views feel good. mavebot now has that base.
 Data reality: old detailed war rows cannot be backfilled unless they were
 collected, but current player/clan snapshots can start now.
 
-Built now: /config clan set and /config clan status.
-Data model: guilds[guildId].defaultClanTag in /shared/clash-history.json.
-Try: /config clan set tag:#JY99CJC8
-What it shows: the saved default clan and which commands can use it next.
+Built now: richer /roster status pages/buttons.
+Data model: rosters[rosterId], guilds[guildId], links[discordUserId].players,
+players[tag], and clans[tag] in /shared/clash-history.json.
+Try: /roster status
+What it shows: the configured clan's signups, missing members, data quality,
+and next action.
 
-Still missing: /link player so roster signup can resolve Discord users.
+Still missing: exports and deeper war/CWL reliability pages.
 ```
 
 Use the exact labels required by `clash-product-delivery.md` unless there is a

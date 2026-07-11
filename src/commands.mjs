@@ -55,6 +55,92 @@ export const commands = [
     ]
   },
   {
+    name: 'config',
+    description: 'Sets up mavebot for this Discord server.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'clan',
+        description: 'Configure the default Clash clan for this server.',
+        type: ApplicationCommandOptionType.SubcommandGroup,
+        options: [
+          {
+            name: 'set',
+            description: 'Set the default clan used by summary, roster, war, and activity commands.',
+            type: ApplicationCommandOptionType.Subcommand,
+            options: [
+              {
+                name: 'tag',
+                description: 'Clan tag, with or without #.',
+                type: ApplicationCommandOptionType.String,
+                required: true,
+                min_length: 3,
+                max_length: 20
+              }
+            ]
+          },
+          {
+            name: 'status',
+            description: 'Show the configured clan, tracking counts, and next useful commands.',
+            type: ApplicationCommandOptionType.Subcommand
+          }
+        ]
+      }
+    ]
+  },
+  {
+    name: 'link',
+    description: 'Links Discord users to Clash of Clans player tags.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'player',
+        description: 'Link your Discord account to a Clash player tag.',
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: 'tag',
+            description: 'Player tag, with or without #.',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+            min_length: 3,
+            max_length: 20
+          }
+        ]
+      },
+      {
+        name: 'status',
+        description: 'Show linked Clash players for yourself or another Discord user.',
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: 'user',
+            description: 'Discord user to check. Defaults to you.',
+            type: ApplicationCommandOptionType.User,
+            required: false
+          }
+        ]
+      },
+      {
+        name: 'remove',
+        description: 'Remove one of your linked Clash player tags.',
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: 'tag',
+            description: 'Player tag to unlink, with or without #.',
+            type: ApplicationCommandOptionType.String,
+            required: true,
+            min_length: 3,
+            max_length: 20
+          }
+        ]
+      }
+    ]
+  },
+  {
     name: 'track',
     description: 'Starts Clash history tracking for a player or clan.',
     integration_types: [0],
@@ -133,7 +219,7 @@ export const commands = [
         options: [
           {
             name: 'clan',
-            description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+            description: "Clan tag, with or without #. Defaults to this server's configured clan.",
             type: ApplicationCommandOptionType.String,
             required: false,
             min_length: 3,
@@ -175,7 +261,7 @@ export const commands = [
           },
           {
             name: 'clan',
-            description: 'Clan tag for this roster. Defaults to the latest tracked clan.',
+            description: "Clan tag for this roster. Defaults to this server's configured clan.",
             type: ApplicationCommandOptionType.String,
             required: false,
             min_length: 3,
@@ -197,7 +283,7 @@ export const commands = [
         options: [
           {
             name: 'clan',
-            description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+            description: "Clan tag, with or without #. Defaults to this server's configured clan.",
             type: ApplicationCommandOptionType.String,
             required: false,
             min_length: 3,
@@ -215,7 +301,7 @@ export const commands = [
     options: [
       {
         name: 'clan',
-        description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+        description: "Clan tag, with or without #. Defaults to this server's configured clan.",
         type: ApplicationCommandOptionType.String,
         required: false,
         min_length: 3,
@@ -231,7 +317,7 @@ export const commands = [
     options: [
       {
         name: 'clan',
-        description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+        description: "Clan tag, with or without #. Defaults to this server's configured clan.",
         type: ApplicationCommandOptionType.String,
         required: false,
         min_length: 3,
@@ -247,7 +333,7 @@ export const commands = [
     options: [
       {
         name: 'clan',
-        description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+        description: "Clan tag, with or without #. Defaults to this server's configured clan.",
         type: ApplicationCommandOptionType.String,
         required: false,
         min_length: 3,
