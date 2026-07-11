@@ -12,8 +12,10 @@ long-term player/clan tracking commands.
 - Keep data useful for Discord users first. Prefer clear commands and compact
   paged output over trying to mirror every large bot feature at once.
 - Broad "make it like ClashKing/ClashPerk" asks require product discovery plus
-  implementation. Read `clash-competitor-research.md`, inspect public sources,
-  then produce a command/data model roadmap and build the safe first slice.
+  implementation. Read `clash-product-delivery.md`,
+  `clash-operations-roadmap.md`, and `clash-competitor-research.md`, inspect
+  public sources, then produce a command/data model roadmap and build the safe
+  first slice.
 
 ## Data Reality
 

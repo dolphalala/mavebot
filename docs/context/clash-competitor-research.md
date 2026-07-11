@@ -2,7 +2,7 @@
 
 This file is durable context for requests like "look into ClashKing and
 ClashPerk", "build it like ClashKing", or "create the same data structure".
-Read it with `clash-product-delivery.md` and
+Read it with `clash-product-delivery.md`, `clash-operations-roadmap.md`, and
 `clash-database-guidance.md` before answering broad Clash product or
 data-collection asks.
 
@@ -75,7 +75,8 @@ mavebot should become a focused clan-operations bot first:
 When a Discord user asks to research ClashKing/ClashPerk, build the same data
 structure, create a roster/war/activity system, or design a competitor-style
 feature, the worker must pass the delivery gate in
-`clash-product-delivery.md`. It must not give a tiny "done" answer. It should
+`clash-product-delivery.md` and choose the next visible command slice from
+`clash-operations-roadmap.md`. It must not give a tiny "done" answer. It should
 do the local Codex equivalent:
 
 1. Inspect the current mavebot source and context docs.

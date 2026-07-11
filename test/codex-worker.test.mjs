@@ -651,6 +651,9 @@ test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product disc
       '## clash-product-delivery.md',
       'Use the completion gate.',
       '',
+      '## clash-operations-roadmap.md',
+      'Choose the next missing visible command.',
+      '',
       '## clash-competitor-research.md',
       'Use competitor research.'
     ].join('\n'),
@@ -662,8 +665,11 @@ test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product disc
   assert.match(prompt, /product-discovery/);
   assert.match(prompt, /ClashKing, ClashPerk, roster, CWL, war history, activity/);
   assert.match(prompt, /docs\/context\/clash-product-delivery\.md/);
+  assert.match(prompt, /docs\/context\/clash-operations-roadmap\.md/);
   assert.match(prompt, /docs\/context\/clash-competitor-research\.md/);
   assert.match(prompt, /completion gate/);
+  assert.match(prompt, /Choose the next missing visible command/);
+  assert.match(prompt, /choose the next missing visible command from docs\/context\/clash-operations-roadmap\.md/);
   assert.match(prompt, /source\/context audit/);
   assert.match(prompt, /visible command or honest blocker/);
   assert.match(prompt, /what you learned, what mavebot should build, what changed now, and a concrete demo/i);
@@ -1565,6 +1571,7 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   await writeFile(path.join(dir, 'local-codex-parity.md'), '# Local Parity\nMatch local Codex.');
   await writeFile(path.join(dir, 'code-map.md'), '# Code Map\nUpdate index and commands.');
   await writeFile(path.join(dir, 'clash-product-delivery.md'), '# Clash Delivery\nUse delivery gates.');
+  await writeFile(path.join(dir, 'clash-operations-roadmap.md'), '# Clash Roadmap\nChoose the next visible command.');
   await writeFile(path.join(dir, 'clash-competitor-research.md'), '# Clash Competitors\nBuild real product plans.');
   await writeFile(path.join(dir, 'clash-database-guidance.md'), '# Clash DB\nUse polling snapshots.');
   await writeFile(path.join(dir, 'z-extra.md'), '# Extra\nLess important.');
@@ -1584,8 +1591,12 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
     'source map should be loaded before Clash delivery guidance'
   );
   assert.ok(
-    bundle.indexOf('## clash-product-delivery.md') < bundle.indexOf('## clash-competitor-research.md'),
-    'Clash delivery guidance should be loaded before competitor research'
+    bundle.indexOf('## clash-product-delivery.md') < bundle.indexOf('## clash-operations-roadmap.md'),
+    'Clash delivery guidance should be loaded before operations roadmap'
+  );
+  assert.ok(
+    bundle.indexOf('## clash-operations-roadmap.md') < bundle.indexOf('## clash-competitor-research.md'),
+    'operations roadmap should be loaded before competitor research'
   );
   assert.ok(
     bundle.indexOf('## clash-competitor-research.md') < bundle.indexOf('## clash-database-guidance.md'),
@@ -1600,6 +1611,8 @@ test('readRepoContextBundle loads bounded extra docs/context markdown files', as
   assert.match(bundle, /Update index and commands/);
   assert.match(bundle, /## clash-product-delivery\.md/);
   assert.match(bundle, /Use delivery gates/);
+  assert.match(bundle, /## clash-operations-roadmap\.md/);
+  assert.match(bundle, /Choose the next visible command/);
   assert.match(bundle, /## clash-competitor-research\.md/);
   assert.match(bundle, /Build real product plans/);
   assert.match(bundle, /## clash-ui-guidance\.md/);
