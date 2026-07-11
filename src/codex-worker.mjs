@@ -465,7 +465,7 @@ export function humanizeWorkerChannelMessage(text) {
 }
 
 function hasExplicitNotLiveClaim(text) {
-  return /\b(?:not live yet|not actually live|never actually live|no deployed .*link exists|isn[’']t usable|could not verify .*live|not verified live)\b/i.test(
+  return /\b(?:not live yet|not actually live|never actually live|never deployed|not deployed|no deployed .*link exists|no real (?:one|.*link)|not a real (?:one|.*link)|isn[’']t (?:a )?real (?:one|.*link)|isn[’']t usable|could not verify .*live|not verified live)\b/i.test(
     String(text || '')
   );
 }

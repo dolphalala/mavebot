@@ -104,7 +104,7 @@ long-lived server state.
   The follow-up runner fix also exposed a final-message bug: the wrapper
   appended "It's live now" for the runner-fix deploy even though the answer said
   no website link existed. Final replies must not add live suffixes to explicit
-  not-live audit answers.
+  not-live audit answers, including "no real link yet" wording.
 
 ## Persistent Product Context
 

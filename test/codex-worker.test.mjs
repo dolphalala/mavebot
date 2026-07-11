@@ -1423,6 +1423,24 @@ test('finalChannelMessage does not append live suffix to explicit not-live audit
   assert.doesNotMatch(message, /It's live now\./);
 });
 
+test('finalChannelMessage does not append live suffix when answer says no real link exists', () => {
+  const message = finalChannelMessage({
+    codexMessage: [
+      'You are not getting a website link because there is not a real one yet.',
+      '',
+      'The big website job timed out before it committed, deployed, or verified anything.'
+    ].join('\n'),
+    checkOk: true,
+    pushResult: { pushed: true },
+    deployResult: { matched: true },
+    runtime: { botOk: true },
+    job: { text: 'why are u not giving me the link' }
+  });
+
+  assert.match(message, /not getting a website link/);
+  assert.doesNotMatch(message, /It's live now\./);
+});
+
 test('workerFailureMessage keeps channel failures short and non-secret', () => {
   const message = workerFailureMessage(
     new Error('npm run check exited 1\nSECRET_TOKEN=abc123\nfull stack trace')
