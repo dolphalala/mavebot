@@ -19,6 +19,7 @@ import {
   CocApiError,
   buildPlayerProfilePages,
   fetchPlayer,
+  normalizeClanTag,
   normalizePlayerTag
 } from './coc.mjs';
 import { createLanaHeartPng, randomLoveLetter, randomLoveuPoem } from './lana-art.mjs';
@@ -36,6 +37,7 @@ import {
   DEFAULT_CLASH_HISTORY_PLAYER_INTERVAL_MS,
   DEFAULT_CLASH_HISTORY_WAR_INTERVAL_MS,
   buildClashPlayerHistoryText,
+  buildClashRosterPlanText,
   clashHistoryStorePath,
   readClashHistoryStore,
   recordClashPlayerSnapshot,
@@ -2389,6 +2391,64 @@ client.on(Events.InteractionCreate, async (interaction) => {
           : 'I could not read Clash history for that player right now.';
       await interaction.editReply(message);
       console.error('Clash history command failed:', error);
+    }
+    return;
+  }
+
+  if (interaction.commandName === 'roster') {
+    const subcommand = interaction.options.getSubcommand(true);
+    await interaction.deferReply();
+
+    try {
+      if (subcommand !== 'plan') {
+        await interaction.editReply('I do not know that `/roster` subcommand yet.');
+        return;
+      }
+
+      const clan = interaction.options.getString('clan');
+      const size = interaction.options.getInteger('size') || 15;
+      const style = interaction.options.getString('style') || 'balanced';
+      let store = await readClashHistoryStore(clashHistoryStorePath());
+      let normalizedClanTag = null;
+      let seeded = false;
+
+      if (clan) {
+        normalizedClanTag = normalizeClanTag(clan);
+        if (!store.clans?.[normalizedClanTag]?.current) {
+          const result = await trackClashHistoryClan(normalizedClanTag, {
+            storePath: clashHistoryStorePath(),
+            source: `discord:${interaction.user.id}`,
+            clanIntervalMs: clashHistoryClanIntervalMs
+          });
+          store = result.store;
+          seeded = true;
+        }
+      }
+
+      const text = buildClashRosterPlanText(store, {
+        clanTag: normalizedClanTag,
+        size,
+        style
+      });
+
+      await interaction.editReply(
+        [
+          seeded
+            ? 'I started tracking this clan now, so the roster plan is based on the first snapshot.'
+            : null,
+          text ||
+            'Track a clan first with `/track clan tag:#CLAN`, or pass a clan tag to `/roster plan clan:#CLAN`.'
+        ]
+          .filter(Boolean)
+          .join('\n\n')
+      );
+    } catch (error) {
+      const message =
+        error instanceof CocApiError
+          ? error.message
+          : 'I could not build a Clash roster plan right now.';
+      await interaction.editReply(message);
+      console.error('Clash roster command failed:', error);
     }
     return;
   }

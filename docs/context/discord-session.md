@@ -121,12 +121,14 @@ long-lived server state.
 - `/legends player:<tag>` tracks Legend League trophy snapshots in
   `/shared/legends-tracking.json`.
 - `/track player:<tag>`, `/track clan:<tag>`, and `/track status` seed and
-  report the Clash history store at `/shared/clash-history.json`. Future
-  `/roster`, `/warstats`, `/activity`, and `/summary` work should build on
-  that store.
+  report the Clash history store at `/shared/clash-history.json`.
 - `/history player:<tag>` reads from `/shared/clash-history.json`, seeds a
   player if needed, and explains that detailed history starts from the first
   tracked snapshot.
+- `/roster plan clan:<tag> size:<5-50> style:<balanced|safe|growth>` reads
+  from `/shared/clash-history.json`, seeds a passed clan if needed, and gives a
+  first lineup/bench/data-quality plan. Future `/roster signup/status`,
+  `/warstats`, `/activity`, and `/summary` work should build on that store.
 - `/pictionary` is a Clash of Clans picture guessing game using Clash-style
   assets, difficulty settings, chat guesses, and a durable guild leaderboard.
 - `/elder`, `/mute`, and `/bench` use `/shared/elder-votes.json`; Discord role

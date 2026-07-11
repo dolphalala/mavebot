@@ -959,6 +959,199 @@ export function buildClashPlayerHistoryText(record, { tracked = null } = {}) {
   return text.length > 1900 ? `${text.slice(0, 1880)}\n...` : text;
 }
 
+function latestPlayerForRoster(store, tag, clanMember = null) {
+  const normalizedTag = normalizePlayerTag(tag);
+  const record = store.players?.[normalizedTag] || null;
+  const current = record?.current || null;
+  return {
+    tag: normalizedTag,
+    record,
+    current: current || clanMember || { tag: normalizedTag, name: normalizedTag },
+    hasPlayerSnapshot: Boolean(current)
+  };
+}
+
+function totalLevels(items = []) {
+  return (items || []).reduce(
+    (total, item) => total + (Number.isFinite(item?.level) ? item.level : 0),
+    0
+  );
+}
+
+function rosterWarSummary(record) {
+  const rows = Object.values(record?.warStats || {});
+  const attacks = rows.flatMap((row) => row.attacks || []);
+  const defenses = rows.flatMap((row) => row.defenses || []);
+  return {
+    rows: rows.length,
+    attacks: attacks.length,
+    stars: attacks.reduce(
+      (total, attack) => total + (Number.isFinite(attack.stars) ? attack.stars : 0),
+      0
+    ),
+    triples: attacks.filter((attack) => attack.stars === 3).length,
+    missed: rows.reduce(
+      (total, row) => total + (Number.isFinite(row.missedAttacks) ? row.missedAttacks : 0),
+      0
+    ),
+    defenses: defenses.length
+  };
+}
+
+function rosterCandidate(store, tag, clanMember = null, style = 'balanced') {
+  const { record, current, hasPlayerSnapshot } = latestPlayerForRoster(store, tag, clanMember);
+  const snapshots = Array.isArray(record?.snapshots) ? record.snapshots : [];
+  const war = rosterWarSummary(record);
+  const townHall = Number.isFinite(current.townHallLevel) ? current.townHallLevel : 0;
+  const heroScore = totalLevels(current.heroes);
+  const equipmentScore = totalLevels(current.heroEquipment);
+  const trophies = Number.isFinite(current.trophies) ? current.trophies : 0;
+  const warStars = Number.isFinite(current.warStars) ? current.warStars : 0;
+  const donations = Number.isFinite(current.donations) ? current.donations : 0;
+  const attackWins = Number.isFinite(current.attackWins) ? current.attackWins : 0;
+  const styleWeights = {
+    safe: { townHall: 1100, heroes: 8, equipment: 5, war: 35, activity: 0.6 },
+    balanced: { townHall: 1000, heroes: 7, equipment: 4, war: 25, activity: 0.8 },
+    growth: { townHall: 900, heroes: 5, equipment: 3, war: 15, activity: 1.1 }
+  };
+  const weights = styleWeights[style] || styleWeights.balanced;
+  const score =
+    townHall * weights.townHall +
+    heroScore * weights.heroes +
+    equipmentScore * weights.equipment +
+    war.stars * weights.war +
+    war.triples * 45 -
+    war.missed * 60 +
+    trophies * 0.3 +
+    warStars * 1.5 +
+    donations * weights.activity * 0.15 +
+    attackWins * weights.activity -
+    (hasPlayerSnapshot ? 0 : 350);
+
+  return {
+    tag: normalizePlayerTag(current.tag || tag),
+    name: current.name || tag,
+    townHall,
+    trophies,
+    warStars,
+    heroScore,
+    equipmentScore,
+    snapshots: snapshots.length,
+    hasPlayerSnapshot,
+    war,
+    score
+  };
+}
+
+function rosterReason(candidate) {
+  const bits = [`TH ${candidate.townHall || '?'}`];
+  if (candidate.heroScore) {
+    bits.push(`heroes ${candidate.heroScore}`);
+  }
+  if (candidate.war.attacks) {
+    bits.push(`${candidate.war.attacks} war attacks/${candidate.war.stars} stars`);
+  }
+  if (candidate.snapshots) {
+    bits.push(`${candidate.snapshots} snapshots`);
+  } else {
+    bits.push('needs player snapshot');
+  }
+  return bits.join(', ');
+}
+
+function rosterLine(candidate, index) {
+  return `${index}. ${candidate.name} (${candidate.tag}) - ${Math.round(candidate.score)} - ${rosterReason(candidate)}`;
+}
+
+function selectRosterClan(store, clanTag = null) {
+  if (clanTag) {
+    return store.clans?.[normalizeClanTag(clanTag)] || null;
+  }
+  const clans = Object.values(store.clans || {}).filter((record) => record?.current);
+  if (!clans.length) {
+    return null;
+  }
+  return clans.sort((a, b) => String(b.lastSeenAt || '').localeCompare(String(a.lastSeenAt || '')))[0];
+}
+
+export function buildClashRosterPlanText(
+  store,
+  { clanTag = null, size = 15, style = 'balanced' } = {}
+) {
+  const clan = selectRosterClan(store, clanTag);
+  if (!clan?.current) {
+    return null;
+  }
+
+  const rosterSize = Math.min(50, Math.max(5, Number.isFinite(size) ? size : 15));
+  const normalizedStyle = ['safe', 'balanced', 'growth'].includes(style) ? style : 'balanced';
+  const memberTags = [
+    ...(clan.current.memberTags || []),
+    ...Object.keys(clan.members || {})
+  ];
+  const uniqueTags = [
+    ...new Set(
+      memberTags.flatMap((tag) => {
+        try {
+          return [normalizePlayerTag(tag)];
+        } catch {
+          return [];
+        }
+      })
+    )
+  ];
+  const candidates = uniqueTags
+    .map((tag) => rosterCandidate(store, tag, clan.members?.[tag] || null, normalizedStyle))
+    .sort((a, b) => b.score - a.score || b.townHall - a.townHall || b.heroScore - a.heroScore);
+  const starters = candidates.slice(0, rosterSize);
+  const displayedStarters = starters.slice(0, Math.min(rosterSize, 20));
+  const bench = candidates.slice(rosterSize, rosterSize + 5);
+  const snapshotCount = candidates.filter((candidate) => candidate.hasPlayerSnapshot).length;
+  const warCount = candidates.filter((candidate) => candidate.war.rows > 0).length;
+  const missing = candidates.filter((candidate) => !candidate.hasPlayerSnapshot).slice(0, 8);
+  const lines = [
+    `**${clan.name || clan.current.name || 'Clan'} (${clan.tag || clan.current.tag}) roster plan**`,
+    `Style: ${normalizedStyle}. Target size: ${rosterSize}. Pool: ${candidates.length} member${candidates.length === 1 ? '' : 's'}.`,
+    `Data: ${snapshotCount}/${candidates.length} have player snapshots, ${warCount}/${candidates.length} have collected war/CWL rows.`,
+    '',
+    '**Suggested lineup**',
+    ...(displayedStarters.length
+      ? displayedStarters.map((candidate, index) => rosterLine(candidate, index + 1))
+      : ['No members found in the tracked clan snapshot.'])
+  ];
+
+  if (displayedStarters.length < starters.length) {
+    lines.push(`...${starters.length - displayedStarters.length} more starter${starters.length - displayedStarters.length === 1 ? '' : 's'} hidden to keep Discord readable.`);
+  }
+
+  lines.push('', '**Bench watch**');
+  if (bench.length) {
+    lines.push(...bench.map((candidate, index) => rosterLine(candidate, rosterSize + index + 1)));
+  } else {
+    lines.push('No bench candidates outside the selected roster size yet.');
+  }
+
+  lines.push('', '**Needs more data**');
+  if (missing.length) {
+    lines.push(
+      ...missing.map(
+        (candidate) =>
+          `${candidate.name} (${candidate.tag}) needs /history player or another scheduled player snapshot.`
+      )
+    );
+  } else {
+    lines.push('Every listed member has at least one player snapshot.');
+  }
+
+  lines.push(
+    '',
+    'This is a planning aid, not a final war call. It gets better as `/track clan`, `/track player`, and `/history player` collect more snapshots and war rows.'
+  );
+
+  const text = lines.join('\n');
+  return text.length > 1900 ? `${text.slice(0, 1880)}\n...` : text;
+}
+
 function isDue(record, now) {
   if (record?.completedAt) {
     return false;

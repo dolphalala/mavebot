@@ -26,6 +26,11 @@ workflow.
     `/shared/clash-history.json`, including current stats, snapshot deltas,
     clan movement, and collected war/CWL rows. If the player is not tracked
     yet, it seeds the first snapshot and explains that history starts now.
+  - `/roster plan clan:<tag> size:<5-50> style:<balanced|safe|growth>`:
+    suggests a CWL/war lineup from the tracked clan members, player snapshots,
+    hero/equipment totals, activity, and collected war/CWL rows. If a clan tag
+    is passed and not tracked yet, it seeds the first clan snapshot and explains
+    that the first plan is based on limited data.
   - `/pictionary`: starts a Clash of Clans picture guessing game in the current
     channel.
   - `/elder`: lets a server admin or existing elder grant elder status to a
@@ -87,12 +92,13 @@ workflow.
   `CLASH_HISTORY_PLAYER_TAGS`, `CLASH_HISTORY_INTERVAL_MS`,
   `CLASH_HISTORY_PLAYER_INTERVAL_MS`, `CLASH_HISTORY_CLAN_INTERVAL_MS`, and
   `CLASH_HISTORY_WAR_INTERVAL_MS`.
-- `/track` is the user-visible entry point for this store. Future roster,
-  history, activity, and war/CWL commands should read from the same store
-  rather than creating parallel tracking files.
-- `/history player` is the first reporting command on top of the store. Future
-  history improvements should add pages/buttons or richer summaries to this
-  command before creating a separate reporting surface.
+- `/track` is the user-visible enrollment entry point for this store. Roster,
+  history, activity, and war/CWL commands should read from the same store rather
+  than creating parallel tracking files.
+- `/history player` and `/roster plan` are the first reporting commands on top
+  of the store. Future history/roster improvements should add pages/buttons,
+  signup/status flows, notes, and richer summaries to these command families
+  before creating competing reporting surfaces.
 
 ## Discord Command Registration
 

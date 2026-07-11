@@ -121,6 +121,48 @@ export const commands = [
     ]
   },
   {
+    name: 'roster',
+    description: 'Builds Clash roster planning views from tracked history.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'plan',
+        description: 'Suggest a CWL or war lineup from tracked clan and player history.',
+        type: ApplicationCommandOptionType.Subcommand,
+        options: [
+          {
+            name: 'clan',
+            description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+            type: ApplicationCommandOptionType.String,
+            required: false,
+            min_length: 3,
+            max_length: 20
+          },
+          {
+            name: 'size',
+            description: 'Roster size to plan for.',
+            type: ApplicationCommandOptionType.Integer,
+            required: false,
+            min_value: 5,
+            max_value: 50
+          },
+          {
+            name: 'style',
+            description: 'How aggressive the roster recommendation should be.',
+            type: ApplicationCommandOptionType.String,
+            required: false,
+            choices: [
+              { name: 'Balanced', value: 'balanced' },
+              { name: 'Safe', value: 'safe' },
+              { name: 'Growth', value: 'growth' }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
     name: 'pictionary',
     description: 'Starts a Clash of Clans picture guessing game.',
     integration_types: [0],

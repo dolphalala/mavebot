@@ -146,6 +146,51 @@ test('history command exposes player history lookup', () => {
   ]);
 });
 
+test('roster command exposes planning options', () => {
+  const roster = commands.find((command) => command.name === 'roster');
+
+  assert.ok(roster);
+  assert.match(roster.description, /roster planning/i);
+  assert.deepEqual(roster.integration_types, [0]);
+  assert.deepEqual(roster.contexts, [0]);
+  assert.deepEqual(roster.options, [
+    {
+      name: 'plan',
+      description: 'Suggest a CWL or war lineup from tracked clan and player history.',
+      type: ApplicationCommandOptionType.Subcommand,
+      options: [
+        {
+          name: 'clan',
+          description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+          type: ApplicationCommandOptionType.String,
+          required: false,
+          min_length: 3,
+          max_length: 20
+        },
+        {
+          name: 'size',
+          description: 'Roster size to plan for.',
+          type: ApplicationCommandOptionType.Integer,
+          required: false,
+          min_value: 5,
+          max_value: 50
+        },
+        {
+          name: 'style',
+          description: 'How aggressive the roster recommendation should be.',
+          type: ApplicationCommandOptionType.String,
+          required: false,
+          choices: [
+            { name: 'Balanced', value: 'balanced' },
+            { name: 'Safe', value: 'safe' },
+            { name: 'Growth', value: 'growth' }
+          ]
+        }
+      ]
+    }
+  ]);
+});
+
 test('pictionary command is guild-install only and allows round settings', () => {
   const pictionary = commands.find((command) => command.name === 'pictionary');
 

@@ -101,10 +101,12 @@ once:
   `/shared/clash-history.json`.
 - `/history player` now exists for trophy, clan, donation, current stat, and
   war/CWL summaries from the existing store.
-- Next, add `/roster plan` for a read-only CWL planning page from current
-  tracked members, TH levels, heroes, and manual notes.
-- Add `/roster signup` and `/roster status` once the planning page can explain
-  current data quality.
+- `/roster plan` now exists for a read-only CWL/war planning page from current
+  tracked members, TH levels, heroes, equipment, activity, and collected
+  war/CWL rows. It also calls out data quality so users understand when the
+  first snapshot is still shallow.
+- Next, add `/roster signup` and `/roster status` so Discord members can join a
+  CWL/event pool and leaders can see missing players, notes, and bench state.
 - Add `/warstats clan` after current-war/CWL collection has enough real rows to
   summarize attacks and missed hits without misleading users.
 - Add exports after the data model is stable.

@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   buildClashPlayerHistoryText,
+  buildClashRosterPlanText,
   readClashHistoryStore,
   recordClashPlayerSnapshot,
   trackClashHistoryClan,
@@ -295,6 +296,98 @@ test('buildClashPlayerHistoryText summarizes collected war rows', async (t) => {
   assert.match(text, /1 war\/CWL row collected/);
   assert.match(text, /Attacks: 1, stars: 3, triples: 1, missed: 0/);
   assert.match(text, /Defenses seen: 1/);
+});
+
+test('buildClashRosterPlanText explains first-snapshot roster data quality', async (t) => {
+  const storePath = await tempStore(t);
+
+  await trackClashHistoryClan('#CLAN1', {
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    source: 'discord:user-1',
+    fetchClanImpl: async () => clan(),
+    fetchCurrentWarImpl: async () => ({ state: 'notInWar' }),
+    fetchCurrentCwlGroupImpl: async () => ({ state: 'notInWar', rounds: [] }),
+    fetchClanWarLogImpl: async () => ({ items: [] })
+  });
+
+  const store = await readClashHistoryStore(storePath);
+  const text = buildClashRosterPlanText(store, {
+    clanTag: '#CLAN1',
+    size: 15,
+    style: 'safe'
+  });
+
+  assert.match(text, /Mave \(#CLAN1\) roster plan/);
+  assert.match(text, /Style: safe\. Target size: 15\./);
+  assert.match(text, /Data: 0\/2 have player snapshots, 0\/2 have collected war\/CWL rows/);
+  assert.match(text, /Alpha \(#AAA111\).*needs player snapshot/);
+  assert.match(text, /Alpha \(#AAA111\) needs \/history player/);
+  assert.match(text, /This is a planning aid, not a final war call/);
+});
+
+test('buildClashRosterPlanText suggests roster from collected history', async (t) => {
+  const storePath = await tempStore(t);
+
+  await trackNextClashHistorySubject({
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    configuredClanTags: ['#CLAN1'],
+    configuredPlayerTags: [],
+    fetchClanImpl: async () => clan(),
+    fetchCurrentWarImpl: async () => ({ state: 'notInWar' }),
+    fetchCurrentCwlGroupImpl: async () => cwlGroup(),
+    fetchClanWarLogImpl: async () => ({ items: [] })
+  });
+  await trackNextClashHistorySubject({
+    storePath,
+    now: new Date('2026-07-01T00:00:01.000Z'),
+    configuredClanTags: ['#CLAN1'],
+    configuredPlayerTags: [],
+    fetchCwlWarImpl: async () => war()
+  });
+  await recordClashPlayerSnapshot(
+    player('#AAA111', 5700, {
+      name: 'Alpha',
+      townHallLevel: 16,
+      donations: 200
+    }),
+    {
+      storePath,
+      now: new Date('2026-07-01T00:00:02.000Z'),
+      source: 'history'
+    }
+  );
+  await recordClashPlayerSnapshot(
+    player('#BBB222', 5200, {
+      name: 'Bravo',
+      townHallLevel: 15,
+      donations: 50
+    }),
+    {
+      storePath,
+      now: new Date('2026-07-01T00:00:03.000Z'),
+      source: 'history'
+    }
+  );
+
+  const store = await readClashHistoryStore(storePath);
+  const text = buildClashRosterPlanText(store, {
+    clanTag: '#CLAN1',
+    size: 1,
+    style: 'balanced'
+  });
+
+  assert.match(text, /Mave \(#CLAN1\) roster plan/);
+  assert.match(text, /Style: balanced\. Target size: 5\./);
+  assert.match(text, /Data: 2\/2 have player snapshots, 1\/2 have collected war\/CWL rows/);
+  assert.match(text, /Suggested lineup/);
+  assert.match(text, /1\. Alpha \(#AAA111\)/);
+  assert.match(text, /war attacks\/3 stars/);
+  assert.match(text, /Bravo \(#BBB222\)/);
+  assert.match(text, /Bench watch/);
+  assert.match(text, /No bench candidates outside the selected roster size yet/);
+  assert.match(text, /Every listed member has at least one player snapshot/);
 });
 
 test('trackNextClashHistorySubject rotates clan, CWL war, and player work', async (t) => {
