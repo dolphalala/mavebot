@@ -514,6 +514,7 @@ function updatePlayerWarStats(store, warRecord) {
   }
   for (const member of warRecord.members || []) {
     const record = ensurePlayerRecord(store, member.tag, warRecord.lastSeenAt);
+    record.name = record.current?.name || member.name || record.name || member.tag;
     const sideTag = member.sideTag;
     const opponentTag =
       sideTag === warRecord.clan?.tag ? warRecord.opponent?.tag : warRecord.clan?.tag;
@@ -1363,6 +1364,413 @@ export function buildClashRosterPlanText(
 
   const text = lines.join('\n');
   return text.length > 1900 ? `${text.slice(0, 1880)}\n...` : text;
+}
+
+function clippedDiscordText(lines) {
+  const text = lines.filter((line) => line !== null && line !== undefined).join('\n');
+  return text.length > 1900 ? `${text.slice(0, 1880)}\n...` : text;
+}
+
+function normalizeMaybeClanTag(tag) {
+  if (!tag) {
+    return null;
+  }
+  try {
+    return normalizeClanTag(tag);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeMaybePlayerTag(tag) {
+  if (!tag) {
+    return null;
+  }
+  try {
+    return normalizePlayerTag(tag);
+  } catch {
+    return null;
+  }
+}
+
+function selectReportClanTag(store, clanTag = null) {
+  if (clanTag) {
+    return normalizeClanTag(clanTag);
+  }
+  const clan = selectRosterClan(store);
+  if (clan?.tag || clan?.current?.tag) {
+    return normalizeClanTag(clan.tag || clan.current.tag);
+  }
+  const tracked = Object.keys(store.tracked?.clans || {}).sort();
+  return tracked[0] ? normalizeClanTag(tracked[0]) : null;
+}
+
+function reportClanLabel(store, clanTag) {
+  const clan = store.clans?.[clanTag] || null;
+  return `${clan?.name || clan?.current?.name || 'Clan'} (${clanTag})`;
+}
+
+function comparableDateText(value) {
+  return value ? dateText(value) : 'unknown';
+}
+
+function sortedSnapshots(record) {
+  return Array.isArray(record?.snapshots)
+    ? record.snapshots.slice().sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')))
+    : [];
+}
+
+function memberName(store, tag, clan = null) {
+  const normalizedTag = normalizeMaybePlayerTag(tag) || tag;
+  return (
+    store.players?.[normalizedTag]?.current?.name ||
+    store.players?.[normalizedTag]?.name ||
+    clan?.members?.[normalizedTag]?.name ||
+    normalizedTag
+  );
+}
+
+function latestMemberTags(clan) {
+  return uniqueRosterMemberTags(clan);
+}
+
+function warSideForClan(war, clanTag) {
+  const ownIsClan = normalizeMaybeClanTag(war?.clan?.tag) === clanTag;
+  const ownIsOpponent = normalizeMaybeClanTag(war?.opponent?.tag) === clanTag;
+  if (!ownIsClan && !ownIsOpponent) {
+    return { own: null, enemy: null };
+  }
+  return ownIsClan
+    ? { own: war.clan || null, enemy: war.opponent || null }
+    : { own: war.opponent || null, enemy: war.clan || null };
+}
+
+function warsForClan(store, clanTag) {
+  return Object.values(store.wars || {})
+    .filter((war) => {
+      const { own } = warSideForClan(war, clanTag);
+      return Boolean(own);
+    })
+    .sort((a, b) =>
+      String(b.endTime || b.startTime || b.lastSeenAt || '').localeCompare(
+        String(a.endTime || a.startTime || a.lastSeenAt || '')
+      )
+    );
+}
+
+function warResultForClan(war, clanTag) {
+  const { own, enemy } = warSideForClan(war, clanTag);
+  if (!own || !enemy) {
+    return 'seen';
+  }
+  if (Number.isFinite(own.stars) && Number.isFinite(enemy.stars) && own.stars !== enemy.stars) {
+    return own.stars > enemy.stars ? 'win' : 'loss';
+  }
+  if (
+    Number.isFinite(own.destructionPercentage) &&
+    Number.isFinite(enemy.destructionPercentage) &&
+    own.destructionPercentage !== enemy.destructionPercentage
+  ) {
+    return own.destructionPercentage > enemy.destructionPercentage ? 'win' : 'loss';
+  }
+  return 'tie';
+}
+
+function resultCounts(rows, clanTag) {
+  return rows.reduce(
+    (counts, war) => {
+      const result = warResultForClan(war, clanTag);
+      counts[result] = (counts[result] || 0) + 1;
+      return counts;
+    },
+    { win: 0, loss: 0, tie: 0, seen: 0 }
+  );
+}
+
+function sideMemberTags(war, clanTag) {
+  return new Set(
+    (war?.members || [])
+      .filter((member) => normalizeMaybeClanTag(member.sideTag) === clanTag)
+      .map((member) => normalizeMaybePlayerTag(member.tag))
+      .filter(Boolean)
+  );
+}
+
+function clanAttacksForWar(war, clanTag) {
+  const tags = sideMemberTags(war, clanTag);
+  return (war?.attacks || []).filter((attack) => tags.has(normalizeMaybePlayerTag(attack.attackerTag)));
+}
+
+function aggregateWarRows(rows, clanTag) {
+  return rows.reduce(
+    (total, war) => {
+      const { own } = warSideForClan(war, clanTag);
+      const attacks = clanAttacksForWar(war, clanTag);
+      const members = sideMemberTags(war, clanTag);
+      total.attacks += Number.isFinite(own?.attacks) ? own.attacks : attacks.length;
+      total.stars += Number.isFinite(own?.stars)
+        ? own.stars
+        : attacks.reduce((sum, attack) => sum + (Number.isFinite(attack.stars) ? attack.stars : 0), 0);
+      total.triples += attacks.filter((attack) => attack.stars === 3).length;
+      if (Number.isFinite(war?.attacksPerMember) && members.size) {
+        total.missed += Math.max(0, members.size * war.attacksPerMember - attacks.length);
+      }
+      if (!war?.summaryOnly && (war?.attacks || []).length) {
+        total.fullRows += 1;
+      } else {
+        total.summaryRows += 1;
+      }
+      return total;
+    },
+    { attacks: 0, stars: 0, triples: 0, missed: 0, fullRows: 0, summaryRows: 0 }
+  );
+}
+
+function topWarAttackers(store, clanTag, limit = 5) {
+  const rows = [];
+  for (const record of Object.values(store.players || {})) {
+    const playerRows = Object.values(record?.warStats || {}).filter(
+      (row) => normalizeMaybeClanTag(row.clanTag) === clanTag
+    );
+    if (!playerRows.length) {
+      continue;
+    }
+    const attacks = playerRows.flatMap((row) => row.attacks || []);
+    rows.push({
+      tag: record.tag,
+      name: record.current?.name || record.name || record.tag,
+      attacks: attacks.length,
+      stars: attacks.reduce((total, attack) => total + (Number.isFinite(attack.stars) ? attack.stars : 0), 0),
+      triples: attacks.filter((attack) => attack.stars === 3).length,
+      missed: playerRows.reduce(
+        (total, row) => total + (Number.isFinite(row.missedAttacks) ? row.missedAttacks : 0),
+        0
+      )
+    });
+  }
+  return rows
+    .sort((a, b) => b.stars - a.stars || b.triples - a.triples || a.missed - b.missed || b.attacks - a.attacks)
+    .slice(0, limit);
+}
+
+export function buildClashWarStatsText(store, { clanTag = null } = {}) {
+  const selectedClanTag = selectReportClanTag(store, clanTag);
+  if (!selectedClanTag) {
+    return null;
+  }
+
+  const rows = warsForClan(store, selectedClanTag);
+  const counts = resultCounts(rows, selectedClanTag);
+  const aggregate = aggregateWarRows(rows, selectedClanTag);
+  const topAttackers = topWarAttackers(store, selectedClanTag);
+  const recentRows = rows.slice(0, 5).map((war) => {
+    const { own, enemy } = warSideForClan(war, selectedClanTag);
+    const result = warResultForClan(war, selectedClanTag);
+    const score =
+      Number.isFinite(own?.stars) && Number.isFinite(enemy?.stars)
+        ? `${own.stars}-${enemy.stars}`
+        : 'score unknown';
+    return `- ${comparableDateText(war.endTime || war.startTime || war.lastSeenAt)} ${result} vs ${enemy?.name || enemy?.tag || 'opponent'} (${score})`;
+  });
+
+  const lines = [
+    `**${reportClanLabel(store, selectedClanTag)} war stats**`,
+    rows.length
+      ? `${rows.length} war/CWL row${rows.length === 1 ? '' : 's'} collected: ${counts.win}W-${counts.loss}L-${counts.tie}T.`
+      : 'No collected war/CWL rows for this clan yet.',
+    rows.length
+      ? `Attacks ${numberText(aggregate.attacks)} | Stars ${numberText(aggregate.stars)} | Triples ${numberText(aggregate.triples)} | Missed ${numberText(aggregate.missed)}`
+      : 'Use `/track clan tag:#CLAN` so current wars, CWL war tags, and public war-log summaries can start collecting.',
+    aggregate.summaryRows && !aggregate.fullRows
+      ? 'Data note: current rows are public war-log summaries only. Attack-level missed-hit stats start once mavebot sees current wars or CWL wars while polling.'
+      : null,
+    '',
+    '**Recent wars**',
+    ...(recentRows.length ? recentRows : ['No recent war rows in the store yet.']),
+    '',
+    '**Top attackers from full rows**',
+    ...(topAttackers.length
+      ? topAttackers.map(
+          (row, index) =>
+            `${index + 1}. ${row.name} (${row.tag}) - ${row.stars} stars, ${row.triples} triples, ${row.missed} missed`
+        )
+      : ['No attack-level rows collected yet.'])
+  ];
+
+  return clippedDiscordText(lines);
+}
+
+function playerSnapshotDelta(store, tag) {
+  const normalizedTag = normalizeMaybePlayerTag(tag);
+  const snapshots = sortedSnapshots(store.players?.[normalizedTag]);
+  const latest = snapshots.at(-1) || store.players?.[normalizedTag]?.current || null;
+  const previous = snapshots.length > 1 ? snapshots.at(-2) : null;
+  const first = snapshots[0] || null;
+  return {
+    tag: normalizedTag,
+    name: memberName(store, normalizedTag),
+    snapshots: snapshots.length,
+    latest,
+    previous,
+    first,
+    donationsDelta:
+      previous && Number.isFinite(latest?.donations) && Number.isFinite(previous.donations)
+        ? latest.donations - previous.donations
+        : null,
+    receivedDelta:
+      previous && Number.isFinite(latest?.donationsReceived) && Number.isFinite(previous.donationsReceived)
+        ? latest.donationsReceived - previous.donationsReceived
+        : null,
+    trophiesDelta:
+      previous && Number.isFinite(latest?.trophies) && Number.isFinite(previous.trophies)
+        ? latest.trophies - previous.trophies
+        : null,
+    trophiesTotalDelta:
+      first && latest && first !== latest && Number.isFinite(latest.trophies) && Number.isFinite(first.trophies)
+        ? latest.trophies - first.trophies
+        : null,
+    latestSeenAt: store.players?.[normalizedTag]?.lastSeenAt || latest?.at || null
+  };
+}
+
+function topPlayerDeltas(rows, key, limit = 5) {
+  return rows
+    .filter((row) => Number.isFinite(row[key]) && row[key] !== 0)
+    .sort((a, b) => Math.abs(b[key]) - Math.abs(a[key]))
+    .slice(0, limit);
+}
+
+function deltaLine(row, key, label) {
+  return `${row.name} (${row.tag}) ${label} ${signedDeltaText(row[key])}`;
+}
+
+export function buildClashActivityText(store, { clanTag = null } = {}) {
+  const selectedClanTag = selectReportClanTag(store, clanTag);
+  if (!selectedClanTag) {
+    return null;
+  }
+  const clan = store.clans?.[selectedClanTag] || null;
+  if (!clan?.current) {
+    return clippedDiscordText([
+      `**${reportClanLabel(store, selectedClanTag)} activity**`,
+      'Track this clan first with `/track clan tag:#CLAN`. Activity needs at least one clan snapshot.'
+    ]);
+  }
+
+  const snapshots = sortedSnapshots(clan);
+  const latest = snapshots.at(-1) || clan.current;
+  const previous = snapshots.length > 1 ? snapshots.at(-2) : null;
+  const latestTags = new Set((latest.memberTags || []).map(normalizeMaybePlayerTag).filter(Boolean));
+  const previousTags = new Set((previous?.memberTags || []).map(normalizeMaybePlayerTag).filter(Boolean));
+  const joined = [...latestTags].filter((tag) => previous && !previousTags.has(tag));
+  const left = [...previousTags].filter((tag) => previous && !latestTags.has(tag));
+  const memberTags = latestMemberTags(clan);
+  const deltas = memberTags.map((tag) => playerSnapshotDelta(store, tag));
+  const donationRows = topPlayerDeltas(deltas, 'donationsDelta');
+  const receivedRows = topPlayerDeltas(deltas, 'receivedDelta');
+  const trophyRows = topPlayerDeltas(deltas, 'trophiesDelta');
+  const missingSnapshots = deltas.filter((row) => !row.snapshots).slice(0, 6);
+
+  const lines = [
+    `**${reportClanLabel(store, selectedClanTag)} activity**`,
+    `Clan snapshots: ${snapshots.length}. Latest: ${comparableDateText(latest.at || clan.lastSeenAt)}. Members: ${numberText(latest.memberTags?.length || clan.current.members)}.`,
+    previous
+      ? `Movement since last clan snapshot: ${joined.length} joined, ${left.length} left.`
+      : 'Only one clan snapshot exists so far. Join/leave movement appears after the next clan poll.',
+    '',
+    '**Member movement**',
+    joined.length
+      ? `Joined: ${joined.map((tag) => `${memberName(store, tag, clan)} (${tag})`).slice(0, 8).join(', ')}`
+      : 'Joined: none seen since the last snapshot.',
+    left.length
+      ? `Left: ${left.map((tag) => `${memberName(store, tag, clan)} (${tag})`).slice(0, 8).join(', ')}`
+      : 'Left: none seen since the last snapshot.',
+    '',
+    '**Donations and trophies**',
+    ...(donationRows.length
+      ? donationRows.map((row) => `- ${deltaLine(row, 'donationsDelta', 'donated')}`)
+      : ['- Donation deltas need at least two player snapshots.']),
+    ...(receivedRows.length
+      ? receivedRows.slice(0, 3).map((row) => `- ${deltaLine(row, 'receivedDelta', 'received')}`)
+      : []),
+    ...(trophyRows.length
+      ? trophyRows.slice(0, 3).map((row) => `- ${deltaLine(row, 'trophiesDelta', 'trophies')}`)
+      : []),
+    '',
+    '**Needs more data**',
+    ...(missingSnapshots.length
+      ? missingSnapshots.map(
+          (row) =>
+            `${memberName(store, row.tag, clan)} (${row.tag}) needs /history player or the scheduled player poll.`
+        )
+      : ['Every current member has at least one player snapshot.'])
+  ];
+
+  return clippedDiscordText(lines);
+}
+
+function rosterSummaryCounts(store, clanTag) {
+  const clan = store.clans?.[clanTag] || null;
+  const memberTags = latestMemberTags(clan);
+  const rosters = Object.values(store.rosters || {}).filter((record) => record?.clanTag === clanTag);
+  const latestRoster = rosters.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0] || null;
+  const signups = Object.values(latestRoster?.signups || {}).filter((signup) => signup?.playerTag);
+  const signedTags = new Set(signups.map((signup) => signup.playerTag));
+  return {
+    signups: signups.length,
+    missing: memberTags.filter((tag) => !signedTags.has(tag)).length,
+    memberCount: memberTags.length
+  };
+}
+
+export function buildClashSummaryText(store, { clanTag = null } = {}) {
+  const selectedClanTag = selectReportClanTag(store, clanTag);
+  if (!selectedClanTag) {
+    return clippedDiscordText([
+      '**Clash operations summary**',
+      'No tracked clan yet. Start with `/track clan tag:#CLAN`, then use `/summary`, `/activity`, `/warstats`, and `/roster plan`.'
+    ]);
+  }
+
+  const clan = store.clans?.[selectedClanTag] || null;
+  const tracked = store.tracked?.clans?.[selectedClanTag] || null;
+  const clanSnapshots = sortedSnapshots(clan).length;
+  const playerSnapshots = Object.values(store.players || {}).reduce(
+    (total, record) => total + (Array.isArray(record?.snapshots) ? record.snapshots.length : 0),
+    0
+  );
+  const rows = warsForClan(store, selectedClanTag);
+  const counts = resultCounts(rows, selectedClanTag);
+  const aggregate = aggregateWarRows(rows, selectedClanTag);
+  const roster = rosterSummaryCounts(store, selectedClanTag);
+  const latest = clan?.current || null;
+  const lines = [
+    `**${reportClanLabel(store, selectedClanTag)} command center**`,
+    latest
+      ? `Clan: level ${numberText(latest.level)} | ${numberText(latest.memberTags?.length || latest.members)} members | ${latest.warLeague || 'war league unknown'}`
+      : 'Clan: tracked but no clan snapshot has completed yet.',
+    `Tracking: ${Object.keys(store.tracked?.players || {}).length} players, ${Object.keys(store.tracked?.clans || {}).length} clans, ${Object.keys(store.tracked?.wars || {}).length} CWL/current-war tags.`,
+    `Snapshots: ${clanSnapshots} clan, ${playerSnapshots} player. Last checked ${comparableDateText(tracked?.lastCheckedAt)}; next due ${comparableDateText(tracked?.nextDueAt)}.`,
+    '',
+    '**Roster**',
+    roster.memberCount
+      ? `${roster.signups} signed up, ${roster.missing} current clan member${roster.missing === 1 ? '' : 's'} missing signup. Use /roster status clan:${selectedClanTag}.`
+      : 'Use `/track clan` to seed the member pool, then `/roster signup` and `/roster plan`.',
+    '',
+    '**War/CWL**',
+    rows.length
+      ? `${rows.length} row${rows.length === 1 ? '' : 's'}: ${counts.win}W-${counts.loss}L-${counts.tie}T, ${numberText(aggregate.stars)} stars, ${numberText(aggregate.missed)} missed attacks from available full rows. Use /warstats clan:${selectedClanTag}.`
+      : `No war rows yet. Keep /track clan tag:${selectedClanTag} running so current wars and public war-log summaries can collect.`,
+    '',
+    '**Activity**',
+    clanSnapshots > 1
+      ? `Activity has ${clanSnapshots} clan snapshots. Use /activity clan:${selectedClanTag} for joins/leaves and player deltas.`
+      : 'Activity is shallow until the next scheduled clan/player snapshots.',
+    '',
+    'Best next checks: /activity, /warstats, /roster plan, and /history player for specific members.'
+  ];
+
+  return clippedDiscordText(lines);
 }
 
 function isDue(record, now) {

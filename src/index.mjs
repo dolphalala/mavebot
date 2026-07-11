@@ -36,9 +36,12 @@ import {
   DEFAULT_CLASH_HISTORY_INTERVAL_MS,
   DEFAULT_CLASH_HISTORY_PLAYER_INTERVAL_MS,
   DEFAULT_CLASH_HISTORY_WAR_INTERVAL_MS,
+  buildClashActivityText,
   buildClashPlayerHistoryText,
   buildClashRosterPlanText,
   buildClashRosterStatusText,
+  buildClashSummaryText,
+  buildClashWarStatsText,
   clashHistoryStorePath,
   readClashHistoryStore,
   recordClashPlayerSnapshot,
@@ -2494,6 +2497,57 @@ client.on(Events.InteractionCreate, async (interaction) => {
           : 'I could not update the Clash roster right now.';
       await interaction.editReply(message);
       console.error('Clash roster command failed:', error);
+    }
+    return;
+  }
+
+  if (
+    interaction.commandName === 'warstats' ||
+    interaction.commandName === 'activity' ||
+    interaction.commandName === 'summary'
+  ) {
+    await interaction.deferReply();
+
+    try {
+      const clan = interaction.options.getString('clan');
+      let store = await readClashHistoryStore(clashHistoryStorePath());
+      let normalizedClanTag = clan ? normalizeClanTag(clan) : null;
+      let seeded = false;
+
+      if (normalizedClanTag && !store.clans?.[normalizedClanTag]?.current) {
+        const result = await trackClashHistoryClan(normalizedClanTag, {
+          storePath: clashHistoryStorePath(),
+          source: `discord:${interaction.user.id}`,
+          clanIntervalMs: clashHistoryClanIntervalMs
+        });
+        store = result.store;
+        seeded = true;
+      }
+
+      const text =
+        interaction.commandName === 'warstats'
+          ? buildClashWarStatsText(store, { clanTag: normalizedClanTag })
+          : interaction.commandName === 'activity'
+            ? buildClashActivityText(store, { clanTag: normalizedClanTag })
+            : buildClashSummaryText(store, { clanTag: normalizedClanTag });
+
+      await interaction.editReply(
+        [
+          seeded
+            ? 'I started tracking this clan now, so this first report is based on the first snapshot.'
+            : null,
+          text || 'Track a clan first with `/track clan tag:#CLAN`, or pass a clan tag to this command.'
+        ]
+          .filter(Boolean)
+          .join('\n\n')
+      );
+    } catch (error) {
+      const message =
+        error instanceof CocApiError
+          ? error.message
+          : 'I could not read Clash operations data right now.';
+      await interaction.editReply(message);
+      console.error('Clash operations report command failed:', error);
     }
     return;
   }

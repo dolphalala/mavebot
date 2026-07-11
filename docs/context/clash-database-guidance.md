@@ -72,13 +72,19 @@ long-term player/clan tracking commands.
   `/roster status clan:<tag>` are the first roster surfaces on the same store.
   They should be expanded with pages/buttons, richer bench state, and generated
   lineup snapshots before adding another roster store.
+- `/warstats clan:<tag>`, `/activity clan:<tag>`, and `/summary clan:<tag>` are
+  the first operations reports on the same store. They should be expanded with
+  pages/buttons, exports, default-clan config, and deeper war/activity detail
+  before creating separate stores or duplicate reporting commands.
 - Useful next command families:
   - More `/roster` pages/buttons for event enrollment, role notes, missing
     players, bench candidates, generated CWL lineups, and status pages.
-  - `/warstats` for collected attack/defense results from tracked wars.
-  - `/activity` for clan/member movement, donation deltas, and stale accounts.
-  - `/summary` and `/export` commands only after the source data is stable
-    enough to avoid misleading users.
+  - More `/warstats` pages for missed hits, defenses, attack order, and CWL
+    rounds as full war rows accumulate.
+  - More `/activity` pages for stale accounts, role/TH movement, and season
+    summaries.
+  - `/export`, `/config`, and player-linking commands after the source data is
+    stable enough to avoid misleading users.
 - Commands that depend on data collected over time should say "tracking starts
   now" when history is not yet available, not imply old data exists.
 

@@ -53,15 +53,18 @@ all of this:
 - Build from the current `/shared/clash-history.json` store unless there is a
   concrete reason to add a new durable file.
 - Current entry points are `/track`, `/history player`, `/roster plan`,
-  `/roster signup`, and `/roster status`.
-- The next missing visible surfaces are `/warstats clan`, `/activity clan`,
-  `/summary clan`, and richer paged roster views.
+  `/roster signup`, `/roster status`, `/warstats`, `/activity`, and
+  `/summary`.
+- The next missing visible surfaces are richer paged roster/player views,
+  exports, `/config` or default-clan setup, player linking, and deeper
+  war/CWL/activity pages once more scheduled data accumulates.
 - Use command names that actually exist in `src/commands.mjs` and
   `src/index.mjs`. Do not promise `/roster enroll` or `/roster build` unless
   the same run implements, registers, and tests those exact commands.
 - If a user asks for "ClashKing/ClashPerk style" without naming a command,
   infer the next useful leadership workflow: setup, tracking, signup, roster
-  planning, war/CWL reliability, activity, exports.
+  planning, war/CWL reliability, activity, exports, or richer pages on the
+  existing commands.
 - Do not copy competitors exactly. Use public feature shape to build mavebot's
   focused clan-operations version.
 

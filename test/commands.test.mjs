@@ -238,6 +238,26 @@ test('roster command exposes plan, signup, and status options', () => {
   });
 });
 
+test('Clash operations commands expose optional clan tags', () => {
+  for (const name of ['warstats', 'activity', 'summary']) {
+    const command = commands.find((entry) => entry.name === name);
+
+    assert.ok(command, `${name} command should exist`);
+    assert.deepEqual(command.integration_types, [0]);
+    assert.deepEqual(command.contexts, [0]);
+    assert.deepEqual(command.options, [
+      {
+        name: 'clan',
+        description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        min_length: 3,
+        max_length: 20
+      }
+    ]);
+  }
+});
+
 test('pictionary command is guild-install only and allows round settings', () => {
   const pictionary = commands.find((command) => command.name === 'pictionary');
 

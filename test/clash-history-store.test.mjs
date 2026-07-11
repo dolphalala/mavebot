@@ -4,9 +4,12 @@ import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  buildClashActivityText,
   buildClashPlayerHistoryText,
   buildClashRosterPlanText,
   buildClashRosterStatusText,
+  buildClashSummaryText,
+  buildClashWarStatsText,
   readClashHistoryStore,
   recordClashPlayerSnapshot,
   signupClashRoster,
@@ -48,39 +51,41 @@ function player(tag, trophies, extra = {}) {
   };
 }
 
-function clan() {
+function clan(extra = {}) {
+  const memberList = extra.memberList || [
+    {
+      tag: '#AAA111',
+      name: 'Alpha',
+      townHallLevel: 16,
+      expLevel: 240,
+      trophies: 5600,
+      donations: 100,
+      donationsReceived: 80,
+      league: { name: 'Legend League' }
+    },
+    {
+      tag: '#BBB222',
+      name: 'Bravo',
+      townHallLevel: 15,
+      expLevel: 220,
+      trophies: 5200,
+      donations: 50,
+      donationsReceived: 40,
+      league: { name: 'Titan League I' }
+    }
+  ];
   return {
     tag: '#CLAN1',
     name: 'Mave',
     clanLevel: 20,
-    members: 2,
+    members: extra.members ?? memberList.length,
     clanPoints: 55555,
     clanBuilderBasePoints: 44444,
     requiredTrophies: 5000,
     isWarLogPublic: true,
     warLeague: { name: 'Champion League I' },
-    memberList: [
-      {
-        tag: '#AAA111',
-        name: 'Alpha',
-        townHallLevel: 16,
-        expLevel: 240,
-        trophies: 5600,
-        donations: 100,
-        donationsReceived: 80,
-        league: { name: 'Legend League' }
-      },
-      {
-        tag: '#BBB222',
-        name: 'Bravo',
-        townHallLevel: 15,
-        expLevel: 220,
-        trophies: 5200,
-        donations: 50,
-        donationsReceived: 40,
-        league: { name: 'Titan League I' }
-      }
-    ]
+    ...extra,
+    memberList
   };
 }
 
@@ -439,6 +444,156 @@ test('signupClashRoster stores signups and buildClashRosterStatusText shows miss
   assert.match(text, /Missing from signup/);
   assert.match(text, /Bravo \(#BBB222\)/);
   assert.match(text, /Roster status gets smarter/);
+});
+
+test('buildClashWarStatsText summarizes clan war rows and attack-level details', async (t) => {
+  const storePath = await tempStore(t);
+
+  await trackNextClashHistorySubject({
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    configuredClanTags: ['#CLAN1'],
+    configuredPlayerTags: [],
+    fetchClanImpl: async () => clan(),
+    fetchCurrentWarImpl: async () => ({ state: 'notInWar' }),
+    fetchCurrentCwlGroupImpl: async () => cwlGroup(),
+    fetchClanWarLogImpl: async () => ({
+      items: [
+        {
+          endTime: '2026-06-28T00:00:00.000Z',
+          teamSize: 50,
+          attacksPerMember: 2,
+          clan: { tag: '#CLAN1', name: 'Mave', stars: 120, destructionPercentage: 92 },
+          opponent: { tag: '#OLD1', name: 'Old Enemy', stars: 110, destructionPercentage: 88 }
+        }
+      ]
+    })
+  });
+  await trackNextClashHistorySubject({
+    storePath,
+    now: new Date('2026-07-01T00:00:01.000Z'),
+    configuredClanTags: ['#CLAN1'],
+    configuredPlayerTags: [],
+    fetchCwlWarImpl: async () => war()
+  });
+
+  const store = await readClashHistoryStore(storePath);
+  const text = buildClashWarStatsText(store, { clanTag: '#CLAN1' });
+
+  assert.match(text, /Mave \(#CLAN1\) war stats/);
+  assert.match(text, /2 war\/CWL rows collected: 2W-0L-0T/);
+  assert.match(text, /Attacks 1 \| Stars 123 \| Triples 1 \| Missed 0/);
+  assert.match(text, /win vs Enemy \(3-2\)/);
+  assert.match(text, /Alpha \(#AAA111\) - 3 stars, 1 triples, 0 missed/);
+});
+
+test('buildClashActivityText shows member movement and player snapshot deltas', async (t) => {
+  const storePath = await tempStore(t);
+
+  await trackClashHistoryClan('#CLAN1', {
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    source: 'discord:user-1',
+    fetchClanImpl: async () => clan(),
+    fetchCurrentWarImpl: async () => ({ state: 'notInWar' }),
+    fetchCurrentCwlGroupImpl: async () => ({ state: 'notInWar', rounds: [] }),
+    fetchClanWarLogImpl: async () => ({ items: [] })
+  });
+  await recordClashPlayerSnapshot(player('#AAA111', 5600, { name: 'Alpha', donations: 100 }), {
+    storePath,
+    now: new Date('2026-07-01T00:01:00.000Z'),
+    source: 'history'
+  });
+  await recordClashPlayerSnapshot(player('#AAA111', 5650, { name: 'Alpha', donations: 140, donationsReceived: 95 }), {
+    storePath,
+    now: new Date('2026-07-01T00:10:00.000Z'),
+    source: 'history'
+  });
+  await trackClashHistoryClan('#CLAN1', {
+    storePath,
+    now: new Date('2026-07-02T00:00:00.000Z'),
+    source: 'discord:user-1',
+    fetchClanImpl: async () =>
+      clan({
+        memberList: [
+          {
+            tag: '#AAA111',
+            name: 'Alpha',
+            townHallLevel: 16,
+            expLevel: 240,
+            trophies: 5650,
+            donations: 140,
+            donationsReceived: 95,
+            league: { name: 'Legend League' }
+          },
+          {
+            tag: '#CCC333',
+            name: 'Charlie',
+            townHallLevel: 14,
+            expLevel: 200,
+            trophies: 4800,
+            donations: 20,
+            donationsReceived: 10,
+            league: { name: 'Champion League I' }
+          }
+        ]
+      }),
+    fetchCurrentWarImpl: async () => ({ state: 'notInWar' }),
+    fetchCurrentCwlGroupImpl: async () => ({ state: 'notInWar', rounds: [] }),
+    fetchClanWarLogImpl: async () => ({ items: [] })
+  });
+
+  const store = await readClashHistoryStore(storePath);
+  const text = buildClashActivityText(store, { clanTag: '#CLAN1' });
+
+  assert.match(text, /Mave \(#CLAN1\) activity/);
+  assert.match(text, /Movement since last clan snapshot: 1 joined, 1 left/);
+  assert.match(text, /Joined: Charlie \(#CCC333\)/);
+  assert.match(text, /Left: Bravo \(#BBB222\)/);
+  assert.match(text, /Alpha \(#AAA111\) donated \+40/);
+  assert.match(text, /Alpha \(#AAA111\) trophies \+50/);
+  assert.match(text, /Charlie \(#CCC333\) needs \/history player/);
+});
+
+test('buildClashSummaryText gives a compact command-center view', async (t) => {
+  const storePath = await tempStore(t);
+
+  await trackNextClashHistorySubject({
+    storePath,
+    now: new Date('2026-07-01T00:00:00.000Z'),
+    configuredClanTags: ['#CLAN1'],
+    configuredPlayerTags: [],
+    fetchClanImpl: async () => clan(),
+    fetchCurrentWarImpl: async () => ({ state: 'notInWar' }),
+    fetchCurrentCwlGroupImpl: async () => cwlGroup(),
+    fetchClanWarLogImpl: async () => ({ items: [] })
+  });
+  await trackNextClashHistorySubject({
+    storePath,
+    now: new Date('2026-07-01T00:00:01.000Z'),
+    configuredClanTags: ['#CLAN1'],
+    configuredPlayerTags: [],
+    fetchCwlWarImpl: async () => war()
+  });
+  await signupClashRoster({
+    playerTag: '#AAA111',
+    clanTag: '#CLAN1',
+    guildId: 'guild-1',
+    userId: 'discord-user-1',
+    username: 'Allen',
+    storePath,
+    now: new Date('2026-07-01T00:05:00.000Z'),
+    fetchPlayerImpl: async (tag) => player(tag, 5700, { name: 'Alpha', donations: 200 })
+  });
+
+  const store = await readClashHistoryStore(storePath);
+  const text = buildClashSummaryText(store, { clanTag: '#CLAN1' });
+
+  assert.match(text, /Mave \(#CLAN1\) command center/);
+  assert.match(text, /Tracking: 2 players, 1 clans, 1 CWL\/current-war tags/);
+  assert.match(text, /1 signed up, 1 current clan member missing signup/);
+  assert.match(text, /1 row: 1W-0L-0T, 3 stars, 0 missed attacks/);
+  assert.match(text, /Best next checks: \/activity, \/warstats, \/roster plan/);
 });
 
 test('trackNextClashHistorySubject rotates clan, CWL war, and player work', async (t) => {

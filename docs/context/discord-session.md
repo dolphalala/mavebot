@@ -131,8 +131,12 @@ long-lived server state.
 - `/roster signup player:<tag> clan:<tag> note:<text>` and
   `/roster status clan:<tag>` read/write roster enrollment under
   `/shared/clash-history.json` so leaders can see signed players, missing clan
-  members, notes, and data-readiness warnings. Future `/warstats`, `/activity`,
-  and `/summary` work should build on that store.
+  members, notes, and data-readiness warnings.
+- `/warstats clan:<tag>`, `/activity clan:<tag>`, and
+  `/summary clan:<tag>` now read from `/shared/clash-history.json` for the
+  first ClashKing/ClashPerk-style operations views: war/CWL rows, attack-level
+  details when collected, member movement, donation/trophy deltas, roster
+  readiness, and command-center next steps.
 - `/pictionary` is a Clash of Clans picture guessing game using Clash-style
   assets, difficulty settings, chat guesses, and a durable guild leaderboard.
 - `/elder`, `/mute`, and `/bench` use `/shared/elder-votes.json`; Discord role
@@ -148,7 +152,8 @@ long-lived server state.
 - Keep the GitHub repository synchronized with live server changes so worker
   jobs and server auto-deploys use the same code.
 - Continue improving Discord commands for Clash of Clans workflows, especially
-  roster, history, war/CWL, and database-backed clan operations.
+  richer roster pages/buttons, account linking/config, exports, richer
+  war/CWL detail, and database-backed clan operations.
 - Keep broad Clash product asks from collapsing into tiny replies. A request
   like "research how ClashKing and ClashPerk work and create the same data
   structure" should produce a researched plan plus a concrete code/docs/test

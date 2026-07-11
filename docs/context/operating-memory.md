@@ -36,6 +36,16 @@ workflow.
     `/shared/clash-history.json`, then show signed players, missing clan
     members, notes, and data-readiness warnings from the same Clash history
     store.
+  - `/warstats clan:<tag>`: summarizes collected war/CWL rows for a tracked
+    clan, including public war-log results, attack-level stars/triples/missed
+    hits when full current-war/CWL rows exist, and a data-reality note when
+    only summary rows are available.
+  - `/activity clan:<tag>`: shows clan snapshot count, member joins/leaves,
+    donation/received/trophy deltas from player snapshots, and which current
+    members still need player snapshots.
+  - `/summary clan:<tag>`: gives a compact Clash operations command-center
+    view with tracking counts, roster readiness, war/CWL coverage, activity
+    readiness, and next commands.
   - `/pictionary`: starts a Clash of Clans picture guessing game in the current
     channel.
   - `/elder`: lets a server admin or existing elder grant elder status to a
@@ -100,10 +110,11 @@ workflow.
 - `/track` is the user-visible enrollment entry point for this store. Roster,
   history, activity, and war/CWL commands should read from the same store rather
   than creating parallel tracking files.
-- `/history player`, `/roster plan`, `/roster signup`, and `/roster status` are
-  the first reporting/enrollment commands on top of the store. Future
-  history/roster improvements should add pages/buttons, richer bench state, and
-  generated lineup snapshots to these command families before creating
+- `/history player`, `/roster plan`, `/roster signup`, `/roster status`,
+  `/warstats`, `/activity`, and `/summary` are the first reporting/enrollment
+  commands on top of the store. Future history/roster/operations improvements
+  should add pages/buttons, richer bench state, generated lineup snapshots,
+  exports, config/linking, and richer activity/war detail before creating
   competing reporting surfaces.
 
 ## Discord Command Registration

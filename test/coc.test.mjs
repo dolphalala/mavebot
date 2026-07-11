@@ -11,6 +11,7 @@ import {
   fetchCurrentCwlGroup,
   fetchCurrentWar,
   fetchCwlWar,
+  normalizeClanTag,
   fetchPlayer,
   normalizePlayerTag
 } from '../src/coc.mjs';
@@ -77,6 +78,13 @@ test('normalizePlayerTag accepts tags with or without leading hash', () => {
 test('normalizePlayerTag rejects invalid tags', () => {
   assert.throws(() => normalizePlayerTag(''), CocApiError);
   assert.throws(() => normalizePlayerTag('@@@'), CocApiError);
+});
+
+test('normalizeClanTag rejects invalid tags with clan wording', () => {
+  assert.throws(
+    () => normalizeClanTag('@@@'),
+    /Please enter a valid Clash of Clans clan tag/
+  );
 });
 
 test('encodeCocTag safely encodes the leading hash', () => {

@@ -670,8 +670,14 @@ test('buildCodexWorkerPrompt treats ClashKing and ClashPerk asks as product disc
   assert.match(prompt, /If the user asks to start collecting or create the same data structure/);
   assert.match(prompt, /Backend-only work is incomplete/);
   assert.match(prompt, /current Clash data-collection entry point is \/track player, \/track clan, and \/track status/);
-  assert.match(prompt, /\/history player, \/roster plan, \/roster signup, and \/roster status are the first reporting\/enrollment surfaces/);
-  assert.match(prompt, /Future \/warstats, \/activity, \/summary, and richer roster pages should build from the same store/);
+  assert.match(
+    prompt,
+    /\/history player, \/roster plan, \/roster signup, \/roster status, \/warstats, \/activity, and \/summary are the first reporting\/enrollment surfaces/,
+  );
+  assert.match(
+    prompt,
+    /Future richer roster\/player pages, exports, config\/default-clan setup, player linking, and deeper war\/activity pages should build from the same store/,
+  );
   assert.match(prompt, /Use actual command names from src\/commands\.mjs and src\/index\.mjs/);
   assert.match(prompt, /Do not invent roster names such as \/roster enroll or \/roster build/);
   assert.match(prompt, /What I learned, Data reality, What mavebot should build, Current visible slice, Data model\/commands, Demo\/next command, and Still missing/);
@@ -1263,7 +1269,7 @@ test('finalChannelMessage preserves Clash product-delivery structure', () => {
       'Try: `/roster status clan:#JY99CJC8`',
       'What it shows: a CWL pool summary, top accounts, bench/watch list, and what still needs more snapshots.',
       '',
-      'Still missing: `/warstats clan` is the next slice once current-war and CWL rows are deep enough.',
+      'Still missing: richer roster pages, exports, default-clan config, and deeper war/activity pages as scheduled data accumulates.',
       '',
       'Checks:',
       '- npm run check'
@@ -1281,7 +1287,7 @@ test('finalChannelMessage preserves Clash product-delivery structure', () => {
   assert.match(message, /Built now: `\/roster status clan:#JY99CJC8`/);
   assert.match(message, /Data model: `\/shared\/clash-history\.json`/);
   assert.match(message, /Try: `\/roster status clan:#JY99CJC8`/);
-  assert.match(message, /Still missing: `\/warstats clan`/);
+  assert.match(message, /Still missing: richer roster pages/);
   assert.match(message, /It's live now\./);
   assert.doesNotMatch(message, /npm run check/);
 });

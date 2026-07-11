@@ -114,9 +114,13 @@ once:
 - `/roster signup` and `/roster status` now exist so Discord members can join a
   CWL/event pool and leaders can see missing players, notes, and shallow data
   warnings from the same store.
-- Add `/warstats clan` after current-war/CWL collection has enough real rows to
-  summarize attacks and missed hits without misleading users.
-- Add exports after the data model is stable.
+- `/warstats clan`, `/activity clan`, and `/summary clan` now exist as the
+  first Clash operations reports on the same store. They are honest about
+  summary-only public war-log rows versus full attack-level current-war/CWL
+  rows.
+- Next useful slices are richer paged output, default-clan config, player
+  linking, roster exports, war/activity exports, reminders, and deeper
+  attack/missed-hit pages once scheduled data accumulates.
 
 Each slice should leave the Discord user with a working command, a realistic
 demo, or a clear explanation of the exact data that will become useful after

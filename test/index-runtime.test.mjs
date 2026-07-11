@@ -133,3 +133,16 @@ test('roster runtime handles signup and status subcommands', async () => {
   assert.match(source, /buildClashRosterStatusText/);
   assert.match(source, /interaction\.options\.getString\('player', true\)/);
 });
+
+test('Clash operations report commands are handled at runtime', async () => {
+  const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
+
+  assert.match(source, /interaction\.commandName === 'warstats'/);
+  assert.match(source, /interaction\.commandName === 'activity'/);
+  assert.match(source, /interaction\.commandName === 'summary'/);
+  assert.match(source, /buildClashWarStatsText/);
+  assert.match(source, /buildClashActivityText/);
+  assert.match(source, /buildClashSummaryText/);
+  assert.match(source, /interaction\.options\.getString\('clan'\)/);
+  assert.match(source, /I started tracking this clan now/);
+});

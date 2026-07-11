@@ -133,7 +133,14 @@ export async function fetchPlayer(
 }
 
 export function normalizeClanTag(value) {
-  return normalizePlayerTag(value);
+  try {
+    return normalizePlayerTag(value);
+  } catch (error) {
+    if (error instanceof CocApiError) {
+      throw new CocApiError('Please enter a valid Clash of Clans clan tag.');
+    }
+    throw error;
+  }
 }
 
 export async function fetchClan(

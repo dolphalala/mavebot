@@ -208,6 +208,54 @@ export const commands = [
     ]
   },
   {
+    name: 'warstats',
+    description: 'Summarizes collected war and CWL stats for a tracked Clash clan.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'clan',
+        description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        min_length: 3,
+        max_length: 20
+      }
+    ]
+  },
+  {
+    name: 'activity',
+    description: 'Shows clan movement, donation deltas, and data gaps from tracking.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'clan',
+        description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        min_length: 3,
+        max_length: 20
+      }
+    ]
+  },
+  {
+    name: 'summary',
+    description: 'Shows a compact Clash operations summary for a tracked clan.',
+    integration_types: [0],
+    contexts: [0],
+    options: [
+      {
+        name: 'clan',
+        description: 'Clan tag, with or without #. Defaults to the latest tracked clan.',
+        type: ApplicationCommandOptionType.String,
+        required: false,
+        min_length: 3,
+        max_length: 20
+      }
+    ]
+  },
+  {
     name: 'pictionary',
     description: 'Starts a Clash of Clans picture guessing game.',
     integration_types: [0],
