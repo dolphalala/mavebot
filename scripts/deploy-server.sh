@@ -12,6 +12,7 @@ LEGENDS_STORE_FILE="${LEGENDS_STORE_FILE:-/opt/urba-apps/discord-bot/shared/lege
 CLASH_HISTORY_STORE_FILE="${CLASH_HISTORY_STORE_FILE:-/opt/urba-apps/discord-bot/shared/clash-history.json}"
 ELDER_STORE_FILE="${ELDER_STORE_FILE:-/opt/urba-apps/discord-bot/shared/elder-votes.json}"
 PICTIONARY_STORE_FILE="${PICTIONARY_STORE_FILE:-/opt/urba-apps/discord-bot/shared/pictionary-leaderboard.json}"
+BASE_MARKETPLACE_DB_PASSWORD_FILE="${BASE_MARKETPLACE_DB_PASSWORD_FILE:-/opt/urba-apps/discord-bot/shared/base-marketplace-db-password}"
 LOG_DIR="${LOG_DIR:-/opt/urba-apps/discord-bot/shared/logs}"
 LOCK_FILE="${LOCK_FILE:-/opt/urba-apps/discord-bot/shared/deploy.lock}"
 BRANCH="${BRANCH:-main}"
@@ -95,6 +96,18 @@ if [ ! -s "$PICTIONARY_STORE_FILE" ]; then
 fi
 chmod 600 "$PICTIONARY_STORE_FILE"
 chown 1000:1000 "$PICTIONARY_STORE_FILE" 2>/dev/null || true
+if [ ! -s "$BASE_MARKETPLACE_DB_PASSWORD_FILE" ]; then
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 24 >"$BASE_MARKETPLACE_DB_PASSWORD_FILE"
+  else
+    python3 - <<'PY' >"$BASE_MARKETPLACE_DB_PASSWORD_FILE"
+import secrets
+print(secrets.token_hex(24))
+PY
+  fi
+fi
+chmod 600 "$BASE_MARKETPLACE_DB_PASSWORD_FILE"
+chown 1000:1000 "$BASE_MARKETPLACE_DB_PASSWORD_FILE" 2>/dev/null || true
 mkdir -p \
   "$CODEX_HOME_DIR" \
   "$CODEX_WORKER_DIR/jobs" \
@@ -112,7 +125,8 @@ git -C "$APP_ROOT" checkout "$BRANCH"
 git -C "$APP_ROOT" merge --ff-only "origin/$BRANCH"
 
 docker compose -f "$APP_ROOT/docker-compose.yml" config --quiet
-docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker build discord-bot codex-worker
+docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker build discord-bot codex-worker base-marketplace-web
+docker compose -f "$APP_ROOT/docker-compose.yml" up -d base-marketplace-db
 
 has_value() {
   env_has_value "$APP_ENV" "$1"
@@ -130,7 +144,7 @@ else
 fi
 
 docker compose -f "$APP_ROOT/docker-compose.yml" run --rm discord-bot npm run register
-docker compose -f "$APP_ROOT/docker-compose.yml" up -d discord-bot
+docker compose -f "$APP_ROOT/docker-compose.yml" up -d discord-bot base-marketplace-web
 
 requeue_stale_worker_jobs() {
   local processing_dir="$CODEX_WORKER_DIR/processing"
@@ -175,13 +189,28 @@ maybe_recreate_codex_worker
 for _ in $(seq 1 20); do
   if curl --fail --silent --show-error http://127.0.0.1:4188/healthz >/dev/null; then
     echo "Health check passed."
-    docker compose -f "$APP_ROOT/docker-compose.yml" ps
-    exit 0
+    bot_health=1
+    break
   fi
   sleep 2
 done
 
+for _ in $(seq 1 20); do
+  if curl --fail --silent --show-error http://127.0.0.1:4192/healthz >/dev/null; then
+    echo "Marketplace health check passed."
+    marketplace_health=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "${bot_health:-0}" = "1" ] && [ "${marketplace_health:-0}" = "1" ]; then
+  docker compose -f "$APP_ROOT/docker-compose.yml" ps
+  exit 0
+fi
+
 echo "ERROR: health check failed."
 docker compose -f "$APP_ROOT/docker-compose.yml" ps || true
 docker logs --tail=100 urba-discord-bot || true
+docker logs --tail=100 urba-base-marketplace-web || true
 exit 1

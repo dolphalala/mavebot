@@ -61,6 +61,10 @@ workflow.
 - The app is Clash of Clans focused. CoC API calls should use the official API
   base URL `https://api.clashofclans.com/v1` and the server-only
   `COC_API_TOKEN`.
+- The recovered website product is `MaveBase`, a Clash base layout marketplace
+  for fresh paid bases, builder/subscription trust, reviews, anti-repost
+  fingerprints, and Clash API evidence. Focused context lives in
+  `docs/context/base-marketplace.md`.
 
 ## Deployment
 
@@ -72,6 +76,15 @@ workflow.
 - CoC API env keys live in the server-only env file:
   `COC_API_BASE_URL` and `COC_API_TOKEN`.
 - Docker Compose service/container: `urba-discord-bot`.
+- Website Docker Compose service/container: `base-marketplace-web` /
+  `urba-base-marketplace-web`.
+- Website preview URL: `http://5.78.127.221:4192/`.
+- Website local health endpoint: `http://127.0.0.1:4192/healthz`.
+- Website Postgres service/container: `base-marketplace-db` /
+  `urba-base-marketplace-db`, internal only.
+- Website database password file:
+  `/opt/urba-apps/discord-bot/shared/base-marketplace-db-password`; deploy
+  generates it if missing and it must never be committed.
 - Remote Codex worker container: `urba-codex-worker`.
 - Health endpoint: `http://127.0.0.1:4188/healthz`.
 - GitHub deploys should use the server-local private deploy webhook when
@@ -84,7 +97,10 @@ workflow.
   edits a branch or PR is not deployed and must not be described as live.
 - Do not add mavebot endpoints to `chat.urba.group`; that domain belongs to
   Chatwoot.
-- The deploy script builds `discord-bot` and `codex-worker`. It recreates
+- The deploy script builds `discord-bot`, `codex-worker`, and
+  `base-marketplace-web`. It starts/verifies the marketplace Postgres and web
+  services separately from the Discord bot.
+- The deploy script recreates
   `codex-worker` only when no worker job is active; if a job is in
   `processing`, it writes `shared/codex-worker/restart-needed` and completes
   the worker recreate after the queue is clear.
@@ -224,6 +240,7 @@ workflow.
   `docs/context/discord-session.md`, then
   `docs/context/remote-codex-session.md`, then `docs/context/code-map.md`,
   then any relevant focused context file such as
+  `docs/context/base-marketplace.md`,
   `docs/context/clash-database-guidance.md` or
   `docs/context/clash-ui-guidance.md`, then inspect the current code before
   changing behavior.

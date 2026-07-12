@@ -12,9 +12,10 @@ RUN npm install --omit=dev
 COPY --chown=node:node src ./src
 COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node docs ./docs
+COPY --chown=node:node web ./web
 
 USER node
 EXPOSE 4188
-EXPOSE 4190
+EXPOSE 4192
 
 CMD ["node", "src/index.mjs"]

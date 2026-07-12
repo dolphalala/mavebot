@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="MaveBase is a Clash of Clans base layout marketplace prototype for fresh paid bases, builder reviews, and anti-repost protection."
+    />
+    <title>MaveBase - Clash Base Marketplace</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="min-h-screen bg-[#11131b] text-slate-100">
+    <main class="min-h-screen overflow-hidden">
+      <section class="app-shell relative isolate px-4 py-4 sm:px-6 lg:px-8">
+        <div class="mx-auto flex max-w-7xl flex-col gap-4">
+          <header class="topbar flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#171b26]/85 px-4 py-3 shadow-2xl shadow-black/30 backdrop-blur">
+            <div class="flex items-center gap-3">
+              <div class="brand-mark" aria-hidden="true">
+                <span></span>
+              </div>
+              <div>
+                <p class="text-xs uppercase text-emerald-200">MaveBase preview</p>
+                <h1 class="text-xl font-semibold text-white sm:text-2xl">Base layout marketplace</h1>
+              </div>
+            </div>
+            <nav class="flex flex-wrap items-center gap-2 text-sm text-slate-300" aria-label="Marketplace views">
+              <button class="nav-pill is-active" data-section-link="market">Market</button>
+              <button class="nav-pill" data-section-link="builders">Builders</button>
+              <button class="nav-pill" data-section-link="protect">Protect</button>
+            </nav>
+          </header>
+
+          <section class="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
+            <div class="panel hero-panel overflow-hidden rounded-lg border border-white/10 bg-[#171b26]/90 p-4 shadow-2xl shadow-black/25">
+              <div class="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(320px,1.05fr)]">
+                <div class="space-y-4">
+                  <div>
+                    <p class="text-sm font-medium text-amber-200">For fresh war, CWL, Legend, Builder Base, and Capital Hall layouts</p>
+                    <h2 class="mt-2 max-w-2xl text-3xl font-semibold leading-tight text-white sm:text-4xl">
+                      Buy bases with proof, not guesswork.
+                    </h2>
+                    <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+                      MaveBase is built around the pain Allen described: paid base packs need freshness, seller trust, reviews, and duplicate protection before buyers spend money.
+                    </p>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 sm:grid-cols-4" id="stats"></div>
+
+                  <div class="filter-row flex flex-wrap gap-2" aria-label="Marketplace filters">
+                    <button class="filter-chip is-active" data-filter="all">All</button>
+                    <button class="filter-chip" data-filter="Legend League">Legend</button>
+                    <button class="filter-chip" data-filter="CWL">CWL</button>
+                    <button class="filter-chip" data-filter="War">War</button>
+                  </div>
+                </div>
+
+                <div class="preview-frame">
+                  <div class="preview-frame-header">
+                    <span>Live listing preview</span>
+                    <span id="active-price">$4</span>
+                  </div>
+                  <div id="featured-base" class="base-showcase" aria-live="polite"></div>
+                </div>
+              </div>
+            </div>
+
+            <aside class="panel rounded-lg border border-white/10 bg-[#171b26]/90 p-4 shadow-2xl shadow-black/25">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-xs uppercase text-sky-200">Trust engine</p>
+                  <h2 class="text-lg font-semibold text-white">What makes this different</h2>
+                </div>
+                <span class="status-dot">online</span>
+              </div>
+              <div id="findings" class="mt-4 space-y-3"></div>
+            </aside>
+          </section>
+
+          <section id="market" class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div class="panel rounded-lg border border-white/10 bg-[#171b26]/90 p-4 shadow-2xl shadow-black/25">
+              <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p class="text-xs uppercase text-emerald-200">Base listings</p>
+                  <h2 class="text-xl font-semibold text-white">Fresh packs and single bases</h2>
+                </div>
+                <button class="primary-button" id="compare-action">Run similarity check</button>
+              </div>
+              <div id="listing-grid" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"></div>
+            </div>
+
+            <aside class="panel rounded-lg border border-white/10 bg-[#171b26]/90 p-4 shadow-2xl shadow-black/25">
+              <p class="text-xs uppercase text-amber-200">Buyer workflow</p>
+              <h2 class="mt-1 text-xl font-semibold text-white">From browse to protected sale</h2>
+              <ol class="mt-4 space-y-3 text-sm text-slate-300">
+                <li class="workflow-step"><span>1</span>Filter by TH, mode, price, freshness, and builder reputation.</li>
+                <li class="workflow-step"><span>2</span>Open the listing to inspect proof, notes, screenshots, and defense results.</li>
+                <li class="workflow-step"><span>3</span>Run duplicate detection before publish or resale.</li>
+                <li class="workflow-step"><span>4</span>Review the base after real war, CWL, or Legend results come in.</li>
+              </ol>
+            </aside>
+          </section>
+
+          <section id="builders" class="panel rounded-lg border border-white/10 bg-[#171b26]/90 p-4 shadow-2xl shadow-black/25">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p class="text-xs uppercase text-sky-200">Builder reputation</p>
+                <h2 class="text-xl font-semibold text-white">Seller pages need proof and cadence</h2>
+              </div>
+              <span class="subtle-badge">Subscriptions and one-off drops</span>
+            </div>
+            <div id="builders-grid" class="grid gap-3 md:grid-cols-3"></div>
+          </section>
+
+          <section id="protect" class="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(320px,1.05fr)]">
+            <div class="panel rounded-lg border border-white/10 bg-[#171b26]/90 p-4 shadow-2xl shadow-black/25">
+              <p class="text-xs uppercase text-rose-200">Anti-repost protection</p>
+              <h2 class="mt-1 text-xl font-semibold text-white">Layout fingerprints before listings go live</h2>
+              <p class="mt-3 text-sm leading-6 text-slate-300">
+                The goal is not a perfect copy detector on day one. It is a repeatable review queue that blocks obvious reposts during the paid freshness window and records why a listing was allowed or blocked.
+              </p>
+              <div id="fingerprint-signals" class="mt-4 grid gap-2 sm:grid-cols-2"></div>
+            </div>
+
+            <div class="panel rounded-lg border border-white/10 bg-[#171b26]/90 p-4 shadow-2xl shadow-black/25">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-xs uppercase text-violet-200">Similarity demo</p>
+                  <h2 class="text-xl font-semibold text-white">Current rules</h2>
+                </div>
+                <span id="fingerprint-threshold" class="subtle-badge"></span>
+              </div>
+              <div id="fingerprint-results" class="mt-4 space-y-3"></div>
+            </div>
+          </section>
+
+          <section class="panel rounded-lg border border-white/10 bg-[#171b26]/90 p-4 shadow-2xl shadow-black/25">
+            <p class="text-xs uppercase text-emerald-200">Implementation roadmap</p>
+            <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3" id="roadmap"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

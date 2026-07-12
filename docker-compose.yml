@@ -43,6 +43,71 @@ services:
       retries: 3
       start_period: 20s
 
+  base-marketplace-db:
+    image: postgres:16-alpine
+    container_name: urba-base-marketplace-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: base_marketplace
+      POSTGRES_USER: base_marketplace
+      POSTGRES_PASSWORD_FILE: /run/secrets/base_marketplace_db_password
+    secrets:
+      - base_marketplace_db_password
+    volumes:
+      - base-marketplace-db:/var/lib/postgresql/data
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U base_marketplace -d base_marketplace"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  base-marketplace-web:
+    build:
+      context: .
+    container_name: urba-base-marketplace-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      SITE_HOST: 0.0.0.0
+      SITE_PORT: 4192
+      BASE_MARKETPLACE_DB_HOST: base-marketplace-db
+      BASE_MARKETPLACE_DB_PORT: 5432
+      BASE_MARKETPLACE_DB_NAME: base_marketplace
+      BASE_MARKETPLACE_DB_USER: base_marketplace
+      BASE_MARKETPLACE_DB_PASSWORD_FILE: /run/secrets/base_marketplace_db_password
+    secrets:
+      - base_marketplace_db_password
+    ports:
+      - "4192:4192"
+    depends_on:
+      base-marketplace-db:
+        condition: service_healthy
+    command: ["node", "src/site-server.mjs"]
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4192/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
   codex-worker:
     profiles: ["codex-worker"]
     build:
@@ -73,3 +138,10 @@ services:
     security_opt:
       - no-new-privileges:true
     init: true
+
+volumes:
+  base-marketplace-db:
+
+secrets:
+  base_marketplace_db_password:
+    file: /opt/urba-apps/discord-bot/shared/base-marketplace-db-password

@@ -19,6 +19,7 @@ Remote worker prompts include context in this order:
 9. `discord-session.md`.
 10. Extra focused context files, currently prioritized as:
     `remote-codex-session.md`, `local-codex-parity.md`, `code-map.md`,
+    `base-marketplace.md`,
     `clash-product-delivery.md`, `clash-operations-roadmap.md`,
     `clash-competitor-research.md`, `clash-database-guidance.md`,
     `clash-ui-guidance.md`.
@@ -39,6 +40,8 @@ authority when docs are stale.
 - `local-codex-parity.md`: checklist for making remote jobs match the quality
   of this local Codex Desktop session.
 - `code-map.md`: source-file map and feature change recipes.
+- `base-marketplace.md`: recovered MaveBase website requirements, service
+  architecture, market notes, and anti-repost model.
 - `clash-product-delivery.md`: acceptance contract for broad ClashKing,
   ClashPerk, roster, CWL, war-history, and scheduled-collection asks.
 - `clash-operations-roadmap.md`: concrete mavebot command roadmap for turning

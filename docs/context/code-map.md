@@ -23,6 +23,11 @@ It is a map, not a replacement for reading the current source.
   It attaches supported local image files from active Discord jobs and nearby
   Discord context to `codex exec` with `--image`, and owns the final verified
   live/not-live channel wording after checks and deploy verification.
+- `src/site-server.mjs`: MaveBase marketplace preview web server. Serves
+  `web/public/`, exposes `/api/marketplace/summary`,
+  `/api/base-fingerprint/demo`, and `/healthz`.
+- `src/site-store.mjs`: optional Postgres connection, schema initialization,
+  and database health for the MaveBase marketplace foundation.
 
 ## Feature Modules
 
@@ -50,6 +55,9 @@ It is a map, not a replacement for reading the current source.
   storage.
 - `src/lana-art.mjs`: generated heart images plus `/lana` and `/loveu` love
   copy.
+- `src/base-marketplace-data.mjs`: current MaveBase demo listings, builders,
+  market findings, fingerprint demo, and roadmap data for the website preview.
+- `web/public/`: Tailwind-powered MaveBase prototype UI assets.
 
 ## Change Recipes
 
@@ -74,6 +82,19 @@ Registering a command without a matching runtime handler causes Discord's
 3. Preserve malformed JSON as a `.corrupt-*` backup before resetting.
 4. Add tests for normal and malformed state.
 5. Document the state file in `operating-memory.md`.
+
+### Change The MaveBase Website
+
+1. Read `docs/context/base-marketplace.md` before changing product direction.
+2. Keep the website separate from the Discord bot service and unrelated apps.
+3. Update `src/base-marketplace-data.mjs`, `src/site-server.mjs`,
+   `src/site-store.mjs`, and `web/public/` as needed.
+4. For database changes, update the Postgres schema in `src/site-store.mjs`
+   and document server state in `operating-memory.md`.
+5. Run `npm run check`.
+6. Verify `http://127.0.0.1:4192/healthz` locally or in Docker.
+7. After deploy, verify `http://5.78.127.221:4192/` and
+   `http://5.78.127.221:4192/healthz`.
 
 ### Change Clash Of Clans UI
 

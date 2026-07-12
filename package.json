@@ -11,12 +11,13 @@
     "codex-worker": "node src/codex-worker.mjs",
     "register": "node scripts/register-commands.mjs",
     "test": "node --test",
-    "check": "node --check src/index.mjs && node --check src/codex-worker.mjs && node --check src/discord-codex-control.mjs && node --check src/commands.mjs && node --check src/coc.mjs && node --check src/coc-assets.mjs && node --check src/player-card.mjs && node --check src/legends-store.mjs && node --check src/clash-history-store.mjs && node --check src/moderation-store.mjs && node --check src/pictionary-game.mjs && node --check src/lana-art.mjs && node --check scripts/register-commands.mjs && python -m py_compile scripts/deploy-webhook.py && npm test"
+    "check": "node --check src/index.mjs && node --check src/codex-worker.mjs && node --check src/discord-codex-control.mjs && node --check src/commands.mjs && node --check src/coc.mjs && node --check src/coc-assets.mjs && node --check src/player-card.mjs && node --check src/legends-store.mjs && node --check src/clash-history-store.mjs && node --check src/moderation-store.mjs && node --check src/pictionary-game.mjs && node --check src/lana-art.mjs && node --check src/base-marketplace-data.mjs && node --check src/site-store.mjs && node --check src/site-server.mjs && node --check scripts/register-commands.mjs && python -m py_compile scripts/deploy-webhook.py && npm test"
   },
   "dependencies": {
     "discord.js": "14.26.4",
     "dotenv": "17.4.2",
     "express": "5.2.1",
+    "pg": "^8.22.0",
     "sharp": "^0.34.5"
   },
   "overrides": {

@@ -142,6 +142,7 @@ const repoContextPriority = [
   'remote-codex-session.md',
   'local-codex-parity.md',
   'code-map.md',
+  'base-marketplace.md',
   'clash-product-delivery.md',
   'clash-operations-roadmap.md',
   'clash-competitor-research.md',
