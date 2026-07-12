@@ -134,3 +134,31 @@ planning marketplace changes. If the user asks for a "ClashKing/ClashPerk-like"
 site or base marketplace, they are asking for a visible, game-themed product
 with proof, filters, reviews, and concrete command/database slices, not a thin
 landing page.
+
+## July 2026 Marketplace Correction
+
+Allen rejected the heavier "war board" pass too. It looked themed, but it still
+felt like an explainer instead of a useful marketplace. Future agents must start
+from the product workflow, not visual decoration.
+
+Required first-screen behavior:
+
+- The page must read as a working base shop immediately: search, category
+  filters, Town Hall filters, token wallet, top-up, submit-base, buy, preview,
+  spotlight, reviews, and seller rows should all be visible or one click away.
+- Remove low-value explanatory sections from the primary viewport. Buyers care
+  about base type, price, freshness, proof, reviews, seller quality, and whether
+  a private link is unlocked.
+- Treat site tokens as a core product mechanic. The UI should show balances,
+  token packs, buying with tokens, topping up with money, and spending tokens to
+  spotlight bases.
+- Treat sellers as marketplace participants. Include submission, review queue,
+  boost/spotlight mechanics, seller scores, subscriptions, sales cadence, and
+  eventual payout/accounting needs.
+- Reviews must be part of the buyer loop: leave a review after using a base,
+  surface ratings clearly, and connect review history to seller trust.
+- Anti-repost/freshness protection stays important, but it should support the
+  marketplace instead of dominating the whole page.
+- Prefer compact app UI over oversized hero content. The page should feel like
+  a Clash-focused marketplace dashboard that Lana or a non-technical user can
+  operate, not a pitch deck.

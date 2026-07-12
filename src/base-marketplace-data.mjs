@@ -1,34 +1,14 @@
 export const marketplaceStats = [
-  {
-    label: 'Fresh base drops',
-    value: '184',
-    detail: 'Singles, bundles, and subscription releases tagged by Town Hall, mode, and live season.'
-  },
-  {
-    label: 'Freshness shield',
-    value: '14d',
-    detail: 'Similarity locks protect paid releases while they are still useful and hard to find.'
-  },
-  {
-    label: 'Builder subscriptions',
-    value: '$12-30',
-    detail: 'Monthly packs sit beside $1-5 single-base buys so players are not forced into blind renewals.'
-  },
-  {
-    label: 'Verified reviews',
-    value: '2.7k',
-    detail: 'Ratings attach to the exact layout, replay notes, trophy band, and buyer outcome.'
-  },
-  {
-    label: 'API proof points',
-    value: '41k',
-    detail: 'Player, clan, war, Legend, and trophy snapshots become seller evidence instead of marketing copy.'
-  },
-  {
-    label: 'Leak disputes',
-    value: '6.1%',
-    detail: 'Flagged reposts route to a moderation queue with the similarity signals shown.'
-  }
+  { label: 'Live bases', value: '184', detail: 'Fresh layouts for TH, Builder Base, and Capital.' },
+  { label: 'Token volume', value: '12.4k', detail: 'Tokens spent on singles, packs, reviews, and boosts.' },
+  { label: 'Avg single', value: '4', detail: 'Most one-off bases cost 2-6 site tokens.' },
+  { label: 'Fresh shield', value: '14d', detail: 'Similarity checks protect new paid releases.' }
+];
+
+export const tokenPacks = [
+  { id: 'starter', name: 'Scout Pack', tokens: 25, price: '$5', bonus: 'Good for 5-8 singles' },
+  { id: 'war', name: 'War Chest', tokens: 70, price: '$12', bonus: 'Best value for clan buyers' },
+  { id: 'builder', name: 'Builder Vault', tokens: 160, price: '$25', bonus: 'For boosts and subscriptions' }
 ];
 
 export const baseListings = [
@@ -38,38 +18,35 @@ export const baseListings = [
     townHall: 18,
     mode: 'Legend League',
     format: '1 fresh link',
-    dropType: 'Single base',
-    price: '$4',
-    subscription: '$24/mo builder vault',
-    freshness: '18 hours old',
-    releaseWindow: 'Day 2 Legend push',
+    dropType: 'Single',
+    costTokens: 4,
+    cashPrice: '$4',
+    subscription: '24 tokens/mo',
+    freshness: '18h',
+    shield: '13d left',
     rating: 4.9,
     reviews: 64,
+    sold: 138,
     builder: 'RH Prime',
     builderType: 'Pro builder',
     builderScore: 98,
-    trophies: '6,250+ test band',
-    defenses: '11 defended hits logged',
-    copyState: 'Freshness shield active',
-    copyRisk: 'Low leak risk',
-    testBand: 'Top 2k Legend samples',
+    proofLine: '11 defenses in 6,250+ Legend range',
+    copyState: 'Fresh shield',
+    copyRisk: 'Low',
+    testBand: 'Top 2k Legend',
     accent: '#ffc83d',
-    tags: ['Anti-Root Rider', 'Spell trap core', 'Legend day 2', 'Replay notes'],
+    spotlight: true,
+    tags: ['Anti-Root Rider', 'Legend push', 'Replay notes'],
+    buyerNote: 'Held two root rider spam hits below 80%.',
     proof: [
-      { label: 'Best hold', value: '-23', note: 'Root Rider + clone failed at 83%' },
-      { label: 'Avg loss', value: '-32', note: '11 defenses in 6,250+ range' },
-      { label: 'Buyer fit', value: 'Push', note: 'Needs max traps and active CC swaps' }
+      { label: 'Best hold', value: '-23' },
+      { label: 'Avg loss', value: '-32' },
+      { label: 'Shield', value: '13d' }
     ],
-    metrics: [
-      ['TH', '18'],
-      ['Mode', 'Legend'],
-      ['Price', '$4'],
-      ['Age', '18h'],
-      ['Shield', '13d left'],
-      ['Reviews', '64']
+    reviewsFeed: [
+      { user: 'Dolph', rating: 5, text: 'Cleanest day-two push base I tested.' },
+      { user: 'Auri', rating: 5, text: 'Worth the tokens. Trap notes helped.' }
     ],
-    reviewQuote: 'Best day-two base I tried this month. Held two root rider spam hits below 80.',
-    apiHook: 'Pulls player trophies, league icon, defensive count, and prior Legend finish.',
     layout: [
       'ggggggggggggg',
       'ggwwwwwwwwwgg',
@@ -91,37 +68,34 @@ export const baseListings = [
     mode: 'War',
     format: 'Best of 3',
     dropType: 'Pack',
-    price: '$11',
-    subscription: '$28/mo war room',
-    freshness: '3 days old',
-    releaseWindow: 'CWL prep week',
+    costTokens: 11,
+    cashPrice: '$11',
+    subscription: '28 tokens/mo',
+    freshness: '3d',
+    shield: '11d left',
     rating: 4.8,
     reviews: 39,
+    sold: 82,
     builder: 'Blueprint Scout',
-    builderType: 'Pack seller',
+    builderType: 'War pack seller',
     builderScore: 95,
-    trophies: 'Champion 1 scrims',
-    defenses: '17 hard-mode attacks reviewed',
-    copyState: 'Watermarked links',
-    copyRisk: 'Medium leak watch',
-    testBand: 'Champion 1 / esports trials',
+    proofLine: '13/17 hard-mode hits did not triple',
+    copyState: 'Watermarked',
+    copyRisk: 'Watch',
+    testBand: 'Champion 1 scrims',
     accent: '#3dd7ff',
-    tags: ['Anti-triple', 'Hard mode', 'Builder comments', 'CWL swaps'],
+    spotlight: true,
+    tags: ['Hard mode', 'Anti-triple', 'CWL swaps'],
+    buyerNote: 'Builder notes explain CC and trap swaps.',
     proof: [
-      { label: 'War result', value: '13/17', note: 'Non-triples in hard-mode testing' },
-      { label: 'Trap note', value: 'Clone bait', note: 'Core pathing punishes blimp clone' },
-      { label: 'Buyer fit', value: 'Serious clans', note: 'Requires scouting notes before war day' }
+      { label: 'Non-triples', value: '13/17' },
+      { label: 'Pack', value: '3' },
+      { label: 'Shield', value: '11d' }
     ],
-    metrics: [
-      ['TH', '18'],
-      ['Mode', 'War'],
-      ['Pack', '3'],
-      ['Age', '3d'],
-      ['Shield', '11d left'],
-      ['Reviews', '39']
+    reviewsFeed: [
+      { user: 'Arsh', rating: 5, text: 'Feels like a real war-room base, not filler.' },
+      { user: 'Mave', rating: 4, text: 'Good, but needs the notes to run properly.' }
     ],
-    reviewQuote: 'The builder notes mattered. Our attackers understood exactly which CC and trap swaps to use.',
-    apiHook: 'Connects clan war league, current war attacks, and clan history once enabled.',
     layout: [
       'ggggggggggggg',
       'gwwwwwwwwwwwg',
@@ -142,38 +116,34 @@ export const baseListings = [
     townHall: 17,
     mode: 'CWL',
     format: '5-base week pack',
-    dropType: 'Subscription drop',
-    price: '$16',
-    subscription: '$30/mo limited slots',
-    freshness: '5 days old',
-    releaseWindow: 'Season reset',
+    dropType: 'Subscription',
+    costTokens: 16,
+    cashPrice: '$16',
+    subscription: '30 tokens/mo',
+    freshness: '5d',
+    shield: '9d left',
     rating: 4.7,
     reviews: 52,
+    sold: 104,
     builder: 'CWL Forge',
     builderType: 'League specialist',
     builderScore: 93,
-    trophies: 'Masters 1 to Champ 2',
-    defenses: '31 CWL attacks tagged',
+    proofLine: '31 CWL attacks tagged',
     copyState: 'Review window',
-    copyRisk: 'Moderate remix risk',
-    testBand: 'CWL roster proof',
+    copyRisk: 'Medium',
+    testBand: 'Masters 1 to Champ 2',
     accent: '#9b7cff',
-    tags: ['CWL week', 'Anti-2 star', 'Hero dive punish', 'Limited slots'],
+    spotlight: false,
+    tags: ['CWL week', 'Anti-2 star', 'Limited slots'],
+    buyerNote: 'Every base in the pack has a clear job.',
     proof: [
-      { label: 'Stars held', value: '2.18 avg', note: '31 tagged CWL attacks' },
-      { label: 'Refund flag', value: 'None', note: 'No stale-link complaints this season' },
-      { label: 'Buyer fit', value: 'Roster packs', note: 'Best when assigned by mirror weight' }
+      { label: 'Stars held', value: '2.18' },
+      { label: 'Pack', value: '5' },
+      { label: 'Slots', value: '9' }
     ],
-    metrics: [
-      ['TH', '17'],
-      ['Mode', 'CWL'],
-      ['Pack', '5'],
-      ['Age', '5d'],
-      ['Slots', '9 left'],
-      ['Reviews', '52']
+    reviewsFeed: [
+      { user: 'Rocco', rating: 5, text: 'Good mirror assignments. Not random links.' }
     ],
-    reviewQuote: 'Finally a CWL pack where every base had a job instead of two good links and filler.',
-    apiHook: 'Maps review outcomes to clan, war league, and attack result evidence.',
     layout: [
       'ggggggggggggg',
       'ggwwwwwwwwwgg',
@@ -190,42 +160,38 @@ export const baseListings = [
   },
   {
     id: 'th16-clan-budget',
-    title: 'TH16 Budget Clan War Bundle',
+    title: 'TH16 Clan War Bundle',
     townHall: 16,
     mode: 'War',
     format: '10 clan links',
-    dropType: 'Clan bundle',
-    price: '$18',
-    subscription: '$12/mo small clans',
-    freshness: '7 days old',
-    releaseWindow: 'Weekly clan pack',
+    dropType: 'Bundle',
+    costTokens: 18,
+    cashPrice: '$18',
+    subscription: '12 tokens/mo',
+    freshness: '7d',
+    shield: '7d left',
     rating: 4.6,
     reviews: 27,
+    sold: 61,
     builder: 'Lana Labs',
     builderType: 'New seller',
     builderScore: 88,
-    trophies: 'Casual war sample',
-    defenses: 'Community-tested war log',
+    proofLine: '$1.80 per base for casual clans',
     copyState: 'Similarity review',
-    copyRisk: 'Low price, higher audit',
-    testBand: 'Mid-weight clan wars',
+    copyRisk: 'Audit',
+    testBand: 'Mid-weight wars',
     accent: '#ff7a3d',
-    tags: ['Clan bundles', 'Low price', 'Easy filters', 'Buyer comments'],
+    spotlight: false,
+    tags: ['Budget', 'Clan pack', 'Buyer comments'],
+    buyerNote: 'Useful regular-war filler at a low price.',
     proof: [
-      { label: 'Pack value', value: '$1.80/base', note: 'Affordable clan filler without blind Patreon buy' },
-      { label: 'Review mix', value: '4.6', note: 'Weighted by actual war use' },
-      { label: 'Buyer fit', value: 'Casual wars', note: 'Not marketed as esports/pro proof' }
+      { label: 'Value', value: '1.8t/base' },
+      { label: 'Pack', value: '10' },
+      { label: 'Shield', value: '7d' }
     ],
-    metrics: [
-      ['TH', '16'],
-      ['Mode', 'War'],
-      ['Pack', '10'],
-      ['Age', '7d'],
-      ['Shield', '7d left'],
-      ['Reviews', '27']
+    reviewsFeed: [
+      { user: 'Lana', rating: 5, text: 'Easy for normal clans to use.' }
     ],
-    reviewQuote: 'Good budget pack. Not all pro-grade, but every link was useful for regular war spins.',
-    apiHook: 'Can connect buyer review to clan war attack result after account linking.',
     layout: [
       'ggggggggggggg',
       'gwwwwwwwwwwwg',
@@ -246,38 +212,34 @@ export const baseListings = [
     townHall: 10,
     mode: 'Builder Base',
     format: '2 stages',
-    dropType: 'Single base',
-    price: '$2',
-    subscription: '$8/mo Builder Base feed',
-    freshness: '2 days old',
-    releaseWindow: 'Builder trophy week',
+    dropType: 'Single',
+    costTokens: 2,
+    cashPrice: '$2',
+    subscription: '8 tokens/mo',
+    freshness: '2d',
+    shield: '12d left',
     rating: 4.5,
     reviews: 18,
+    sold: 44,
     builder: 'Night Forge',
     builderType: 'Builder Base seller',
     builderScore: 84,
-    trophies: '5,000+ builder band',
-    defenses: 'Stage-2 pathing notes',
-    copyState: 'Protected',
+    proofLine: '5,000+ Builder Base test band',
+    copyState: 'Fresh shield',
     copyRisk: 'Low',
     testBand: 'Builder trophy push',
     accent: '#46d68c',
-    tags: ['Builder Base', 'Anti-air', 'Stage notes', 'Cheap single'],
+    spotlight: false,
+    tags: ['Builder Base', 'Anti-air', 'Cheap single'],
+    buyerNote: 'Stage-two notes make the base easy to run.',
     proof: [
-      { label: 'Stage two', value: '72%', note: 'Avg attacker completion from sample' },
-      { label: 'Freshness', value: '2d', note: 'Still inside early release window' },
-      { label: 'Buyer fit', value: 'BH10', note: 'Good for trophy push, not clan war' }
+      { label: 'Stage 2 avg', value: '72%' },
+      { label: 'Cost', value: '2t' },
+      { label: 'Shield', value: '12d' }
     ],
-    metrics: [
-      ['BH', '10'],
-      ['Mode', 'Builder'],
-      ['Price', '$2'],
-      ['Age', '2d'],
-      ['Shield', '12d left'],
-      ['Reviews', '18']
+    reviewsFeed: [
+      { user: 'Noob Jinj', rating: 4, text: 'Simple and cheap. Good BH option.' }
     ],
-    reviewQuote: 'The second-stage notes made it much easier to understand why the base works.',
-    apiHook: 'Uses Builder Base trophy and best trophy proof when available from the API.',
     layout: [
       'ggggggggggggg',
       'ggwwwwwwwggg',
@@ -294,42 +256,38 @@ export const baseListings = [
   },
   {
     id: 'capital-peak-ring',
-    title: 'Capital Peak Raid Weekend Ring',
+    title: 'Capital Peak Raid Ring',
     townHall: 10,
     mode: 'Capital Hall',
     format: 'District set',
     dropType: 'Pack',
-    price: '$7',
-    subscription: '$15/mo capital library',
-    freshness: '6 days old',
-    releaseWindow: 'Raid weekend',
+    costTokens: 7,
+    cashPrice: '$7',
+    subscription: '15 tokens/mo',
+    freshness: '6d',
+    shield: 'Manual',
     rating: 4.4,
     reviews: 15,
+    sold: 26,
     builder: 'Capital Cartel',
     builderType: 'Capital Hall mapper',
     builderScore: 82,
-    trophies: 'Capital 10 clans',
-    defenses: 'Raid pathing review',
+    proofLine: 'Raid weekend pathing review',
     copyState: 'Manual review',
-    copyRisk: 'District remix watch',
-    testBand: 'Raid weekend samples',
+    copyRisk: 'Medium',
+    testBand: 'Capital 10 clans',
     accent: '#dc5cff',
-    tags: ['Capital Hall', 'Raid weekend', 'District set', 'Pathing proof'],
+    spotlight: false,
+    tags: ['Capital Hall', 'Raid weekend', 'District set'],
+    buyerNote: 'Better than random screenshots from Discord.',
     proof: [
-      { label: 'Districts', value: '4', note: 'Capital Peak plus core districts' },
-      { label: 'Avg attacks', value: '-1.3', note: 'Fewer attacks versus prior weekend' },
-      { label: 'Buyer fit', value: 'Capital clans', note: 'Needs district-level browsing and comments' }
+      { label: 'Districts', value: '4' },
+      { label: 'Attacks', value: '-1.3' },
+      { label: 'Review', value: 'Manual' }
     ],
-    metrics: [
-      ['CH', '10'],
-      ['Mode', 'Capital'],
-      ['Pack', '4'],
-      ['Age', '6d'],
-      ['Review', 'Manual'],
-      ['Reviews', '15']
+    reviewsFeed: [
+      { user: 'Pekkaboo', rating: 4, text: 'District set was easy to apply.' }
     ],
-    reviewQuote: 'The district set was easier to apply than random screenshots from Discord.',
-    apiHook: 'Future API enrichment can attach clan capital raid weekend evidence.',
     layout: [
       'ggggggggggggg',
       'gwwwwwwwwwwwg',
@@ -349,182 +307,108 @@ export const baseListings = [
 export const builderProfiles = [
   {
     name: 'RH Prime',
-    specialty: 'Legend League anti-meta bases',
+    specialty: 'Legend anti-meta',
     score: 98,
-    cadence: 'New drops every 2-4 days during push weeks',
-    subscription: '$24/mo',
-    proof: 'Requires replay notes, trophy band, and defensive sample before a listing is marked verified.',
-    strengths: ['Fast freshness', 'Strong review response', 'Legend proof'],
-    risk: 'High resale target, so leak scanning must be strict.',
+    followers: '2.8k',
+    sales: '1.4k',
+    nextDrop: 'Tonight',
+    subscription: '24 tokens/mo',
     accent: '#ffc83d'
   },
   {
     name: 'Blueprint Scout',
-    specialty: 'CWL, hard-mode, and custom war packs',
+    specialty: 'War and CWL packs',
     score: 95,
-    cadence: 'Weekly pack drops plus limited CWL windows',
-    subscription: '$28-30/mo',
-    proof: 'Builder comments explain trap swaps, CC plans, and which attacks the base is meant to punish.',
-    strengths: ['War notes', 'Limited slots', 'Pack history'],
-    risk: 'More expensive subscriptions need transparent pack quality.',
+    followers: '1.9k',
+    sales: '940',
+    nextDrop: '2 days',
+    subscription: '28 tokens/mo',
     accent: '#3dd7ff'
   },
   {
     name: 'Lana Labs',
-    specialty: 'Affordable clan bundles and new-builder discovery',
+    specialty: 'Budget clan bundles',
     score: 88,
-    cadence: 'Community-voted releases every week',
-    subscription: '$12/mo',
-    proof: 'Base-level reviews distinguish bargain value from pro-level proof.',
-    strengths: ['Low entry price', 'Clan bundles', 'Friendly support'],
-    risk: 'Needs strict duplicate review because newer sellers have less history.',
+    followers: '420',
+    sales: '216',
+    nextDrop: 'Friday',
+    subscription: '12 tokens/mo',
     accent: '#ff7a3d'
   },
   {
     name: 'Night Forge',
-    specialty: 'Builder Base trophy layouts',
+    specialty: 'Builder Base',
     score: 84,
-    cadence: 'Small drops around Builder Base meta changes',
-    subscription: '$8/mo',
-    proof: 'Stage-two pathing and Builder trophy deltas are required for premium labels.',
-    strengths: ['Niche coverage', 'Cheap singles', 'Stage notes'],
-    risk: 'Smaller market needs search filters that expose it clearly.',
+    followers: '315',
+    sales: '144',
+    nextDrop: 'Next week',
+    subscription: '8 tokens/mo',
     accent: '#46d68c'
   }
 ];
 
 export const researchFindings = [
   {
-    title: 'Large free sites optimize discovery',
-    body: 'They prove players want filters, copy links, ratings, and fresh uploads, but they do not solve paid freshness, builder trust, or leak protection.'
+    title: 'Fresh paid bases need a market, not a brochure',
+    body: 'Users should see fresh listings, token cost, reviews, proof, and buy buttons immediately.'
   },
   {
-    title: 'Paid builders sell cadence and confidence',
-    body: 'Subscription buyers care whether bases are fresh, tested, and released on a predictable schedule, not just whether a screenshot looks cool.'
+    title: 'Builders need monetization controls',
+    body: 'A useful marketplace lets sellers submit links, sell singles or subscriptions, and spend tokens to spotlight fresh drops.'
   },
   {
-    title: 'The buyer problem is blind renewal',
-    body: 'A player may pay around $30 for a private feed and only use a few bases, so MaveBase has to expose individual base proof and reviews before purchase.'
-  },
-  {
-    title: 'The moat is evidence',
-    body: 'Reviews, Clash API snapshots, replay notes, freshness windows, and duplicate checks create the trust layer that Discord leaks and generic layout catalogs lack.'
+    title: 'Similarity protection is still the trust layer',
+    body: 'Fresh paid layouts are only valuable if reposts and remix leaks are flagged before buyers waste tokens.'
   }
-];
-
-export const marketIntel = [
-  {
-    label: 'Subscription fatigue',
-    value: '$30 blind packs',
-    detail: 'Monthly feeds work for loyal fans, but buyers need per-base ratings and renewal proof.'
-  },
-  {
-    label: 'Leak rings',
-    value: 'pooled buys',
-    detail: 'Groups buy once, repost everywhere, and destroy a builder release window unless the market detects duplicates.'
-  },
-  {
-    label: 'Base usefulness',
-    value: 'not every link',
-    detail: 'A pack can include filler. Ratings must attach to each layout, not only the builder.'
-  },
-  {
-    label: 'Mode coverage',
-    value: 'TH/BH/CH',
-    detail: 'Town Hall, Builder Base, Capital, Legend, CWL, trophy, farm, hybrid, and fun bases need separate filters.'
-  }
-];
-
-export const apiProofCards = [
-  {
-    title: 'Legend proof',
-    value: 'rank, trophies, defense losses',
-    detail: 'Player tags can prove trophy range, league badge, prior finish, and whether the base was tested in a real push band.'
-  },
-  {
-    title: 'War proof',
-    value: 'stars, percent, attack style',
-    detail: 'Clan war and CWL context should turn a review into evidence: who attacked, what hit failed, and where the base was used.'
-  },
-  {
-    title: 'Builder reputation',
-    value: 'cadence, disputes, renewals',
-    detail: 'A seller profile should show how often they release, how fast they respond, and whether buyers keep renewing.'
-  }
-];
-
-export const buyerChecklist = [
-  'Can I buy this exact base without subscribing?',
-  'How old is the release and how many days remain in the freshness shield?',
-  'Which trophy band, war league, or player profile proves the base worked?',
-  'Are reviews about this base, this pack, or just the builder?',
-  'Was this layout blocked, approved, or queued by the similarity scan?',
-  'Does the seller explain trap swaps, CC, and intended attack counters?'
 ];
 
 export const fingerprintDemo = {
   protectionWindowDays: 14,
   threshold: 0.82,
   signals: [
-    {
-      title: 'Layout normalization',
-      body: 'Strip cosmetic naming, normalize grid orientation, and record Town Hall/mode before comparing.'
-    },
-    {
-      title: 'Compartment graph',
-      body: 'Compare wall rings, junctions, core shape, and pathing lanes to catch small visual remixes.'
-    },
-    {
-      title: 'Defense anchors',
-      body: 'Track Town Hall, Inferno, Scatter, Eagle, sweeper, air, hero, trap, and spell-tower coordinates.'
-    },
-    {
-      title: 'Freshness window',
-      body: 'Block obvious reposts above threshold while the paid base is still inside its release window.'
-    },
-    {
-      title: 'Review queue',
-      body: 'Borderline matches go to a seller/moderator review with the exact similarity signals shown.'
-    },
-    {
-      title: 'Audit trail',
-      body: 'Persist allow/block/dispute outcomes so future buyers know whether a listing was original.'
-    }
+    { title: 'Exact link scan', body: 'Normalize copied base links and block repeat submissions.' },
+    { title: 'Layout shape', body: 'Compare walls, compartments, core shape, and high-value defenses.' },
+    { title: 'Fresh window', body: 'Hold similar uploads while a paid base is still fresh.' }
   ],
   verdicts: [
     {
       pair: 'TH18 Legend Diamond vs repost attempt',
       score: 0.91,
       status: 'Blocked as too similar',
-      detail: 'Same core, same inferno/scatter offsets, same trap-density ring, and only two exterior swaps.',
-      matchSignals: ['Core', 'Infernos', 'Traps', 'Walls']
+      detail: 'Same core, trap ring, and inferno offsets.',
+      matchSignals: ['Core', 'Traps', 'Walls']
     },
     {
       pair: 'TH18 War Maze vs teaser remix',
       score: 0.78,
       status: 'Queued for review',
-      detail: 'Compartments changed, but high-value defense anchors still line up with the paid pack.',
-      matchSignals: ['Town Hall', 'Scatter', 'Wall ring']
+      detail: 'Enough overlap to make a moderator check it.',
+      matchSignals: ['Town Hall', 'Scatter']
     },
     {
       pair: 'BH10 Night Cache vs trophy farm',
       score: 0.39,
       status: 'Allowed',
-      detail: 'Mode and stage are similar, but the compartment graph and defensive anchors are different.',
+      detail: 'Different compartments and defense anchors.',
       matchSignals: ['Mode only']
     }
   ]
 };
 
+export const activityFeed = [
+  { type: 'sale', text: 'RH Prime sold TH18 Legend Diamond for 4 tokens.' },
+  { type: 'review', text: 'Dolph left a 5-star review on a Legend base.' },
+  { type: 'submit', text: 'Lana Labs submitted a TH16 clan bundle for review.' },
+  { type: 'boost', text: 'Blueprint Scout bought a 24h spotlight slot.' }
+];
+
 export const productRoadmap = [
-  'Replace demo listings with Postgres-backed builders, bases, reviews, comments, subscriptions, and purchases.',
-  'Add upload review with normalized layout fingerprints and similarity events before a base can be published.',
-  'Add Clash API enrichment for player tags, clan tags, war/CWL evidence, Legend stats, and Builder Base proof.',
-  'Build seller pages with cadence, pack history, freshness reliability, dispute rate, and renewal quality.',
-  'Add buyer pages for saved bases, private purchased links, review prompts, and renewal decisions.',
-  'Add Discord alerts for new drops, price changes, leak disputes, and base review requests.',
-  'Add mode-specific storefronts for Legend, CWL, war, Builder Base, Capital Hall, farming, trophy, and fun bases.',
-  'Add moderation tools for duplicate appeals, takedowns, refund notes, and seller trust adjustments.'
+  'Persist listings, token balances, purchases, submissions, reviews, and boosts in Postgres.',
+  'Add payment checkout for token top-ups and seller payout accounting.',
+  'Add similarity checks before submitted base links can go live.',
+  'Add buyer library pages for purchased private links and review reminders.',
+  'Add seller dashboards for subscriptions, spotlight slots, disputes, and revenue.',
+  'Add Clash API proof badges for player, clan, war, CWL, Legend, Builder Base, and Capital evidence.'
 ];
 
 export function marketplaceSummary() {
@@ -534,10 +418,9 @@ export function marketplaceSummary() {
     listings: baseListings,
     builders: builderProfiles,
     findings: researchFindings,
-    marketIntel,
-    apiProofCards,
-    buyerChecklist,
     fingerprint: fingerprintDemo,
+    tokenPacks,
+    activityFeed,
     roadmap: productRoadmap
   };
 }

@@ -10,14 +10,19 @@ const tileClass = {
   s: 'tile-scatter',
   a: 'tile-air',
   e: 'tile-eagle',
-  p: 'tile-pet',
-  b: 'tile-builder',
   '.': 'tile-grass'
 };
 
-let summary = null;
-let activeFilter = 'all';
-let activeListingId = null;
+const state = {
+  summary: null,
+  wallet: 38,
+  filter: 'all',
+  townHall: 'all',
+  query: '',
+  sort: 'spotlight',
+  activeId: null,
+  feed: []
+};
 
 function byId(id) {
   return document.getElementById(id);
@@ -33,368 +38,361 @@ function escapeHtml(value) {
 }
 
 function layoutDimensions(layout) {
-  const rows = layout.length || 1;
-  const cols = Math.max(...layout.map((row) => row.length), 1);
-  return { rows, cols };
+  return { rows: layout.length || 1, cols: Math.max(...layout.map((row) => row.length), 1) };
 }
 
-function tileMarkup(layout) {
-  return layout
-    .flatMap((row) => row.padEnd(layoutDimensions(layout).cols, 'g').split(''))
-    .map((tile) => `<span class="tile ${tileClass[tile] || 'tile-grass'}" aria-hidden="true"></span>`)
-    .join('');
-}
-
-function baseMapMarkup(listing, className = 'base-map') {
+function baseMap(listing, className = 'base-map') {
   const { rows, cols } = layoutDimensions(listing.layout);
-  return `
-    <div
-      class="${className}"
-      role="img"
-      aria-label="${escapeHtml(listing.title)} map preview"
-      style="--rows: ${rows}; --cols: ${cols}; --card-accent: ${escapeHtml(listing.accent)}"
-    >
-      ${tileMarkup(listing.layout)}
-    </div>
-  `;
+  const tiles = listing.layout
+    .flatMap((row) => row.padEnd(cols, 'g').split(''))
+    .map((tile) => `<span class="tile ${tileClass[tile] || 'tile-grass'}"></span>`)
+    .join('');
+  return `<div class="${className}" style="--rows:${rows};--cols:${cols};--accent:${escapeHtml(listing.accent)}" role="img" aria-label="${escapeHtml(listing.title)} preview">${tiles}</div>`;
 }
 
-function metricMarkup(metrics) {
-  return metrics
-    .map(
-      ([label, value]) => `
-        <div class="metric">
-          <span>${escapeHtml(label)}</span>
-          <strong>${escapeHtml(value)}</strong>
-        </div>
-      `
-    )
+function stars(value) {
+  return `${Number(value).toFixed(1)} stars`;
+}
+
+function activeListing() {
+  return state.summary.listings.find((listing) => listing.id === state.activeId) || state.summary.listings[0];
+}
+
+function filteredListings() {
+  const query = state.query.trim().toLowerCase();
+  return state.summary.listings
+    .filter((listing) => state.filter === 'all' || listing.mode === state.filter)
+    .filter((listing) => state.townHall === 'all' || String(listing.townHall) === state.townHall)
+    .filter((listing) => {
+      if (!query) return true;
+      return [listing.title, listing.builder, listing.mode, listing.dropType, ...listing.tags]
+        .join(' ')
+        .toLowerCase()
+        .includes(query);
+    })
+    .sort((a, b) => {
+      if (state.sort === 'fresh') return freshnessRank(a.freshness) - freshnessRank(b.freshness);
+      if (state.sort === 'rating') return b.rating - a.rating;
+      if (state.sort === 'price') return a.costTokens - b.costTokens;
+      return Number(b.spotlight) - Number(a.spotlight) || b.sold - a.sold;
+    });
+}
+
+function freshnessRank(value) {
+  if (value.endsWith('h')) return Number(value.replace('h', '')) / 24;
+  if (value.endsWith('d')) return Number(value.replace('d', ''));
+  return 99;
+}
+
+function renderWallet() {
+  byId('wallet-balance').textContent = `${state.wallet} tokens`;
+}
+
+function renderFilters() {
+  const modes = ['all', 'Legend League', 'War', 'CWL', 'Builder Base', 'Capital Hall'];
+  byId('category-filters').innerHTML = modes
+    .map((mode) => `<button class="filter-button ${state.filter === mode ? 'active' : ''}" data-filter="${escapeHtml(mode)}">${mode === 'all' ? 'All bases' : escapeHtml(mode)}</button>`)
+    .join('');
+
+  const townHalls = ['all', ...new Set(state.summary.listings.map((listing) => String(listing.townHall)))].sort((a, b) => {
+    if (a === 'all') return -1;
+    if (b === 'all') return 1;
+    return Number(b) - Number(a);
+  });
+  byId('townhall-filters').innerHTML = townHalls
+    .map((th) => `<button class="mini-pill ${state.townHall === th ? 'active' : ''}" data-townhall="${escapeHtml(th)}">${th === 'all' ? 'All' : `TH${escapeHtml(th)}`}</button>`)
     .join('');
 }
 
-function tagMarkup(tags, limit = tags.length) {
-  return tags
-    .slice(0, limit)
-    .map((tag) => `<span class="tag-pill">${escapeHtml(tag)}</span>`)
-    .join('');
-}
-
-function renderStats(stats) {
-  byId('stats').innerHTML = stats
+function renderStats() {
+  byId('market-stats').innerHTML = state.summary.stats
     .map(
       (stat) => `
-        <article class="stat-card">
+        <article>
           <strong>${escapeHtml(stat.value)}</strong>
           <span>${escapeHtml(stat.label)}</span>
-          <p>${escapeHtml(stat.detail)}</p>
         </article>
       `
     )
     .join('');
 }
 
-function listingHeader(listing) {
+function listingCard(listing) {
   return `
-    <div class="listing-head">
-      <div>
-        <span class="mode-badge">TH${escapeHtml(listing.townHall)} ${escapeHtml(listing.mode)}</span>
-        <h3 class="mt-2">${escapeHtml(listing.title)}</h3>
-      </div>
-      <span class="price-stamp">${escapeHtml(listing.price)}</span>
-    </div>
-  `;
-}
-
-function renderFeatured(listing) {
-  byId('active-price').textContent = listing.price;
-  byId('featured-base').innerHTML = `
-    <div class="featured-shell">
-      <div class="featured-title">
-        ${listingHeader(listing)}
-        <p class="mt-3">${escapeHtml(listing.reviewQuote)}</p>
-      </div>
-      <div class="base-stage">
-        ${baseMapMarkup(listing)}
-      </div>
-      <div class="metric-grid">
-        ${metricMarkup(listing.metrics)}
-      </div>
-      <div class="tag-row">
-        ${tagMarkup(listing.tags)}
-      </div>
-      <div class="selected-proof-grid">
-        ${listing.proof
-          .map(
-            (proof) => `
-              <article class="selected-proof-card">
-                <h3>${escapeHtml(proof.label)}</h3>
-                <strong class="mt-2 block text-[1.45rem] text-[#ffc83d]">${escapeHtml(proof.value)}</strong>
-                <p class="mt-1">${escapeHtml(proof.note)}</p>
-              </article>
-            `
-          )
-          .join('')}
-      </div>
-    </div>
-  `;
-}
-
-function filteredListings() {
-  if (!summary) return [];
-  return summary.listings.filter((listing) => activeFilter === 'all' || listing.mode === activeFilter);
-}
-
-function activeListing() {
-  return summary.listings.find((listing) => listing.id === activeListingId) || summary.listings[0];
-}
-
-function renderSelectedListing(listing) {
-  byId('selected-listing').innerHTML = `
-    <div class="selected-layout">
-      <div class="selected-head">
-        <div>
-          <h2 class="mt-0">${escapeHtml(listing.title)}</h2>
-          <p class="muted-text mt-2">${escapeHtml(listing.builder)} - ${escapeHtml(listing.builderType)} - ${escapeHtml(listing.dropType)}</p>
+    <article class="listing-card ${listing.id === state.activeId ? 'active' : ''}" style="--accent:${escapeHtml(listing.accent)}">
+      <button class="listing-select" data-listing-id="${escapeHtml(listing.id)}" aria-label="View ${escapeHtml(listing.title)}">
+        ${baseMap(listing, 'mini-map')}
+        <span class="drop-badge">${escapeHtml(listing.dropType)}</span>
+      </button>
+      <div class="listing-body">
+        <div class="card-topline">
+          <span>TH${escapeHtml(listing.townHall)} ${escapeHtml(listing.mode)}</span>
+          <strong>${escapeHtml(listing.costTokens)}t</strong>
         </div>
-        <span class="price-stamp">${escapeHtml(listing.price)}</span>
+        <h3>${escapeHtml(listing.title)}</h3>
+        <p>${escapeHtml(listing.builder)} &middot; ${escapeHtml(stars(listing.rating))} &middot; ${escapeHtml(listing.reviews)} reviews</p>
+        <div class="listing-tags">
+          ${listing.tags.slice(0, 3).map((tag) => `<span>${escapeHtml(tag)}</span>`).join('')}
+        </div>
+        <div class="card-actions">
+          <button class="gold-button buy-button" data-buy-id="${escapeHtml(listing.id)}">Buy for ${escapeHtml(listing.costTokens)}t</button>
+          <button class="stone-button preview-button" data-listing-id="${escapeHtml(listing.id)}">Preview</button>
+        </div>
       </div>
-      <div class="base-stage">
-        ${baseMapMarkup(listing)}
-      </div>
-      <div class="metric-grid">
-        ${metricMarkup([
-          ['Format', listing.format],
-          ['Freshness', listing.freshness],
-          ['Release', listing.releaseWindow],
-          ['Proof band', listing.testBand],
-          ['Copy state', listing.copyState],
-          ['Risk', listing.copyRisk]
-        ])}
-      </div>
-      <div class="quote-box">${escapeHtml(listing.reviewQuote)}</div>
-      <div class="selected-proof-grid">
-        ${listing.proof
-          .map(
-            (proof) => `
-              <article class="selected-proof-card">
-                <h3>${escapeHtml(proof.label)}</h3>
-                <strong class="mt-2 block text-[1.35rem] text-[#ffc83d]">${escapeHtml(proof.value)}</strong>
-                <p class="mt-1">${escapeHtml(proof.note)}</p>
-              </article>
-            `
-          )
-          .join('')}
-      </div>
-      <p class="muted-text">${escapeHtml(listing.apiHook)}</p>
-    </div>
+    </article>
   `;
 }
 
 function renderListings() {
   const listings = filteredListings();
-  if (!listings.some((listing) => listing.id === activeListingId)) {
-    activeListingId = listings[0]?.id || summary.listings[0]?.id;
+  if (!listings.some((listing) => listing.id === state.activeId)) {
+    state.activeId = listings[0]?.id || state.summary.listings[0].id;
   }
+  byId('result-count').textContent = `${listings.length} bases`;
+  byId('market-subtitle').textContent = listings.length ? 'Pick a base, buy with tokens, then review after using it.' : 'No bases match this search.';
+  byId('listing-grid').innerHTML = listings.map(listingCard).join('');
+  renderSelected();
+  renderSpotlight();
+  renderReviews();
+}
 
-  const active = activeListing();
-  renderFeatured(active);
-  renderSelectedListing(active);
+function renderSpotlight() {
+  const listing = state.summary.listings.find((item) => item.spotlight) || activeListing();
+  byId('spotlight-card').innerHTML = `
+    <div class="spotlight-copy">
+      <span class="kicker">Spotlight slot</span>
+      <h2>${escapeHtml(listing.title)}</h2>
+      <p>${escapeHtml(listing.proofLine)}</p>
+      <div class="spotlight-actions">
+        <button class="gold-button buy-button" data-buy-id="${escapeHtml(listing.id)}">Buy ${escapeHtml(listing.costTokens)}t</button>
+        <button class="stone-button" data-boost-id="${escapeHtml(listing.id)}">Boost 12t</button>
+      </div>
+    </div>
+    ${baseMap(listing, 'spotlight-map')}
+  `;
+}
 
-  byId('listing-grid').innerHTML = listings
+function renderSelected() {
+  const listing = activeListing();
+  byId('selected-listing').innerHTML = `
+    <div class="selected-head">
+      <span class="kicker">Selected base</span>
+      <strong>${escapeHtml(listing.costTokens)} tokens</strong>
+    </div>
+    <h2>${escapeHtml(listing.title)}</h2>
+    ${baseMap(listing, 'detail-map')}
+    <div class="proof-grid">
+      ${listing.proof.map((proof) => `<article><span>${escapeHtml(proof.label)}</span><strong>${escapeHtml(proof.value)}</strong></article>`).join('')}
+    </div>
+    <p class="selected-note">${escapeHtml(listing.buyerNote)}</p>
+    <dl class="detail-list">
+      <div><dt>Seller</dt><dd>${escapeHtml(listing.builder)}</dd></div>
+      <div><dt>Freshness</dt><dd>${escapeHtml(listing.freshness)} &middot; ${escapeHtml(listing.shield)}</dd></div>
+      <div><dt>Protection</dt><dd>${escapeHtml(listing.copyState)} &middot; ${escapeHtml(listing.copyRisk)}</dd></div>
+      <div><dt>Sold</dt><dd>${escapeHtml(listing.sold)} copies</dd></div>
+    </dl>
+    <div class="panel-actions">
+      <button class="gold-button full buy-button" data-buy-id="${escapeHtml(listing.id)}">Buy private link</button>
+      <button class="stone-button full" data-boost-id="${escapeHtml(listing.id)}">Spotlight this base</button>
+    </div>
+  `;
+}
+
+function renderTokenPacks() {
+  byId('token-packs').innerHTML = state.summary.tokenPacks
     .map(
-      (listing) => `
-        <button
-          class="listing-card ${listing.id === active.id ? 'is-active' : ''}"
-          data-listing-id="${escapeHtml(listing.id)}"
-          style="--card-accent: ${escapeHtml(listing.accent)}"
-        >
-          <div class="space-y-3">
-            ${listingHeader(listing)}
-            ${baseMapMarkup(listing, 'mini-map')}
-            <div class="metric-grid">
-              ${metricMarkup([
-                ['Drop', listing.dropType],
-                ['Age', listing.freshness],
-                ['Rating', `${listing.rating} / ${listing.reviews}`],
-                ['Proof', listing.testBand],
-                ['Shield', listing.copyState],
-                ['Sub', listing.subscription]
-              ])}
-            </div>
-            <p class="listing-meta">${escapeHtml(listing.reviewQuote)}</p>
-          </div>
-          <div class="tag-row mt-3">${tagMarkup(listing.tags, 4)}</div>
+      (pack) => `
+        <button class="token-pack" data-token-pack="${escapeHtml(pack.id)}">
+          <span>${escapeHtml(pack.name)}</span>
+          <strong>${escapeHtml(pack.tokens)} tokens</strong>
+          <small>${escapeHtml(pack.price)} &middot; ${escapeHtml(pack.bonus)}</small>
         </button>
       `
     )
     .join('');
-
-  document.querySelectorAll('[data-listing-id]').forEach((button) => {
-    button.addEventListener('click', () => {
-      activeListingId = button.dataset.listingId;
-      renderListings();
-    });
-  });
 }
 
-function renderMarketIntel(items) {
-  byId('market-intel').innerHTML = items
-    .map(
-      (item) => `
-        <article class="intel-card">
-          <h3>${escapeHtml(item.label)}</h3>
-          <strong class="mt-2">${escapeHtml(item.value)}</strong>
-          <p class="mt-2">${escapeHtml(item.detail)}</p>
-        </article>
-      `
-    )
-    .join('');
-}
-
-function renderFindings(findings) {
-  byId('findings').innerHTML = findings
-    .map(
-      (finding) => `
-        <article class="finding-card">
-          <h3>${escapeHtml(finding.title)}</h3>
-          <p class="mt-2">${escapeHtml(finding.body)}</p>
-        </article>
-      `
-    )
-    .join('');
-}
-
-function renderBuilders(builders) {
-  byId('builders-grid').innerHTML = builders
+function renderBuilders() {
+  byId('builder-list').innerHTML = state.summary.builders
     .map(
       (builder) => `
-        <article class="builder-card" style="--card-accent: ${escapeHtml(builder.accent)}">
-          <div class="builder-head">
-            <div>
-              <h3>${escapeHtml(builder.name)}</h3>
-              <p class="mt-2">${escapeHtml(builder.specialty)}</p>
-            </div>
-            <span class="stone-badge">${escapeHtml(builder.score)}</span>
-          </div>
-          <div class="builder-score mt-4" aria-label="Trust score ${escapeHtml(builder.score)}">
-            <span style="width: ${escapeHtml(builder.score)}%"></span>
-          </div>
-          <div class="metric-grid mt-3">
-            ${metricMarkup([
-              ['Sub', builder.subscription],
-              ['Drops', builder.cadence],
-              ['Risk', builder.risk]
-            ])}
-          </div>
-          <p class="mt-3">${escapeHtml(builder.proof)}</p>
-          <div class="tag-row mt-3">${tagMarkup(builder.strengths)}</div>
+        <button class="seller-row" data-builder="${escapeHtml(builder.name)}" style="--accent:${escapeHtml(builder.accent)}">
+          <span>
+            <strong>${escapeHtml(builder.name)}</strong>
+            <small>${escapeHtml(builder.specialty)} &middot; ${escapeHtml(builder.nextDrop)}</small>
+          </span>
+          <b>${escapeHtml(builder.score)}</b>
+        </button>
+      `
+    )
+    .join('');
+}
+
+function renderActivity() {
+  byId('activity-feed').innerHTML = state.feed
+    .slice(0, 7)
+    .map((item) => `<article><span>${escapeHtml(item.type)}</span><p>${escapeHtml(item.text)}</p></article>`)
+    .join('');
+}
+
+function renderReviews() {
+  const listing = activeListing();
+  byId('review-title').textContent = listing.title;
+  byId('review-list').innerHTML = listing.reviewsFeed
+    .map(
+      (review) => `
+        <article class="review-card">
+          <div><strong>${escapeHtml(review.user)}</strong><span>${escapeHtml(review.rating)} stars</span></div>
+          <p>${escapeHtml(review.text)}</p>
         </article>
       `
     )
     .join('');
 }
 
-function renderFingerprint(fingerprint) {
-  byId('fingerprint-threshold').textContent = `${Math.round(fingerprint.threshold * 100)}% block`;
-  byId('fingerprint-signals').innerHTML = fingerprint.signals
-    .map(
-      (signal) => `
-        <article class="signal-card">
-          <h3>${escapeHtml(signal.title)}</h3>
-          <p class="mt-2">${escapeHtml(signal.body)}</p>
-        </article>
-      `
-    )
-    .join('');
-
-  byId('fingerprint-results').innerHTML = fingerprint.verdicts
+function renderShield() {
+  const fingerprint = state.summary.fingerprint;
+  byId('shield-threshold').textContent = `${Math.round(fingerprint.threshold * 100)}% block`;
+  byId('shield-feed').innerHTML = fingerprint.verdicts
     .map((verdict) => {
-      const status = verdict.status.toLowerCase();
-      const stateClass = status.includes('blocked') ? 'is-blocked' : status.includes('queued') ? 'is-queued' : 'is-allowed';
+      const tone = verdict.status.toLowerCase().includes('blocked') ? 'danger' : verdict.status.toLowerCase().includes('queued') ? 'warn' : 'ok';
       return `
-        <article class="verdict-card ${stateClass}">
-          <div class="card-split">
-            <h3>${escapeHtml(verdict.pair)}</h3>
-            <span class="stone-badge">${Math.round(verdict.score * 100)}%</span>
-          </div>
-          <strong class="mt-3">${escapeHtml(verdict.status)}</strong>
-          <p class="mt-2">${escapeHtml(verdict.detail)}</p>
-          <div class="tag-row mt-3">${tagMarkup(verdict.matchSignals)}</div>
+        <article class="shield-card ${tone}">
+          <div><strong>${escapeHtml(verdict.status)}</strong><span>${Math.round(verdict.score * 100)}%</span></div>
+          <p>${escapeHtml(verdict.pair)}</p>
+          <small>${escapeHtml(verdict.detail)}</small>
         </article>
       `;
     })
     .join('');
 }
 
-function renderApiProof(cards) {
-  byId('api-proof').innerHTML = cards
-    .map(
-      (card) => `
-        <article class="proof-card">
-          <h3>${escapeHtml(card.title)}</h3>
-          <strong class="mt-2 block text-[#ffc83d]">${escapeHtml(card.value)}</strong>
-          <p class="mt-2">${escapeHtml(card.detail)}</p>
-        </article>
-      `
-    )
-    .join('');
+function buyListing(id) {
+  const listing = state.summary.listings.find((item) => item.id === id);
+  if (!listing) return;
+  if (state.wallet < listing.costTokens) {
+    state.feed.unshift({ type: 'top up', text: `Need ${listing.costTokens - state.wallet} more tokens for ${listing.title}.` });
+    renderActivity();
+    byId('token-shop').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  state.wallet -= listing.costTokens;
+  state.feed.unshift({ type: 'purchase', text: `Bought ${listing.title} for ${listing.costTokens} tokens. Private link unlocked.` });
+  renderWallet();
+  renderActivity();
 }
 
-function renderChecklist(items) {
-  byId('buyer-checklist').innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+function boostListing(id) {
+  const listing = state.summary.listings.find((item) => item.id === id);
+  if (!listing) return;
+  const cost = 12;
+  if (state.wallet < cost) {
+    state.feed.unshift({ type: 'top up', text: `Need ${cost - state.wallet} more tokens to spotlight ${listing.title}.` });
+    renderActivity();
+    byId('token-shop').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  state.wallet -= cost;
+  state.feed.unshift({ type: 'boost', text: `${listing.title} is queued for a 24h spotlight slot.` });
+  renderWallet();
+  renderActivity();
 }
 
-function renderRoadmap(roadmap) {
-  byId('roadmap').innerHTML = roadmap
-    .map((item) => `<article class="roadmap-card"><p>${escapeHtml(item)}</p></article>`)
-    .join('');
-}
+function wireEvents() {
+  document.addEventListener('click', (event) => {
+    const target = event.target.closest('button');
+    if (!target) return;
 
-function wireControls() {
-  document.querySelectorAll('[data-filter]').forEach((button) => {
-    button.addEventListener('click', () => {
-      activeFilter = button.dataset.filter;
-      document.querySelectorAll('[data-filter]').forEach((item) => item.classList.remove('is-active'));
-      button.classList.add('is-active');
+    if (target.dataset.filter) {
+      state.filter = target.dataset.filter;
+      renderFilters();
       renderListings();
-    });
+    }
+    if (target.dataset.townhall) {
+      state.townHall = target.dataset.townhall;
+      renderFilters();
+      renderListings();
+    }
+    if (target.dataset.listingId) {
+      state.activeId = target.dataset.listingId;
+      renderListings();
+      byId('selected-listing').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    if (target.dataset.buyId) buyListing(target.dataset.buyId);
+    if (target.dataset.boostId) boostListing(target.dataset.boostId);
+    if (target.dataset.tokenPack) {
+      const pack = state.summary.tokenPacks.find((item) => item.id === target.dataset.tokenPack);
+      state.wallet += pack.tokens;
+      state.feed.unshift({ type: 'top up', text: `Added ${pack.tokens} tokens with ${pack.name}.` });
+      renderWallet();
+      renderActivity();
+    }
+    if (target.dataset.scrollTarget) {
+      byId(target.dataset.scrollTarget)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    if (target.dataset.builder) {
+      state.query = target.dataset.builder;
+      byId('market-search').value = state.query;
+      renderListings();
+    }
   });
 
-  document.querySelectorAll('[data-section-link]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const target = byId(button.dataset.sectionLink);
-      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      document.querySelectorAll('.nav-pill').forEach((item) => item.classList.remove('is-active'));
-      if (button.classList.contains('nav-pill')) button.classList.add('is-active');
-    });
+  byId('market-search').addEventListener('input', (event) => {
+    state.query = event.target.value;
+    renderListings();
   });
-}
 
-async function loadSummary() {
-  const response = await fetch('/api/marketplace/summary', { headers: { accept: 'application/json' } });
-  if (!response.ok) throw new Error(`summary request failed: ${response.status}`);
-  return response.json();
+  byId('sort-select').addEventListener('change', (event) => {
+    state.sort = event.target.value;
+    renderListings();
+  });
+
+  byId('submit-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const title = data.get('title');
+    const mode = data.get('mode');
+    const cost = data.get('cost');
+    byId('submission-result').textContent = `${title} is queued for ${mode} review at ${cost} tokens.`;
+    state.feed.unshift({ type: 'submit', text: `${title} submitted for similarity review.` });
+    renderActivity();
+    event.currentTarget.reset();
+  });
+
+  byId('review-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const text = String(data.get('review') || '').trim();
+    if (!text) return;
+    const listing = activeListing();
+    listing.reviewsFeed.unshift({ user: 'You', rating: Number(data.get('rating')), text });
+    listing.reviews += 1;
+    state.feed.unshift({ type: 'review', text: `Posted a review on ${listing.title}.` });
+    renderReviews();
+    renderListings();
+    renderActivity();
+    event.currentTarget.reset();
+  });
 }
 
 async function boot() {
-  summary = await loadSummary();
-  activeListingId = summary.listings[0]?.id;
-  renderStats(summary.stats);
-  renderMarketIntel(summary.marketIntel);
-  renderFindings(summary.findings);
+  const response = await fetch('/api/marketplace/summary', { headers: { accept: 'application/json' } });
+  if (!response.ok) throw new Error(`Summary request failed: ${response.status}`);
+  state.summary = await response.json();
+  state.activeId = state.summary.listings[0].id;
+  state.feed = [...state.summary.activityFeed];
+  renderWallet();
+  renderFilters();
+  renderStats();
+  renderBuilders();
+  renderTokenPacks();
   renderListings();
-  renderChecklist(summary.buyerChecklist);
-  renderBuilders(summary.builders);
-  renderFingerprint(summary.fingerprint);
-  renderApiProof(summary.apiProofCards);
-  renderRoadmap(summary.roadmap);
-  wireControls();
+  renderActivity();
+  renderShield();
+  wireEvents();
 }
 
 boot().catch((error) => {
   console.error(error);
-  document.body.insertAdjacentHTML(
-    'afterbegin',
-    `<div class="war-card m-4 border-red-400 text-red-100">Marketplace preview failed to load: ${escapeHtml(error.message)}</div>`
-  );
+  document.body.insertAdjacentHTML('afterbegin', `<div class="load-error">Marketplace failed to load: ${escapeHtml(error.message)}</div>`);
 });

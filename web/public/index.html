@@ -5,146 +5,188 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="MaveBase is a Clash of Clans base layout marketplace prototype for fresh paid bases, builder subscriptions, reviews, API proof, and anti-repost protection."
+      content="MaveBase is a Clash of Clans base marketplace for buying fresh layouts with site tokens, submitting base links, reviews, seller subscriptions, and spotlight boosts."
     />
-    <title>MaveBase - Clash Base Market</title>
+    <title>MaveBase - Clash Base Marketplace</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@600;700;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito+Sans:wght@600;700;800;900&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="site-shell">
-      <header class="war-topbar" aria-label="MaveBase navigation">
-        <a class="brand-lockup" href="#top" aria-label="MaveBase home">
-          <span class="brand-shield" aria-hidden="true"><span></span></span>
+    <main class="market-shell">
+      <header class="market-header">
+        <a class="brand" href="/" aria-label="MaveBase home">
+          <span class="brand-icon" aria-hidden="true"></span>
           <span>
             <strong>MaveBase</strong>
-            <small>Clash base market</small>
+            <small>Base marketplace</small>
           </span>
         </a>
-        <nav class="war-nav" aria-label="Page sections">
-          <button class="nav-pill is-active" data-section-link="market">Market</button>
-          <button class="nav-pill" data-section-link="builders">Builders</button>
-          <button class="nav-pill" data-section-link="shield-lab">Shield lab</button>
-          <button class="nav-pill" data-section-link="proof-room">API proof</button>
-        </nav>
+
+        <label class="search-box">
+          <span>Search</span>
+          <input id="market-search" type="search" placeholder="TH18 anti-root, CWL, builder..." autocomplete="off" />
+        </label>
+
+        <div class="header-actions">
+          <div class="wallet-pill" aria-live="polite">
+            <span>Balance</span>
+            <strong id="wallet-balance">38 tokens</strong>
+          </div>
+          <button class="gold-button" data-scroll-target="token-shop">Top up</button>
+          <button class="stone-button" data-scroll-target="submit-base">Submit base</button>
+        </div>
       </header>
 
-      <section id="top" class="hero-grid">
-        <div class="hero-copy">
-          <p class="eyebrow">Fresh bases, builder proof, no blind renewals</p>
-          <h1>Trade Clash bases like a real war market.</h1>
-          <p class="hero-lede">
-            Browse fresh Legend, CWL, war, Builder Base, and Capital layouts with seller reviews,
-            API-backed evidence, and a similarity shield that blocks reposts while paid drops are still valuable.
-          </p>
-          <div class="hero-actions">
-            <button class="primary-button" data-section-link="market">Scout the market</button>
-            <button class="secondary-button" data-section-link="shield-lab">Check the shield</button>
-          </div>
-          <div id="stats" class="stats-rail" aria-label="Marketplace snapshot"></div>
-        </div>
+      <section class="market-layout">
+        <aside class="left-rail">
+          <section class="panel compact-panel">
+            <h2>Shop</h2>
+            <div id="category-filters" class="filter-stack"></div>
+          </section>
 
-        <aside class="war-card command-board" aria-label="Featured base preview">
-          <div class="board-head">
-            <span class="board-kicker">Live drop board</span>
-            <span id="active-price" class="price-stamp">$4</span>
-          </div>
-          <div id="featured-base" aria-live="polite"></div>
-        </aside>
-      </section>
+          <section class="panel compact-panel">
+            <h2>Town Hall</h2>
+            <div id="townhall-filters" class="pill-grid"></div>
+          </section>
 
-      <section class="intel-grid" aria-label="Market intelligence">
-        <div class="war-card intel-panel">
-          <p class="eyebrow">Why this market exists</p>
-          <h2>Paid bases need trust signals before money changes hands.</h2>
-          <div id="market-intel" class="intel-list"></div>
-        </div>
-        <div class="war-card findings-panel">
-          <p class="eyebrow">Research conclusions</p>
-          <h2>The product edge</h2>
-          <div id="findings" class="finding-stack"></div>
-        </div>
-      </section>
-
-      <section id="market" class="war-card market-panel">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Base market</p>
-            <h2>Fresh singles, packs, and builder drops</h2>
-          </div>
-          <div class="filter-row" aria-label="Listing filters">
-            <button class="filter-chip is-active" data-filter="all">All</button>
-            <button class="filter-chip" data-filter="Legend League">Legend</button>
-            <button class="filter-chip" data-filter="CWL">CWL</button>
-            <button class="filter-chip" data-filter="War">War</button>
-            <button class="filter-chip" data-filter="Builder Base">Builder</button>
-            <button class="filter-chip" data-filter="Capital Hall">Capital</button>
-          </div>
-        </div>
-        <div id="listing-grid" class="listing-grid"></div>
-      </section>
-
-      <section class="detail-grid">
-        <aside class="war-card selected-panel">
-          <p class="eyebrow">Selected listing</p>
-          <div id="selected-listing"></div>
-        </aside>
-        <aside class="war-card checklist-panel">
-          <p class="eyebrow">Buyer checklist</p>
-          <h2>Questions every listing must answer</h2>
-          <ul id="buyer-checklist" class="checklist"></ul>
-        </aside>
-      </section>
-
-      <section id="builders" class="war-card builders-panel">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Builder hall</p>
-            <h2>Subscriptions need cadence, proof, and dispute history.</h2>
-          </div>
-          <span class="stone-badge">seller pages</span>
-        </div>
-        <div id="builders-grid" class="builders-grid"></div>
-      </section>
-
-      <section id="shield-lab" class="shield-grid">
-        <div class="war-card shield-panel">
-          <p class="eyebrow">Anti-repost shield</p>
-          <h2>Base fingerprints protect the freshness window.</h2>
-          <p class="section-copy">
-            The first version should block obvious reposts, queue borderline remixes, and show buyers why a base was allowed or flagged.
-          </p>
-          <div id="fingerprint-signals" class="signal-grid"></div>
-        </div>
-        <div class="war-card verdict-panel">
-          <div class="section-head compact">
-            <div>
-              <p class="eyebrow">Similarity scan</p>
-              <h2>Current demo verdicts</h2>
+          <section class="panel compact-panel">
+            <div class="panel-head">
+              <h2>Top sellers</h2>
+              <span>Score</span>
             </div>
-            <span id="fingerprint-threshold" class="stone-badge"></span>
-          </div>
-          <div id="fingerprint-results" class="verdict-stack"></div>
-        </div>
+            <div id="builder-list" class="seller-list"></div>
+          </section>
+        </aside>
+
+        <section class="market-main">
+          <section class="market-hero">
+            <div>
+              <p class="kicker">Fresh drops</p>
+              <h1>Buy the exact base you want.</h1>
+              <p>Spend site tokens on fresh links, packs, subscriptions, reviews, and spotlight boosts.</p>
+            </div>
+            <div id="market-stats" class="market-stats"></div>
+          </section>
+
+          <section class="spotlight-grid" aria-label="Spotlight listings">
+            <article id="spotlight-card" class="spotlight-card"></article>
+            <aside class="panel activity-panel">
+              <div class="panel-head">
+                <h2>Live market</h2>
+                <span id="result-count">0 bases</span>
+              </div>
+              <div id="activity-feed" class="activity-feed"></div>
+            </aside>
+          </section>
+
+          <section class="panel listings-panel">
+            <div class="market-toolbar">
+              <div>
+                <h2>Base listings</h2>
+                <p id="market-subtitle">Fresh bases ready to buy.</p>
+              </div>
+              <label class="select-label">
+                Sort
+                <select id="sort-select">
+                  <option value="spotlight">Spotlight first</option>
+                  <option value="fresh">Freshest</option>
+                  <option value="rating">Top rated</option>
+                  <option value="price">Cheapest</option>
+                </select>
+              </label>
+            </div>
+            <div id="listing-grid" class="listing-grid"></div>
+          </section>
+        </section>
+
+        <aside class="right-rail">
+          <section class="panel selected-panel">
+            <div id="selected-listing"></div>
+          </section>
+
+          <section id="token-shop" class="panel token-panel">
+            <div class="panel-head">
+              <h2>Token shop</h2>
+              <span>Demo</span>
+            </div>
+            <div id="token-packs" class="token-packs"></div>
+          </section>
+
+          <section id="submit-base" class="panel submit-panel">
+            <h2>Submit a base</h2>
+            <form id="submit-form" class="submit-form">
+              <label>
+                Base title
+                <input name="title" type="text" placeholder="TH18 anti-root diamond" required />
+              </label>
+              <label>
+                Copy link
+                <input name="link" type="url" placeholder="https://link.clashofclans.com/..." required />
+              </label>
+              <div class="form-row">
+                <label>
+                  Mode
+                  <select name="mode">
+                    <option>Legend League</option>
+                    <option>War</option>
+                    <option>CWL</option>
+                    <option>Builder Base</option>
+                    <option>Capital Hall</option>
+                  </select>
+                </label>
+                <label>
+                  Cost
+                  <input name="cost" type="number" min="1" max="50" value="4" required />
+                </label>
+              </div>
+              <button class="gold-button full" type="submit">Queue for review</button>
+            </form>
+            <div id="submission-result" class="submission-result" aria-live="polite"></div>
+          </section>
+        </aside>
       </section>
 
-      <section id="proof-room" class="proof-grid">
-        <div class="war-card proof-panel">
-          <p class="eyebrow">Clash API proof room</p>
-          <h2>Evidence should follow the base, not the sales pitch.</h2>
-          <div id="api-proof" class="proof-list"></div>
-        </div>
-        <div class="war-card roadmap-panel">
-          <p class="eyebrow">Build path</p>
-          <h2>What the prototype needs next</h2>
-          <div id="roadmap" class="roadmap-list"></div>
-        </div>
+      <section class="bottom-grid">
+        <section class="panel review-panel">
+          <div class="panel-head">
+            <h2>Reviews</h2>
+            <span id="review-title">Selected base</span>
+          </div>
+          <div id="review-list" class="review-list"></div>
+          <form id="review-form" class="review-form">
+            <label>
+              Leave a review
+              <textarea name="review" rows="3" placeholder="Did it hold? Was the link fresh?"></textarea>
+            </label>
+            <div class="form-row">
+              <label>
+                Rating
+                <select name="rating">
+                  <option value="5">5 stars</option>
+                  <option value="4">4 stars</option>
+                  <option value="3">3 stars</option>
+                  <option value="2">2 stars</option>
+                  <option value="1">1 star</option>
+                </select>
+              </label>
+              <button class="stone-button" type="submit">Post review</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel trust-panel">
+          <div class="panel-head">
+            <h2>Fresh shield</h2>
+            <span id="shield-threshold">82%</span>
+          </div>
+          <div id="shield-feed" class="shield-feed"></div>
+        </section>
       </section>
     </main>
     <script type="module" src="/app.js"></script>
