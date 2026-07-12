@@ -16,6 +16,12 @@ BASE_MARKETPLACE_DB_PASSWORD_FILE="${BASE_MARKETPLACE_DB_PASSWORD_FILE:-/opt/urb
 LOG_DIR="${LOG_DIR:-/opt/urba-apps/discord-bot/shared/logs}"
 LOCK_FILE="${LOCK_FILE:-/opt/urba-apps/discord-bot/shared/deploy.lock}"
 BRANCH="${BRANCH:-main}"
+DEPLOY_MIN_AVAILABLE_KB="${DEPLOY_MIN_AVAILABLE_KB:-393216}"
+DEPLOY_HEADROOM_WAIT_SECONDS="${DEPLOY_HEADROOM_WAIT_SECONDS:-300}"
+CHATWOOT_HEALTH_URL="${CHATWOOT_HEALTH_URL:-https://chat.urba.group/}"
+CHATWOOT_HEALTH_CHECK="${CHATWOOT_HEALTH_CHECK:-1}"
+
+export COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"
 
 mkdir -p "$LOG_DIR" "$(dirname "$LOCK_FILE")"
 exec >>"$LOG_DIR/deploy.log" 2>&1
@@ -77,6 +83,46 @@ run_low_priority() {
   fi
 }
 
+mem_available_kb() {
+  awk '/^MemAvailable:/ { print $2; exit }' /proc/meminfo
+}
+
+wait_for_deploy_headroom() {
+  local phase="$1"
+  local available
+  local waited=0
+
+  while true; do
+    available="$(mem_available_kb)"
+    if [ "${available:-0}" -ge "$DEPLOY_MIN_AVAILABLE_KB" ]; then
+      echo "Memory headroom OK for $phase: ${available}kB available."
+      return 0
+    fi
+
+    if [ "$waited" -ge "$DEPLOY_HEADROOM_WAIT_SECONDS" ]; then
+      echo "ERROR: refusing $phase; MemAvailable=${available}kB below DEPLOY_MIN_AVAILABLE_KB=${DEPLOY_MIN_AVAILABLE_KB}kB after ${waited}s."
+      return 1
+    fi
+
+    echo "Waiting for memory headroom before $phase: ${available}kB available, need ${DEPLOY_MIN_AVAILABLE_KB}kB."
+    sleep 10
+    waited=$((waited + 10))
+  done
+}
+
+check_chatwoot_health() {
+  local phase="$1"
+
+  [ "$CHATWOOT_HEALTH_CHECK" = "1" ] || return 0
+  if curl --fail --silent --show-error --max-time 15 "$CHATWOOT_HEALTH_URL" >/dev/null; then
+    echo "Chatwoot health OK during $phase."
+    return 0
+  fi
+
+  echo "WARN: Chatwoot health check failed during $phase at $CHATWOOT_HEALTH_URL."
+  return 0
+}
+
 if ! env_has_value "$CODEX_WORKER_ENV" GITHUB_TOKEN; then
   if env_has_value "$APP_ENV" GITHUB_TOKEN; then
     printf 'GITHUB_TOKEN=%s\n' "$(env_value "$APP_ENV" GITHUB_TOKEN)" >>"$CODEX_WORKER_ENV"
@@ -132,8 +178,13 @@ git -C "$APP_ROOT" fetch origin "$BRANCH"
 git -C "$APP_ROOT" checkout "$BRANCH"
 git -C "$APP_ROOT" merge --ff-only "origin/$BRANCH"
 
+check_chatwoot_health "pre-deploy"
 docker compose -f "$APP_ROOT/docker-compose.yml" config --quiet
-run_low_priority docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker build discord-bot codex-worker
+wait_for_deploy_headroom "Docker app build"
+run_low_priority docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker build discord-bot
+wait_for_deploy_headroom "Docker worker build"
+run_low_priority docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker build codex-worker
+wait_for_deploy_headroom "container update"
 run_low_priority docker compose -f "$APP_ROOT/docker-compose.yml" up -d base-marketplace-db
 
 has_value() {
@@ -213,6 +264,7 @@ for _ in $(seq 1 20); do
 done
 
 if [ "${bot_health:-0}" = "1" ] && [ "${marketplace_health:-0}" = "1" ]; then
+  check_chatwoot_health "post-deploy"
   docker compose -f "$APP_ROOT/docker-compose.yml" ps
   exit 0
 fi

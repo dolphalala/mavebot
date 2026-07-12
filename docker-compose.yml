@@ -10,6 +10,10 @@ services:
     <<: *node-app-image
     container_name: urba-discord-bot
     restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 768m
+    cpus: "1.0"
+    pids_limit: 256
     env_file:
       - /opt/urba-apps/discord-bot/.env
     environment:
@@ -34,6 +38,11 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     healthcheck:
       test:
         [
@@ -51,6 +60,10 @@ services:
     image: postgres:16-alpine
     container_name: urba-base-marketplace-db
     restart: unless-stopped
+    mem_limit: 256m
+    memswap_limit: 512m
+    cpus: "0.75"
+    pids_limit: 128
     environment:
       POSTGRES_DB: base_marketplace
       POSTGRES_USER: base_marketplace
@@ -61,6 +74,11 @@ services:
       - base-marketplace-db:/var/lib/postgresql/data
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     healthcheck:
       test:
         [
@@ -76,6 +94,10 @@ services:
     image: urba-discord-bot-app:latest
     container_name: urba-base-marketplace-web
     restart: unless-stopped
+    mem_limit: 256m
+    memswap_limit: 512m
+    cpus: "0.75"
+    pids_limit: 128
     environment:
       NODE_ENV: production
       SITE_HOST: 0.0.0.0
@@ -98,6 +120,11 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
     healthcheck:
       test:
         [
@@ -118,6 +145,10 @@ services:
       dockerfile: Dockerfile.worker
     container_name: urba-codex-worker
     restart: unless-stopped
+    mem_limit: 1024m
+    memswap_limit: 1536m
+    cpus: "1.25"
+    pids_limit: 512
     env_file:
       - /opt/urba-apps/discord-bot/.env
       - /opt/urba-apps/discord-bot/codex-worker.env
@@ -141,6 +172,11 @@ services:
     security_opt:
       - no-new-privileges:true
     init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
 
 volumes:
   base-marketplace-db:

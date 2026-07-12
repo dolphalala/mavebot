@@ -90,6 +90,13 @@ workflow.
   host and made Chatwoot appear down. Keep Docker build/deploy work
   low-priority and verify Chatwoot after any deploy that builds images, pulls
   base images, or starts new containers.
+- On 2026-07-12, a server audit found runtime usage was modest but deploy-time
+  pressure was real: the kernel logged sustained memory pressure during Docker
+  builds, and old Docker build cache plus journals consumed about 14 GB. Safe
+  cleanup pruned Docker build cache/unused images and vacuumed journald without
+  deleting Docker volumes. Future deploys must keep `COMPOSE_PARALLEL_LIMIT=1`,
+  build app and worker images separately, wait for memory headroom, and keep
+  mavebot container memory/pid/log limits in `docker-compose.yml`.
 - Remote Codex worker container: `urba-codex-worker`.
 - Health endpoint: `http://127.0.0.1:4188/healthz`.
 - GitHub deploys should use the server-local private deploy webhook when
@@ -105,6 +112,10 @@ workflow.
 - The deploy script builds `discord-bot`, `codex-worker`, and
   `base-marketplace-web`. It starts/verifies the marketplace Postgres and web
   services separately from the Discord bot.
+- If a deploy fails after the repo advances, `poll-deploy.sh` uses
+  `/opt/urba-apps/discord-bot/shared/deploy-needed` and
+  `/opt/urba-apps/discord-bot/shared/deploy-failed-at` to retry deliberately
+  instead of either getting stuck or hammering the small VPS every 30 seconds.
 - The deploy script recreates
   `codex-worker` only when no worker job is active; if a job is in
   `processing`, it writes `shared/codex-worker/restart-needed` and completes
