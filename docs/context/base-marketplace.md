@@ -98,3 +98,39 @@ Start with a review queue, not a perfect detector:
   URLs, or server-side cached assets only after legal/source review.
 - Future work should replace demo data with Postgres-backed listings,
   builders, reviews, subscriptions, and similarity events.
+
+## July 2026 Frontend Reset
+
+The first remote-worker version looked too generic: dark cards, abstract copy,
+and no clear Clash/base-trading product. That direction is rejected.
+
+The website must look and read like a Clash of Clans base market from the first
+viewport:
+
+- Use a fantasy/war/base-building visual language: stone panels, gold buttons,
+  grass-map texture, wall tiles, tower/core/trap markers, badges, and compact
+  battle-board sections.
+- Do not use a generic SaaS hero, marketing gradient, or vague marketplace
+  copy.
+- Show the actual marketplace mechanics immediately: fresh drops, low-dollar
+  single-base buys, builder subscriptions, freshness shields, reviews, proof
+  bands, leak risk, and similarity verdicts.
+- Include Town Hall, Builder Base, and Capital Hall coverage in the visible
+  filter model, not only in future notes.
+- Make seller pages about cadence, subscription value, dispute/leak risk,
+  review history, and proof quality.
+- Treat anti-repost detection as a first-class product surface. The UI should
+  show the signal list, threshold, blocked/queued/allowed verdicts, and why a
+  duplicate was caught.
+- Treat Clash API evidence as a first-class product surface. The UI should
+  explain how player tags, clan tags, war/CWL, Legend stats, trophy bands, and
+  Builder Base proof attach to a listing.
+- Keep copyrighted Clash asset packs out of the repo. Generated/CSS map
+  previews are acceptable for the prototype; if real icons are added later,
+  document source URLs and review the asset policy before caching them.
+
+Future Codex agents should read the recovered Discord requirement before
+planning marketplace changes. If the user asks for a "ClashKing/ClashPerk-like"
+site or base marketplace, they are asking for a visible, game-themed product
+with proof, filters, reviews, and concrete command/database slices, not a thin
+landing page.

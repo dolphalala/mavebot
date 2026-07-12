@@ -1,11 +1,18 @@
 const tileClass = {
+  g: 'tile-grass',
   w: 'tile-wall',
   d: 'tile-defense',
   t: 'tile-tower',
   c: 'tile-core',
   h: 'tile-hero',
   x: 'tile-trap',
-  '.': 'tile-empty'
+  i: 'tile-inferno',
+  s: 'tile-scatter',
+  a: 'tile-air',
+  e: 'tile-eagle',
+  p: 'tile-pet',
+  b: 'tile-builder',
+  '.': 'tile-grass'
 };
 
 let summary = null;
@@ -16,15 +23,59 @@ function byId(id) {
   return document.getElementById(id);
 }
 
-function moneyToNumber(price) {
-  return Number(String(price).replace(/[^0-9.]/g, '')) || 0;
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
 }
 
-function tileMarkup(layout, { mini = false } = {}) {
+function layoutDimensions(layout) {
+  const rows = layout.length || 1;
+  const cols = Math.max(...layout.map((row) => row.length), 1);
+  return { rows, cols };
+}
+
+function tileMarkup(layout) {
   return layout
-    .join('')
-    .split('')
-    .map((tile) => `<span class="tile ${tileClass[tile] || 'tile-empty'}" aria-hidden="true"></span>`)
+    .flatMap((row) => row.padEnd(layoutDimensions(layout).cols, 'g').split(''))
+    .map((tile) => `<span class="tile ${tileClass[tile] || 'tile-grass'}" aria-hidden="true"></span>`)
+    .join('');
+}
+
+function baseMapMarkup(listing, className = 'base-map') {
+  const { rows, cols } = layoutDimensions(listing.layout);
+  return `
+    <div
+      class="${className}"
+      role="img"
+      aria-label="${escapeHtml(listing.title)} map preview"
+      style="--rows: ${rows}; --cols: ${cols}; --card-accent: ${escapeHtml(listing.accent)}"
+    >
+      ${tileMarkup(listing.layout)}
+    </div>
+  `;
+}
+
+function metricMarkup(metrics) {
+  return metrics
+    .map(
+      ([label, value]) => `
+        <div class="metric">
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+        </div>
+      `
+    )
+    .join('');
+}
+
+function tagMarkup(tags, limit = tags.length) {
+  return tags
+    .slice(0, limit)
+    .map((tag) => `<span class="tag-pill">${escapeHtml(tag)}</span>`)
     .join('');
 }
 
@@ -33,9 +84,9 @@ function renderStats(stats) {
     .map(
       (stat) => `
         <article class="stat-card">
-          <strong>${stat.value}</strong>
-          <span>${stat.label}</span>
-          <p class="mt-2">${stat.detail}</p>
+          <strong>${escapeHtml(stat.value)}</strong>
+          <span>${escapeHtml(stat.label)}</span>
+          <p>${escapeHtml(stat.detail)}</p>
         </article>
       `
     )
@@ -44,23 +95,12 @@ function renderStats(stats) {
 
 function listingHeader(listing) {
   return `
-    <div class="flex items-start justify-between gap-3">
+    <div class="listing-head">
       <div>
-        <p class="text-xs uppercase text-slate-400">TH${listing.townHall} ${listing.mode}</p>
-        <h3 class="mt-1 text-base font-semibold text-white">${listing.title}</h3>
+        <span class="mode-badge">TH${escapeHtml(listing.townHall)} ${escapeHtml(listing.mode)}</span>
+        <h3 class="mt-2">${escapeHtml(listing.title)}</h3>
       </div>
-      <span class="subtle-badge">${listing.price}</span>
-    </div>
-  `;
-}
-
-function listingFacts(listing) {
-  return `
-    <div class="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-300">
-      <span><strong class="text-white">${listing.rating}</strong> rating</span>
-      <span><strong class="text-white">${listing.reviews}</strong> reviews</span>
-      <span>${listing.freshness}</span>
-      <span>${listing.copyState}</span>
+      <span class="price-stamp">${escapeHtml(listing.price)}</span>
     </div>
   `;
 }
@@ -68,30 +108,32 @@ function listingFacts(listing) {
 function renderFeatured(listing) {
   byId('active-price').textContent = listing.price;
   byId('featured-base').innerHTML = `
-    <div class="space-y-4">
-      ${listingHeader(listing)}
-      <div class="base-map" role="img" aria-label="${listing.title} map preview">
-        ${tileMarkup(listing.layout)}
+    <div class="featured-shell">
+      <div class="featured-title">
+        ${listingHeader(listing)}
+        <p class="mt-3">${escapeHtml(listing.reviewQuote)}</p>
       </div>
-      <div class="grid gap-3 sm:grid-cols-3">
-        <div class="finding-card">
-          <p class="text-xs uppercase text-slate-400">Builder</p>
-          <p class="mt-1 font-semibold text-white">${listing.builder}</p>
-          <p class="text-xs text-slate-300">${listing.builderType}</p>
-        </div>
-        <div class="finding-card">
-          <p class="text-xs uppercase text-slate-400">Proof band</p>
-          <p class="mt-1 font-semibold text-white">${listing.trophies}</p>
-          <p class="text-xs text-slate-300">${listing.defenses}</p>
-        </div>
-        <div class="finding-card">
-          <p class="text-xs uppercase text-slate-400">Freshness</p>
-          <p class="mt-1 font-semibold text-white">${listing.freshness}</p>
-          <p class="text-xs text-slate-300">${listing.format}</p>
-        </div>
+      <div class="base-stage">
+        ${baseMapMarkup(listing)}
       </div>
-      <div class="flex flex-wrap gap-2">
-        ${listing.tags.map((tag) => `<span class="tag-pill">${tag}</span>`).join('')}
+      <div class="metric-grid">
+        ${metricMarkup(listing.metrics)}
+      </div>
+      <div class="tag-row">
+        ${tagMarkup(listing.tags)}
+      </div>
+      <div class="selected-proof-grid">
+        ${listing.proof
+          .map(
+            (proof) => `
+              <article class="selected-proof-card">
+                <h3>${escapeHtml(proof.label)}</h3>
+                <strong class="mt-2 block text-[1.45rem] text-[#ffc83d]">${escapeHtml(proof.value)}</strong>
+                <p class="mt-1">${escapeHtml(proof.note)}</p>
+              </article>
+            `
+          )
+          .join('')}
       </div>
     </div>
   `;
@@ -102,30 +144,86 @@ function filteredListings() {
   return summary.listings.filter((listing) => activeFilter === 'all' || listing.mode === activeFilter);
 }
 
+function activeListing() {
+  return summary.listings.find((listing) => listing.id === activeListingId) || summary.listings[0];
+}
+
+function renderSelectedListing(listing) {
+  byId('selected-listing').innerHTML = `
+    <div class="selected-layout">
+      <div class="selected-head">
+        <div>
+          <h2 class="mt-0">${escapeHtml(listing.title)}</h2>
+          <p class="muted-text mt-2">${escapeHtml(listing.builder)} - ${escapeHtml(listing.builderType)} - ${escapeHtml(listing.dropType)}</p>
+        </div>
+        <span class="price-stamp">${escapeHtml(listing.price)}</span>
+      </div>
+      <div class="base-stage">
+        ${baseMapMarkup(listing)}
+      </div>
+      <div class="metric-grid">
+        ${metricMarkup([
+          ['Format', listing.format],
+          ['Freshness', listing.freshness],
+          ['Release', listing.releaseWindow],
+          ['Proof band', listing.testBand],
+          ['Copy state', listing.copyState],
+          ['Risk', listing.copyRisk]
+        ])}
+      </div>
+      <div class="quote-box">${escapeHtml(listing.reviewQuote)}</div>
+      <div class="selected-proof-grid">
+        ${listing.proof
+          .map(
+            (proof) => `
+              <article class="selected-proof-card">
+                <h3>${escapeHtml(proof.label)}</h3>
+                <strong class="mt-2 block text-[1.35rem] text-[#ffc83d]">${escapeHtml(proof.value)}</strong>
+                <p class="mt-1">${escapeHtml(proof.note)}</p>
+              </article>
+            `
+          )
+          .join('')}
+      </div>
+      <p class="muted-text">${escapeHtml(listing.apiHook)}</p>
+    </div>
+  `;
+}
+
 function renderListings() {
   const listings = filteredListings();
   if (!listings.some((listing) => listing.id === activeListingId)) {
     activeListingId = listings[0]?.id || summary.listings[0]?.id;
   }
-  const activeListing = summary.listings.find((listing) => listing.id === activeListingId) || summary.listings[0];
-  renderFeatured(activeListing);
+
+  const active = activeListing();
+  renderFeatured(active);
+  renderSelectedListing(active);
 
   byId('listing-grid').innerHTML = listings
     .map(
       (listing) => `
         <button
-          class="listing-card text-left ${listing.id === activeListing.id ? 'is-active' : ''}"
-          data-listing-id="${listing.id}"
-          style="--card-accent: ${listing.accent}"
+          class="listing-card ${listing.id === active.id ? 'is-active' : ''}"
+          data-listing-id="${escapeHtml(listing.id)}"
+          style="--card-accent: ${escapeHtml(listing.accent)}"
         >
-          <div>
+          <div class="space-y-3">
             ${listingHeader(listing)}
-            <div class="mini-map mt-3" aria-hidden="true">${tileMarkup(listing.layout, { mini: true })}</div>
-            ${listingFacts(listing)}
+            ${baseMapMarkup(listing, 'mini-map')}
+            <div class="metric-grid">
+              ${metricMarkup([
+                ['Drop', listing.dropType],
+                ['Age', listing.freshness],
+                ['Rating', `${listing.rating} / ${listing.reviews}`],
+                ['Proof', listing.testBand],
+                ['Shield', listing.copyState],
+                ['Sub', listing.subscription]
+              ])}
+            </div>
+            <p class="listing-meta">${escapeHtml(listing.reviewQuote)}</p>
           </div>
-          <div class="mt-3 flex flex-wrap gap-2">
-            ${listing.tags.slice(0, 2).map((tag) => `<span class="tag-pill">${tag}</span>`).join('')}
-          </div>
+          <div class="tag-row mt-3">${tagMarkup(listing.tags, 4)}</div>
         </button>
       `
     )
@@ -139,13 +237,27 @@ function renderListings() {
   });
 }
 
+function renderMarketIntel(items) {
+  byId('market-intel').innerHTML = items
+    .map(
+      (item) => `
+        <article class="intel-card">
+          <h3>${escapeHtml(item.label)}</h3>
+          <strong class="mt-2">${escapeHtml(item.value)}</strong>
+          <p class="mt-2">${escapeHtml(item.detail)}</p>
+        </article>
+      `
+    )
+    .join('');
+}
+
 function renderFindings(findings) {
   byId('findings').innerHTML = findings
     .map(
       (finding) => `
         <article class="finding-card">
-          <h3 class="font-semibold text-white">${finding.title}</h3>
-          <p class="mt-1 text-sm leading-6 text-slate-300">${finding.body}</p>
+          <h3>${escapeHtml(finding.title)}</h3>
+          <p class="mt-2">${escapeHtml(finding.body)}</p>
         </article>
       `
     )
@@ -156,19 +268,26 @@ function renderBuilders(builders) {
   byId('builders-grid').innerHTML = builders
     .map(
       (builder) => `
-        <article class="builder-card">
-          <div class="flex items-start justify-between gap-3">
+        <article class="builder-card" style="--card-accent: ${escapeHtml(builder.accent)}">
+          <div class="builder-head">
             <div>
-              <h3 class="font-semibold text-white">${builder.name}</h3>
-              <p class="mt-1 text-sm text-slate-300">${builder.specialty}</p>
+              <h3>${escapeHtml(builder.name)}</h3>
+              <p class="mt-2">${escapeHtml(builder.specialty)}</p>
             </div>
-            <span class="subtle-badge">${builder.score}</span>
+            <span class="stone-badge">${escapeHtml(builder.score)}</span>
           </div>
-          <div class="builder-score mt-4" aria-label="Trust score ${builder.score}">
-            <span style="width: ${builder.score}%"></span>
+          <div class="builder-score mt-4" aria-label="Trust score ${escapeHtml(builder.score)}">
+            <span style="width: ${escapeHtml(builder.score)}%"></span>
           </div>
-          <p class="mt-3 text-sm text-slate-300">${builder.cadence}</p>
-          <p class="mt-2 text-xs text-slate-400">${builder.proof}</p>
+          <div class="metric-grid mt-3">
+            ${metricMarkup([
+              ['Sub', builder.subscription],
+              ['Drops', builder.cadence],
+              ['Risk', builder.risk]
+            ])}
+          </div>
+          <p class="mt-3">${escapeHtml(builder.proof)}</p>
+          <div class="tag-row mt-3">${tagMarkup(builder.strengths)}</div>
         </article>
       `
     )
@@ -176,30 +295,58 @@ function renderBuilders(builders) {
 }
 
 function renderFingerprint(fingerprint) {
-  byId('fingerprint-threshold').textContent = `${fingerprint.threshold} block threshold`;
+  byId('fingerprint-threshold').textContent = `${Math.round(fingerprint.threshold * 100)}% block`;
   byId('fingerprint-signals').innerHTML = fingerprint.signals
-    .map((signal) => `<div class="signal-card text-sm text-slate-300">${signal}</div>`)
+    .map(
+      (signal) => `
+        <article class="signal-card">
+          <h3>${escapeHtml(signal.title)}</h3>
+          <p class="mt-2">${escapeHtml(signal.body)}</p>
+        </article>
+      `
+    )
     .join('');
 
   byId('fingerprint-results').innerHTML = fingerprint.verdicts
     .map((verdict) => {
-      const blocked = verdict.status.toLowerCase().includes('blocked');
+      const status = verdict.status.toLowerCase();
+      const stateClass = status.includes('blocked') ? 'is-blocked' : status.includes('queued') ? 'is-queued' : 'is-allowed';
       return `
-        <article class="result-card ${blocked ? 'is-blocked' : 'is-allowed'}">
-          <div class="flex items-start justify-between gap-3">
-            <h3 class="font-semibold text-white">${verdict.pair}</h3>
-            <span class="subtle-badge">${verdict.score}</span>
+        <article class="verdict-card ${stateClass}">
+          <div class="card-split">
+            <h3>${escapeHtml(verdict.pair)}</h3>
+            <span class="stone-badge">${Math.round(verdict.score * 100)}%</span>
           </div>
-          <p class="mt-2 text-sm text-slate-300">${verdict.status}</p>
+          <strong class="mt-3">${escapeHtml(verdict.status)}</strong>
+          <p class="mt-2">${escapeHtml(verdict.detail)}</p>
+          <div class="tag-row mt-3">${tagMarkup(verdict.matchSignals)}</div>
         </article>
       `;
     })
     .join('');
 }
 
+function renderApiProof(cards) {
+  byId('api-proof').innerHTML = cards
+    .map(
+      (card) => `
+        <article class="proof-card">
+          <h3>${escapeHtml(card.title)}</h3>
+          <strong class="mt-2 block text-[#ffc83d]">${escapeHtml(card.value)}</strong>
+          <p class="mt-2">${escapeHtml(card.detail)}</p>
+        </article>
+      `
+    )
+    .join('');
+}
+
+function renderChecklist(items) {
+  byId('buyer-checklist').innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+}
+
 function renderRoadmap(roadmap) {
   byId('roadmap').innerHTML = roadmap
-    .map((item, index) => `<article class="roadmap-card text-sm text-slate-300"><strong class="text-white">${index + 1}.</strong> ${item}</article>`)
+    .map((item) => `<article class="roadmap-card"><p>${escapeHtml(item)}</p></article>`)
     .join('');
 }
 
@@ -217,13 +364,9 @@ function wireControls() {
     button.addEventListener('click', () => {
       const target = byId(button.dataset.sectionLink);
       target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      document.querySelectorAll('[data-section-link]').forEach((item) => item.classList.remove('is-active'));
-      button.classList.add('is-active');
+      document.querySelectorAll('.nav-pill').forEach((item) => item.classList.remove('is-active'));
+      if (button.classList.contains('nav-pill')) button.classList.add('is-active');
     });
-  });
-
-  byId('compare-action').addEventListener('click', () => {
-    byId('protect').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 }
 
@@ -237,10 +380,13 @@ async function boot() {
   summary = await loadSummary();
   activeListingId = summary.listings[0]?.id;
   renderStats(summary.stats);
+  renderMarketIntel(summary.marketIntel);
   renderFindings(summary.findings);
   renderListings();
+  renderChecklist(summary.buyerChecklist);
   renderBuilders(summary.builders);
   renderFingerprint(summary.fingerprint);
+  renderApiProof(summary.apiProofCards);
   renderRoadmap(summary.roadmap);
   wireControls();
 }
@@ -249,6 +395,6 @@ boot().catch((error) => {
   console.error(error);
   document.body.insertAdjacentHTML(
     'afterbegin',
-    `<div class="m-4 rounded-lg border border-rose-400/40 bg-rose-950/70 p-3 text-sm text-rose-100">Marketplace preview failed to load: ${error.message}</div>`
+    `<div class="war-card m-4 border-red-400 text-red-100">Marketplace preview failed to load: ${escapeHtml(error.message)}</div>`
   );
 });
