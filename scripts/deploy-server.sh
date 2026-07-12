@@ -69,6 +69,14 @@ env_value() {
   ' "$file"
 }
 
+run_low_priority() {
+  if command -v ionice >/dev/null 2>&1; then
+    ionice -c2 -n7 nice -n 10 "$@"
+  else
+    nice -n 10 "$@"
+  fi
+}
+
 if ! env_has_value "$CODEX_WORKER_ENV" GITHUB_TOKEN; then
   if env_has_value "$APP_ENV" GITHUB_TOKEN; then
     printf 'GITHUB_TOKEN=%s\n' "$(env_value "$APP_ENV" GITHUB_TOKEN)" >>"$CODEX_WORKER_ENV"
@@ -125,8 +133,8 @@ git -C "$APP_ROOT" checkout "$BRANCH"
 git -C "$APP_ROOT" merge --ff-only "origin/$BRANCH"
 
 docker compose -f "$APP_ROOT/docker-compose.yml" config --quiet
-docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker build discord-bot codex-worker
-docker compose -f "$APP_ROOT/docker-compose.yml" up -d base-marketplace-db
+run_low_priority docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker build discord-bot codex-worker
+run_low_priority docker compose -f "$APP_ROOT/docker-compose.yml" up -d base-marketplace-db
 
 has_value() {
   env_has_value "$APP_ENV" "$1"
@@ -143,8 +151,8 @@ else
   echo "Registering global slash commands because DISCORD_GUILD_ID is blank."
 fi
 
-docker compose -f "$APP_ROOT/docker-compose.yml" run --rm discord-bot npm run register
-docker compose -f "$APP_ROOT/docker-compose.yml" up -d discord-bot base-marketplace-web
+run_low_priority docker compose -f "$APP_ROOT/docker-compose.yml" run --rm discord-bot npm run register
+run_low_priority docker compose -f "$APP_ROOT/docker-compose.yml" up -d discord-bot base-marketplace-web
 
 requeue_stale_worker_jobs() {
   local processing_dir="$CODEX_WORKER_DIR/processing"
@@ -180,7 +188,7 @@ maybe_recreate_codex_worker() {
     return 0
   fi
 
-  docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker up -d --no-deps --force-recreate codex-worker
+  run_low_priority docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker up -d --no-deps --force-recreate codex-worker
   rm -f "$marker"
 }
 

@@ -85,6 +85,11 @@ workflow.
 - Website database password file:
   `/opt/urba-apps/discord-bot/shared/base-marketplace-db-password`; deploy
   generates it if missing and it must never be committed.
+- The VPS is shared with Chatwoot and has only about 2 GB RAM. A 2 GB
+  `/swapfile` was added on 2026-07-12 after mavebot auto-deploys saturated the
+  host and made Chatwoot appear down. Keep Docker build/deploy work
+  low-priority and verify Chatwoot after any deploy that builds images, pulls
+  base images, or starts new containers.
 - Remote Codex worker container: `urba-codex-worker`.
 - Health endpoint: `http://127.0.0.1:4188/healthz`.
 - GitHub deploys should use the server-local private deploy webhook when

@@ -9,7 +9,8 @@ ENV NODE_ENV=production
 ENV XDG_CACHE_HOME=/tmp/.cache
 
 COPY --chown=node:node package*.json ./
-RUN npm install --omit=dev --no-package-lock
+RUN npm install --omit=dev --include=optional --no-package-lock \
+  && npm install --omit=dev --include=optional --os=linux --libc=musl --cpu=x64 sharp
 
 COPY --chown=node:node src ./src
 COPY --chown=node:node docs ./docs

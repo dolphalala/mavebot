@@ -7,7 +7,8 @@ ENV XDG_CACHE_HOME=/tmp/.cache
 RUN apk add --no-cache fontconfig ttf-dejavu
 
 COPY --chown=node:node package*.json ./
-RUN npm install --omit=dev
+RUN npm install --omit=dev --include=optional \
+  && npm install --omit=dev --include=optional --os=linux --libc=musl --cpu=x64 sharp
 
 COPY --chown=node:node src ./src
 COPY --chown=node:node scripts ./scripts
