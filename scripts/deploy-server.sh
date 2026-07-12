@@ -125,7 +125,7 @@ git -C "$APP_ROOT" checkout "$BRANCH"
 git -C "$APP_ROOT" merge --ff-only "origin/$BRANCH"
 
 docker compose -f "$APP_ROOT/docker-compose.yml" config --quiet
-docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker build discord-bot codex-worker base-marketplace-web
+docker compose -f "$APP_ROOT/docker-compose.yml" --profile codex-worker build discord-bot codex-worker
 docker compose -f "$APP_ROOT/docker-compose.yml" up -d base-marketplace-db
 
 has_value() {
