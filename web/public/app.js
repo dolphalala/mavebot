@@ -21,7 +21,11 @@ const state = {
   query: '',
   sort: 'spotlight',
   activeId: null,
-  feed: []
+  feed: [],
+  purchases: [],
+  walletLedger: [],
+  sellerQueue: [],
+  spotlightQueue: []
 };
 
 function byId(id) {
@@ -111,6 +115,21 @@ function renderStats() {
         <article>
           <strong>${escapeHtml(stat.value)}</strong>
           <span>${escapeHtml(stat.label)}</span>
+          <small>${escapeHtml(stat.detail)}</small>
+        </article>
+      `
+    )
+    .join('');
+}
+
+function renderPipeline() {
+  byId('market-pipeline').innerHTML = state.summary.marketPipeline
+    .map(
+      (step) => `
+        <article>
+          <span>${escapeHtml(step.label)}</span>
+          <strong>${escapeHtml(step.value)}</strong>
+          <p>${escapeHtml(step.detail)}</p>
         </article>
       `
     )
@@ -131,6 +150,11 @@ function listingCard(listing) {
         </div>
         <h3>${escapeHtml(listing.title)}</h3>
         <p>${escapeHtml(listing.builder)} &middot; ${escapeHtml(stars(listing.rating))} &middot; ${escapeHtml(listing.reviews)} reviews</p>
+        <div class="listing-facts">
+          <span>${escapeHtml(listing.freshness)} fresh</span>
+          <span>${escapeHtml(listing.shield)}</span>
+          <span>${escapeHtml(listing.sold)} sold</span>
+        </div>
         <div class="listing-tags">
           ${listing.tags.slice(0, 3).map((tag) => `<span>${escapeHtml(tag)}</span>`).join('')}
         </div>
@@ -174,13 +198,19 @@ function renderSpotlight() {
 
 function renderSelected() {
   const listing = activeListing();
+  const owned = isOwned(listing.id);
   byId('selected-listing').innerHTML = `
     <div class="selected-head">
       <span class="kicker">Selected base</span>
-      <strong>${escapeHtml(listing.costTokens)} tokens</strong>
+      <strong>${owned ? 'Owned' : `${escapeHtml(listing.costTokens)} tokens`}</strong>
     </div>
     <h2>${escapeHtml(listing.title)}</h2>
     ${baseMap(listing, 'detail-map')}
+    <div class="status-strip">
+      <span>${escapeHtml(listing.dropType)}</span>
+      <span>${escapeHtml(listing.cashPrice)} demo cash</span>
+      <span>${escapeHtml(listing.copyRisk)} leak risk</span>
+    </div>
     <div class="proof-grid">
       ${listing.proof.map((proof) => `<article><span>${escapeHtml(proof.label)}</span><strong>${escapeHtml(proof.value)}</strong></article>`).join('')}
     </div>
@@ -192,7 +222,7 @@ function renderSelected() {
       <div><dt>Sold</dt><dd>${escapeHtml(listing.sold)} copies</dd></div>
     </dl>
     <div class="panel-actions">
-      <button class="gold-button full buy-button" data-buy-id="${escapeHtml(listing.id)}">Buy private link</button>
+      <button class="gold-button full buy-button" data-buy-id="${escapeHtml(listing.id)}">${owned ? 'Open private link' : 'Buy private link'}</button>
       <button class="stone-button full" data-boost-id="${escapeHtml(listing.id)}">Spotlight this base</button>
     </div>
   `;
@@ -203,10 +233,89 @@ function renderTokenPacks() {
     .map(
       (pack) => `
         <button class="token-pack" data-token-pack="${escapeHtml(pack.id)}">
-          <span>${escapeHtml(pack.name)}</span>
-          <strong>${escapeHtml(pack.tokens)} tokens</strong>
-          <small>${escapeHtml(pack.price)} &middot; ${escapeHtml(pack.bonus)}</small>
+          <span>${escapeHtml(pack.tag)}</span>
+          <strong>${escapeHtml(pack.price)} for ${escapeHtml(pack.tokens)} tokens</strong>
+          <small>${escapeHtml(pack.unit)} &middot; ${escapeHtml(pack.bonus)}</small>
         </button>
+      `
+    )
+    .join('');
+}
+
+function ownedItems() {
+  return [...state.purchases, ...state.summary.buyerLibrary];
+}
+
+function isOwned(listingId) {
+  return ownedItems().some((item) => item.listingId === listingId);
+}
+
+function renderBuyerLibrary() {
+  const items = ownedItems();
+  byId('library-count').textContent = `${items.length} links`;
+  byId('buyer-library-list').innerHTML = items
+    .map(
+      (item) => `
+        <article class="library-card">
+          <div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(item.status)} &middot; ${escapeHtml(item.paid)}</span>
+          </div>
+          <button class="stone-button" data-copy-library="${escapeHtml(item.id)}">${escapeHtml(item.action)}</button>
+          <small>Review due: ${escapeHtml(item.reviewDue)} &middot; Access: ${escapeHtml(item.expires)}</small>
+        </article>
+      `
+    )
+    .join('');
+}
+
+function renderWalletLedger() {
+  byId('wallet-ledger').innerHTML = `
+    <h3>Wallet history</h3>
+    ${state.walletLedger
+      .slice(0, 5)
+      .map(
+        (item) => `
+          <article>
+            <span>${escapeHtml(item.type)}</span>
+            <strong>${escapeHtml(item.amount)}t</strong>
+            <small>${escapeHtml(item.detail)} &middot; ${escapeHtml(item.when)}</small>
+          </article>
+        `
+      )
+      .join('')}
+  `;
+}
+
+function renderSellerQueue() {
+  byId('seller-queue').innerHTML = state.sellerQueue
+    .map(
+      (item) => `
+        <article class="queue-card">
+          <div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(item.seller)} &middot; ${escapeHtml(item.ask)}</span>
+          </div>
+          <b>${escapeHtml(item.status)}</b>
+          <small>${escapeHtml(item.result)} &middot; ${escapeHtml(item.eta)}</small>
+        </article>
+      `
+    )
+    .join('');
+}
+
+function renderSpotlightQueue() {
+  byId('spotlight-queue').innerHTML = state.spotlightQueue
+    .map(
+      (item) => `
+        <article class="queue-card spotlight-queue-card">
+          <div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(item.seller)} &middot; ${escapeHtml(item.spend)}</span>
+          </div>
+          <b>${escapeHtml(item.slot)}</b>
+          <small>${escapeHtml(item.lift)}</small>
+        </article>
       `
     )
     .join('');
@@ -270,6 +379,12 @@ function renderShield() {
 function buyListing(id) {
   const listing = state.summary.listings.find((item) => item.id === id);
   if (!listing) return;
+  if (isOwned(id)) {
+    state.feed.unshift({ type: 'library', text: `${listing.title} is already in your library.` });
+    renderActivity();
+    byId('buyer-library').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
   if (state.wallet < listing.costTokens) {
     state.feed.unshift({ type: 'top up', text: `Need ${listing.costTokens - state.wallet} more tokens for ${listing.title}.` });
     renderActivity();
@@ -277,9 +392,24 @@ function buyListing(id) {
     return;
   }
   state.wallet -= listing.costTokens;
+  listing.sold += 1;
+  state.purchases.unshift({
+    id: `owned-${listing.id}-${Date.now()}`,
+    listingId: listing.id,
+    title: listing.title,
+    status: 'Unlocked',
+    action: 'Copy link',
+    expires: 'Forever',
+    reviewDue: 'After first defense',
+    paid: `${listing.costTokens} tokens`
+  });
+  state.walletLedger.unshift({ type: 'Purchase', amount: `-${listing.costTokens}`, detail: listing.title, when: 'Just now' });
   state.feed.unshift({ type: 'purchase', text: `Bought ${listing.title} for ${listing.costTokens} tokens. Private link unlocked.` });
   renderWallet();
   renderActivity();
+  renderBuyerLibrary();
+  renderWalletLedger();
+  renderListings();
 }
 
 function boostListing(id) {
@@ -293,9 +423,13 @@ function boostListing(id) {
     return;
   }
   state.wallet -= cost;
+  state.walletLedger.unshift({ type: 'Boost', amount: `-${cost}`, detail: listing.title, when: 'Just now' });
+  state.spotlightQueue.unshift({ title: listing.title, seller: listing.builder, slot: 'Queued', spend: `${cost} tokens`, lift: 'Awaiting slot' });
   state.feed.unshift({ type: 'boost', text: `${listing.title} is queued for a 24h spotlight slot.` });
   renderWallet();
   renderActivity();
+  renderWalletLedger();
+  renderSpotlightQueue();
 }
 
 function wireEvents() {
@@ -323,9 +457,11 @@ function wireEvents() {
     if (target.dataset.tokenPack) {
       const pack = state.summary.tokenPacks.find((item) => item.id === target.dataset.tokenPack);
       state.wallet += pack.tokens;
+      state.walletLedger.unshift({ type: 'Top up', amount: `+${pack.tokens}`, detail: `${pack.name} checkout`, when: 'Just now' });
       state.feed.unshift({ type: 'top up', text: `Added ${pack.tokens} tokens with ${pack.name}.` });
       renderWallet();
       renderActivity();
+      renderWalletLedger();
     }
     if (target.dataset.scrollTarget) {
       byId(target.dataset.scrollTarget)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -334,6 +470,13 @@ function wireEvents() {
       state.query = target.dataset.builder;
       byId('market-search').value = state.query;
       renderListings();
+    }
+    if (target.dataset.copyLibrary) {
+      const item = ownedItems().find((owned) => owned.id === target.dataset.copyLibrary);
+      if (item) {
+        state.feed.unshift({ type: 'library', text: `${item.title} private link is ready to copy.` });
+        renderActivity();
+      }
     }
   });
 
@@ -354,8 +497,18 @@ function wireEvents() {
     const mode = data.get('mode');
     const cost = data.get('cost');
     byId('submission-result').textContent = `${title} is queued for ${mode} review at ${cost} tokens.`;
+    state.sellerQueue.unshift({
+      id: `queue-${Date.now()}`,
+      title,
+      seller: 'You',
+      status: 'Similarity scan',
+      eta: '5 min',
+      ask: `${cost} tokens`,
+      result: `${mode} link received`
+    });
     state.feed.unshift({ type: 'submit', text: `${title} submitted for similarity review.` });
     renderActivity();
+    renderSellerQueue();
     event.currentTarget.reset();
   });
 
@@ -381,14 +534,22 @@ async function boot() {
   state.summary = await response.json();
   state.activeId = state.summary.listings[0].id;
   state.feed = [...state.summary.activityFeed];
+  state.walletLedger = [...state.summary.walletActivity];
+  state.sellerQueue = [...state.summary.sellerQueue];
+  state.spotlightQueue = [...state.summary.spotlightQueue];
   renderWallet();
   renderFilters();
   renderStats();
+  renderPipeline();
   renderBuilders();
   renderTokenPacks();
   renderListings();
   renderActivity();
   renderShield();
+  renderBuyerLibrary();
+  renderWalletLedger();
+  renderSellerQueue();
+  renderSpotlightQueue();
   wireEvents();
 }
 

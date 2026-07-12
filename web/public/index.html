@@ -15,7 +15,7 @@
       href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito+Sans:wght@600;700;800;900&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/styles.css?v=20260712-ten-pass" />
   </head>
   <body>
     <main class="market-shell">
@@ -27,6 +27,12 @@
             <small>Base marketplace</small>
           </span>
         </a>
+
+        <nav class="market-nav" aria-label="Marketplace sections">
+          <button type="button" data-scroll-target="listing-grid">Shop</button>
+          <button type="button" data-scroll-target="submit-base">Sell</button>
+          <button type="button" data-scroll-target="buyer-library">Library</button>
+        </nav>
 
         <label class="search-box">
           <span>Search</span>
@@ -67,12 +73,18 @@
         <section class="market-main">
           <section class="market-hero">
             <div>
-              <p class="kicker">Fresh drops</p>
-              <h1>Buy the exact base you want.</h1>
-              <p>Spend site tokens on fresh links, packs, subscriptions, reviews, and spotlight boosts.</p>
+              <p class="kicker">Base shop</p>
+              <h1>Buy fresh Clash bases with tokens.</h1>
+              <p>Top up, unlock private links, submit your own layouts, review bases, and boost good drops into the spotlight.</p>
+              <div class="hero-actions">
+                <button class="gold-button" data-scroll-target="listing-grid">Browse bases</button>
+                <button class="stone-button" data-scroll-target="submit-base">Sell a link</button>
+              </div>
             </div>
             <div id="market-stats" class="market-stats"></div>
           </section>
+
+          <section id="market-pipeline" class="market-pipeline" aria-label="Marketplace workflow"></section>
 
           <section class="spotlight-grid" aria-label="Spotlight listings">
             <article id="spotlight-card" class="spotlight-card"></article>
@@ -110,12 +122,21 @@
             <div id="selected-listing"></div>
           </section>
 
+          <section id="buyer-library" class="panel library-panel">
+            <div class="panel-head">
+              <h2>Your library</h2>
+              <span id="library-count">0 links</span>
+            </div>
+            <div id="buyer-library-list" class="library-list"></div>
+          </section>
+
           <section id="token-shop" class="panel token-panel">
             <div class="panel-head">
               <h2>Token shop</h2>
-              <span>Demo</span>
+              <span>Top up</span>
             </div>
             <div id="token-packs" class="token-packs"></div>
+            <div id="wallet-ledger" class="wallet-ledger"></div>
           </section>
 
           <section id="submit-base" class="panel submit-panel">
@@ -188,7 +209,25 @@
           <div id="shield-feed" class="shield-feed"></div>
         </section>
       </section>
+
+      <section class="operations-grid">
+        <section class="panel queue-panel">
+          <div class="panel-head">
+            <h2>Seller queue</h2>
+            <span>Review before listing</span>
+          </div>
+          <div id="seller-queue" class="queue-list"></div>
+        </section>
+
+        <section class="panel spotlight-panel">
+          <div class="panel-head">
+            <h2>Spotlight slots</h2>
+            <span>Paid boosts</span>
+          </div>
+          <div id="spotlight-queue" class="queue-list"></div>
+        </section>
+      </section>
     </main>
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/app.js?v=20260712-ten-pass"></script>
   </body>
 </html>

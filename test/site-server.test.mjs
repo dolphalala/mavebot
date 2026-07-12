@@ -26,6 +26,10 @@ test('marketplace summary includes core product surfaces', () => {
   const summary = marketplaceSummary();
   assert.ok(summary.listings.length >= 3);
   assert.ok(summary.builders.length >= 3);
+  assert.ok(summary.tokenPacks.length >= 3);
+  assert.ok(summary.buyerLibrary.length >= 1);
+  assert.ok(summary.sellerQueue.length >= 1);
+  assert.ok(summary.spotlightQueue.length >= 1);
   assert.ok(summary.roadmap.some((item) => item.toLowerCase().includes('similarity')));
   assert.ok(summary.findings.some((item) => item.body.toLowerCase().includes('fresh')));
 });
@@ -51,11 +55,14 @@ test('site health, API, and static shell respond without a database', async () =
     assert.equal(summaryResponse.status, 200);
     const summaryJson = await summaryResponse.json();
     assert.ok(summaryJson.listings[0].title.includes('TH'));
+    assert.ok(summaryJson.marketPipeline.some((step) => step.label === 'Unlock'));
 
     const pageResponse = await fetch(`${baseUrl}/`);
     assert.equal(pageResponse.status, 200);
     const html = await pageResponse.text();
     assert.match(html, /MaveBase/);
+    assert.match(html, /Your library/);
+    assert.match(html, /Seller queue/);
     assert.match(html, /@tailwindcss\/browser@4/);
   });
 });

@@ -1,14 +1,14 @@
 export const marketplaceStats = [
   { label: 'Live bases', value: '184', detail: 'Fresh layouts for TH, Builder Base, and Capital.' },
-  { label: 'Token volume', value: '12.4k', detail: 'Tokens spent on singles, packs, reviews, and boosts.' },
-  { label: 'Avg single', value: '4', detail: 'Most one-off bases cost 2-6 site tokens.' },
+  { label: 'Today sold', value: '47', detail: 'Private links unlocked by buyers today.' },
+  { label: 'Seller payout', value: '82%', detail: 'Demo seller share after marketplace fee.' },
   { label: 'Fresh shield', value: '14d', detail: 'Similarity checks protect new paid releases.' }
 ];
 
 export const tokenPacks = [
-  { id: 'starter', name: 'Scout Pack', tokens: 25, price: '$5', bonus: 'Good for 5-8 singles' },
-  { id: 'war', name: 'War Chest', tokens: 70, price: '$12', bonus: 'Best value for clan buyers' },
-  { id: 'builder', name: 'Builder Vault', tokens: 160, price: '$25', bonus: 'For boosts and subscriptions' }
+  { id: 'starter', name: 'Scout Pack', tokens: 25, price: '$5', unit: '$0.20/token', bonus: 'Good for 5-8 singles', tag: 'Starter' },
+  { id: 'war', name: 'War Chest', tokens: 70, price: '$12', unit: '$0.17/token', bonus: 'Best value for clan buyers', tag: 'Popular' },
+  { id: 'builder', name: 'Builder Vault', tokens: 160, price: '$25', unit: '$0.16/token', bonus: 'For boosts and subscriptions', tag: 'Best value' }
 ];
 
 export const baseListings = [
@@ -402,6 +402,78 @@ export const activityFeed = [
   { type: 'boost', text: 'Blueprint Scout bought a 24h spotlight slot.' }
 ];
 
+export const marketPipeline = [
+  { label: 'Submit', value: 'Copy link', detail: 'Seller adds title, mode, token price, and Clash layout link.' },
+  { label: 'Scan', value: 'Fresh shield', detail: 'Similarity and duplicate checks run before a base can sell.' },
+  { label: 'List', value: 'Shop cards', detail: 'Buyers filter by TH, mode, price, proof, seller, and reviews.' },
+  { label: 'Unlock', value: 'Private link', detail: 'Tokens unlock the copy link and add it to the buyer library.' }
+];
+
+export const buyerLibrary = [
+  {
+    id: 'owned-th18-legend',
+    listingId: 'th18-war-hardmode',
+    title: 'TH18 Hard Mode War Maze',
+    status: 'Unlocked',
+    action: 'Copy link',
+    expires: 'Forever',
+    reviewDue: 'Today',
+    paid: '11 tokens'
+  },
+  {
+    id: 'owned-bh10-night',
+    listingId: 'bh10-night-cache',
+    title: 'BH10 Night Cache Anti-Air',
+    status: 'Notes ready',
+    action: 'Open notes',
+    expires: 'Forever',
+    reviewDue: '2 days',
+    paid: '2 tokens'
+  }
+];
+
+export const walletActivity = [
+  { type: 'Top up', amount: '+70', detail: 'War Chest checkout', when: '10m ago' },
+  { type: 'Purchase', amount: '-4', detail: 'TH18 Legend Diamond', when: '7m ago' },
+  { type: 'Boost', amount: '-12', detail: 'Spotlight queue', when: '3m ago' }
+];
+
+export const sellerQueue = [
+  {
+    id: 'queue-lana-th17',
+    title: 'TH17 Anti-Queen Charge Box',
+    seller: 'Lana Labs',
+    status: 'Similarity scan',
+    eta: '6 min',
+    ask: '5 tokens',
+    result: 'No exact link match'
+  },
+  {
+    id: 'queue-blueprint-cwl',
+    title: 'CWL Week Two Rotation Pack',
+    seller: 'Blueprint Scout',
+    status: 'Moderator review',
+    eta: '24 min',
+    ask: '18 tokens',
+    result: '78% overlap needs human check'
+  },
+  {
+    id: 'queue-night-bh',
+    title: 'BH10 Anti-Air Funnel',
+    seller: 'Night Forge',
+    status: 'Ready to list',
+    eta: 'Now',
+    ask: '2 tokens',
+    result: 'Fresh shield cleared'
+  }
+];
+
+export const spotlightQueue = [
+  { title: 'TH18 Legend Diamond Trapbox', seller: 'RH Prime', slot: 'Now', spend: '12 tokens', lift: '+38% views' },
+  { title: 'TH17 CWL Split Inferno Box', seller: 'CWL Forge', slot: 'Next', spend: '12 tokens', lift: 'Queued' },
+  { title: 'BH10 Night Cache Anti-Air', seller: 'Night Forge', slot: 'Tonight', spend: '8 tokens', lift: 'Discount slot' }
+];
+
 export const productRoadmap = [
   'Persist listings, token balances, purchases, submissions, reviews, and boosts in Postgres.',
   'Add payment checkout for token top-ups and seller payout accounting.',
@@ -421,6 +493,11 @@ export function marketplaceSummary() {
     fingerprint: fingerprintDemo,
     tokenPacks,
     activityFeed,
+    marketPipeline,
+    buyerLibrary,
+    walletActivity,
+    sellerQueue,
+    spotlightQueue,
     roadmap: productRoadmap
   };
 }

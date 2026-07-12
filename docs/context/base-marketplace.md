@@ -162,3 +162,28 @@ Required first-screen behavior:
 - Prefer compact app UI over oversized hero content. The page should feel like
   a Clash-focused marketplace dashboard that Lana or a non-technical user can
   operate, not a pitch deck.
+
+## July 2026 Ten-Pass Product Polish
+
+The next improvement pass made these surfaces mandatory in the prototype and in
+future implementation work:
+
+- Buyer library: after purchase, the user should see unlocked private links,
+  copy/open actions, review reminders, and what they paid.
+- Wallet ledger: token top-ups and spends need visible history so money-to-token
+  behavior is obvious.
+- Seller queue: submitted base links must land in a review/scanning queue with
+  seller, price, status, ETA, and scan result.
+- Spotlight queue: paid boosts must show slot timing and expected lift instead
+  of being a vague button.
+- Marketplace pipeline: submit, scan, list, unlock should be understandable at a
+  glance without reading a paragraph.
+- Top-up copy should say money and tokens together, for example `$12 for 70
+  tokens`, not just a pack name.
+- Buying a base should add it to the library and update the wallet/feed, even in
+  demo mode.
+- Submitting a base should update seller queue state, not just show a toast.
+- Reviews should stay tied to the selected base and act like part of the buyer
+  loop.
+- Keep the anti-repost/freshness system visible, but secondary to the
+  marketplace workflows.
