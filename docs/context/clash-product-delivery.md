@@ -1,21 +1,21 @@
 # Clash Product Delivery Playbook
 
-This is the acceptance contract for broad Clash requests in Discord `#codex`,
+This is the acceptance contract for broad Clash requests in Codex Desktop,
 especially asks that mention ClashKing, ClashPerk, roster building, CWL, war
 history, activity, scheduled collection, or "the same data structure".
 
 ## Why This Exists
 
-On 2026-07-09 the Discord channel asked mavebot to research how ClashKing and
+On 2026-07-09 Allen asked mavebot to research how ClashKing and
 ClashPerk collect trophies, CWL, and war stats, then create the same kind of
 data structure so mavebot could start collecting data for cared-about players.
-The worker replied only that a backend collector was added. That was not good
+The prior automation replied only that a backend collector was added. That was not good
 enough: it skipped the plan, did not mention sources, did not explain official
 API limits, did not show a command, and gave no demo.
 
 Future jobs must treat that as the known failure pattern.
 
-The same day also exposed the roster-planning version of the bug. The channel
+The same day also exposed the roster-planning version of the bug. Allen
 asked for a `/roster` build plan, a demo, signup/enrollment thinking, and
 context/process improvements. mavebot first answered with only a tiny status
 reply, then later described non-existent commands like `/roster enroll` and
@@ -111,6 +111,6 @@ or state an honest blocker, update tests/docs, and give the command/demo answer.
 - Backend-only changes when a visible command slice was feasible.
 - Saying "use `/roster`" without explaining setup, tracked history, and what
   data is still shallow.
-- Repeating stale command names from older Discord answers instead of checking
+- Repeating stale command names from older answers instead of checking
   the current source.
-- Ignoring a previous Discord complaint that the plan/demo was skipped.
+- Ignoring a previous complaint that the plan/demo was skipped.

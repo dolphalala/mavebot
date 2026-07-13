@@ -4,10 +4,10 @@ This project is the Vibe mirror for the Discord bot intended to run on the
 `urba-chatwoot` shared host at `/opt/urba-apps/discord-bot`.
 
 Before making changes, read `docs/context/README.md` first, then
-`docs/context/operating-memory.md`, `docs/context/discord-session.md`, and any
-focused context file relevant to the task. Discord `#codex` is the remote
-control channel. Remote Codex jobs use the same context surface, so keep it
-concise and current.
+`docs/context/operating-memory.md` and any focused context file relevant to the
+task. This project is edited through Codex Desktop/local git work only; do not
+reintroduce chat-control bridges, server-side coding workers, website services,
+or database sidecars without an explicit user request.
 
 ## Rules
 

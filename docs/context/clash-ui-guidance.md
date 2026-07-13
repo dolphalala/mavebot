@@ -1,8 +1,8 @@
 # Clash UI Guidance
 
 This file is durable context for mavebot's Clash of Clans Discord features.
-Every Discord #codex worker task that touches Clash commands should read it
-after `operating-memory.md` and `discord-session.md`.
+Every Codex Desktop task that touches Clash commands should read it after
+`operating-memory.md`.
 
 ## Product Target
 
@@ -92,11 +92,8 @@ after `operating-memory.md` and `discord-session.md`.
 
 ## Context Hygiene
 
-- Long-lived Discord control will accumulate messages forever. Do not treat old
-  transcript rows as active tasks.
-- Keep `docs/context/discord-session.md` focused on facts, decisions, and open
-  work. If it gets noisy, restructure it and delete duplicated stale bullets
-  after preserving the durable fact in the right section.
 - Add new focused context files under `docs/context/` when a domain needs stable
   guidance, and keep each file bounded.
+- Remove stale implementation notes after preserving any durable fact in the
+  right section.
 - Secrets and raw env values never belong in context docs.

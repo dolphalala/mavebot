@@ -1,7 +1,7 @@
 # Mavebot Operating Memory
 
-This repo backs the `mavebot` Discord bot and Discord `#codex` remote Codex
-workflow.
+This repo backs the `mavebot` Discord bot. It is edited through Codex
+Desktop/local git work, then deployed by pushing to `origin/main`.
 
 ## Product Context
 
@@ -9,62 +9,45 @@ workflow.
 - Discord client/application ID: `1519063290058117170`.
 - Main Discord server observed from the bot token: `mevo`
   (`1431280201068843171`).
-- Current slash commands:
-  - `/lana`: draws a generated PNG heart image plus a randomized embed love
-    note for Lana and Allen.
-  - `/loveu`: accepts a Discord user, composes a randomized love poem from
-    shuffled line pools for them, and attaches a freshly generated heart image.
-  - `/player`: looks up a Clash of Clans player by tag using the server-side
-    CoC API token, then presents compact button pages plus a rendered army
-    image card with Clash Wiki/Fandom item icons when available.
-  - `/legends`: starts or views Legend League trophy tracking for a player tag.
-  - `/track player:<tag>` and `/track clan:<tag>`: seed the first
-    ClashKing/ClashPerk-style history snapshot and enroll the subject in
-    `/shared/clash-history.json`; `/track status` summarizes tracked players,
-    clans, wars/CWL rows, snapshots, and scheduler state.
-  - `/history player:<tag>`: shows collected player history from
-    `/shared/clash-history.json`, including current stats, snapshot deltas,
-    clan movement, and collected war/CWL rows. If the player is not tracked
-    yet, it seeds the first snapshot and explains that history starts now.
-  - `/roster plan clan:<tag> size:<5-50> style:<balanced|safe|growth>`:
-    suggests a CWL/war lineup from the tracked clan members, player snapshots,
-    hero/equipment totals, activity, and collected war/CWL rows. If a clan tag
-    is passed and not tracked yet, it seeds the first clan snapshot and explains
-    that the first plan is based on limited data.
-  - `/roster signup player:<tag> clan:<tag> note:<text>` and
-    `/roster status clan:<tag>`: store Discord-member roster enrollment in
-    `/shared/clash-history.json`, then show signed players, missing clan
-    members, notes, and data-readiness warnings from the same Clash history
-    store.
-  - `/roster export clan:<tag> format:<text|csv>`: exports signed players and
-    missing clan members from the same roster store for leader copy/paste.
-  - `/warstats clan:<tag>`: summarizes collected war/CWL rows for a tracked
-    clan, including public war-log results, attack-level stars/triples/missed
-    hits when full current-war/CWL rows exist, and a data-reality note when
-    only summary rows are available.
-  - `/activity clan:<tag>`: shows clan snapshot count, member joins/leaves,
-    donation/received/trophy deltas from player snapshots, and which current
-    members still need player snapshots.
-  - `/summary clan:<tag>`: gives a compact Clash operations command-center
-    view with tracking counts, roster readiness, war/CWL coverage, activity
-    readiness, and next commands.
-  - `/pictionary`: starts a Clash of Clans picture guessing game in the current
-    channel.
-  - `/elder`: lets a server admin or existing elder grant elder status to a
-    Discord user.
-  - `/mute`: elder vote command. Three unique elder votes mute the target for
-    5 minutes and append the result to the permanent moderation record.
-  - `/bench`: elder vote command. Three unique elder votes assign the target a
-    `benched` role and append the result to the permanent moderation record.
 - Allen is Korean and Lana is Croatian; `/lana` copy can use that context.
 - Lana will manage this app.
 - The app is Clash of Clans focused. CoC API calls should use the official API
   base URL `https://api.clashofclans.com/v1` and the server-only
   `COC_API_TOKEN`.
-- The recovered website product is `MaveBase`, a Clash base layout marketplace
-  for fresh paid bases, builder/subscription trust, reviews, anti-repost
-  fingerprints, and Clash API evidence. Focused context lives in
-  `docs/context/base-marketplace.md`.
+
+## Current Slash Commands
+
+- `/lana`: draws a generated PNG heart image plus a randomized embed love note
+  for Lana and Allen.
+- `/loveu`: accepts a Discord user, composes a randomized love poem from
+  shuffled line pools for them, and attaches a freshly generated heart image.
+- `/player`: looks up a Clash of Clans player by tag using the server-side CoC
+  API token, then presents compact button pages plus a rendered army image card
+  with Clash Wiki/Fandom item icons when available.
+- `/legends`: starts or views Legend League trophy tracking for a player tag.
+- `/track player:<tag>` and `/track clan:<tag>`: seed the first
+  ClashKing/ClashPerk-style history snapshot and enroll the subject in
+  `/shared/clash-history.json`; `/track status` summarizes tracked players,
+  clans, wars/CWL rows, snapshots, and scheduler state.
+- `/history player:<tag>`: shows collected player history from
+  `/shared/clash-history.json`.
+- `/roster plan/signup/status/export`: roster planning, Discord-member roster
+  enrollment, status, and copy/paste exports.
+- `/warstats`, `/activity`, and `/summary`: clan operations reports backed by
+  the Clash history store.
+- `/config clan set/status`, `/link player/status/remove`: setup and identity
+  linking commands for roster/history features.
+- `/pictionary`: starts a Clash of Clans picture guessing game in the current
+  channel.
+- `/elder`, `/mute`, `/bench`: elder and moderation vote commands.
+
+## Scope Boundary
+
+This repo is intentionally back to a simple Discord bot. Future code changes
+should be requested through Codex Desktop/local git work, not through an
+in-channel coding bridge. Do not add chat-control bridges, server-side coding
+workers, website services, or database sidecars unless Allen explicitly asks
+for that exact surface again.
 
 ## Deployment
 
@@ -72,54 +55,30 @@ workflow.
 - Production server alias: `urba-chatwoot`, host `5.78.127.221`.
 - Server app path: `/opt/urba-apps/discord-bot/app`.
 - Runtime env path: `/opt/urba-apps/discord-bot/.env`.
-- Codex worker-only env path: `/opt/urba-apps/discord-bot/codex-worker.env`.
+- Docker Compose service/container: `discord-bot` / `urba-discord-bot`.
+- Health endpoint: `http://127.0.0.1:4188/healthz`.
 - CoC API env keys live in the server-only env file:
   `COC_API_BASE_URL` and `COC_API_TOKEN`.
-- Docker Compose service/container: `urba-discord-bot`.
-- Website Docker Compose service/container: `base-marketplace-web` /
-  `urba-base-marketplace-web`.
-- Website preview URL: `http://5.78.127.221:4192/`.
-- Website local health endpoint: `http://127.0.0.1:4192/healthz`.
-- Website Postgres service/container: `base-marketplace-db` /
-  `urba-base-marketplace-db`, internal only.
-- Website database password file:
-  `/opt/urba-apps/discord-bot/shared/base-marketplace-db-password`; deploy
-  generates it if missing and it must never be committed.
-- The VPS is shared with Chatwoot and has only about 2 GB RAM. A 2 GB
-  `/swapfile` was added on 2026-07-12 after mavebot auto-deploys saturated the
-  host and made Chatwoot appear down. Keep Docker build/deploy work
-  low-priority and verify Chatwoot after any deploy that builds images, pulls
-  base images, or starts new containers.
-- On 2026-07-12, a server audit found runtime usage was modest but deploy-time
-  pressure was real: the kernel logged sustained memory pressure during Docker
-  builds, and old Docker build cache plus journals consumed about 14 GB. Safe
-  cleanup pruned Docker build cache/unused images and vacuumed journald without
-  deleting Docker volumes. Future deploys must keep `COMPOSE_PARALLEL_LIMIT=1`,
-  build app and worker images separately, wait for memory headroom, and keep
-  mavebot container memory/pid/log limits in `docker-compose.yml`.
-- Remote Codex worker container: `urba-codex-worker`.
-- Health endpoint: `http://127.0.0.1:4188/healthz`.
-- GitHub deploys should use the server-local private deploy webhook when
-  configured. The webhook service is `urba-discord-deploy-webhook.service`,
-  backed by `scripts/deploy-webhook.py`, and should bind to the Docker bridge
-  IP so the `codex-worker` container can trigger it without exposing a public
-  port. The `urba-discord-poll-deploy.timer` remains the fallback and runs
-  every 30 seconds.
-- The server poll deploy only follows `origin/main`. A Codex task that only
-  edits a branch or PR is not deployed and must not be described as live.
+- The server-local `urba-discord-poll-deploy.timer` follows `origin/main` and
+  runs `/opt/urba-apps/discord-bot/app/scripts/deploy-server.sh` when GitHub
+  changes.
+- `deploy-server.sh` builds only the Discord bot image, registers slash
+  commands, starts `urba-discord-bot` with `--remove-orphans`, verifies
+  `/healthz`, and checks Chatwoot reachability before/after deploy.
 - Do not add mavebot endpoints to `chat.urba.group`; that domain belongs to
   Chatwoot.
-- The deploy script builds `discord-bot`, `codex-worker`, and
-  `base-marketplace-web`. It starts/verifies the marketplace Postgres and web
-  services separately from the Discord bot.
-- If a deploy fails after the repo advances, `poll-deploy.sh` uses
-  `/opt/urba-apps/discord-bot/shared/deploy-needed` and
-  `/opt/urba-apps/discord-bot/shared/deploy-failed-at` to retry deliberately
-  instead of either getting stuck or hammering the small VPS every 30 seconds.
-- The deploy script recreates
-  `codex-worker` only when no worker job is active; if a job is in
-  `processing`, it writes `shared/codex-worker/restart-needed` and completes
-  the worker recreate after the queue is clear.
+
+## Shared Server RAM Notes
+
+- The VPS is shared with Chatwoot and has only about 2 GB RAM plus a 2 GB
+  swapfile.
+- On 2026-07-12, Docker builds and extra side services created memory pressure
+  that made Chatwoot appear down. Runtime usage was modest, but deploy-time
+  pressure was real.
+- Keep `COMPOSE_PARALLEL_LIMIT=1`, build with low priority, keep container
+  memory/pid/log limits, and verify Chatwoot after deploys.
+- Avoid adding sidecar services or databases unless the user explicitly asks
+  and the server capacity is checked first.
 
 ## Durable State
 
@@ -127,31 +86,26 @@ workflow.
   `/opt/urba-apps/discord-bot/shared/legends-tracking.json`.
 - Clash history collector store:
   `/opt/urba-apps/discord-bot/shared/clash-history.json`.
-  Deploy initializes and chowns it as `/shared/clash-history.json`.
 - Elder/vote moderation store:
   `/opt/urba-apps/discord-bot/shared/elder-votes.json`.
 - Pictionary leaderboard store:
   `/opt/urba-apps/discord-bot/shared/pictionary-leaderboard.json`.
 - Malformed JSON state should be preserved as a `.corrupt-*` backup before
   starting a clean store.
+
+## Clash Data Model
+
 - Clash history collection follows the ClashKing/ClashPerk-style polling model:
   the official Clash API has no webhooks, so mavebot rotates through due
-  tracked subjects on a schedule. Env knobs are
-  `CLASH_HISTORY_STORE_PATH`, `CLASH_HISTORY_CLAN_TAGS`,
+  tracked subjects on a schedule.
+- Env knobs are `CLASH_HISTORY_STORE_PATH`, `CLASH_HISTORY_CLAN_TAGS`,
   `CLASH_HISTORY_PLAYER_TAGS`, `CLASH_HISTORY_INTERVAL_MS`,
   `CLASH_HISTORY_PLAYER_INTERVAL_MS`, `CLASH_HISTORY_CLAN_INTERVAL_MS`, and
   `CLASH_HISTORY_WAR_INTERVAL_MS`.
-- `/config clan set/status`, `/link player/status/remove`, and `/track` are the
-  user-visible setup, linking, and enrollment entry points for this store.
-  Roster, history, activity, and war/CWL commands should read from the same
-  store rather than creating parallel tracking files.
-- `/history player`, `/roster plan`, `/roster signup`, `/roster status`,
-  `/roster export`,
-  `/warstats`, `/activity`, and `/summary` are the first reporting/enrollment
-  commands on top of the store. Future history/roster/operations improvements
-  should add pages/buttons, richer bench state, generated lineup snapshots,
-  reminders, and richer activity/war detail before creating competing reporting
-  surfaces.
+- `/config`, `/link`, and `/track` are the user-visible setup, linking, and
+  enrollment entry points for this store. Roster, history, activity, and
+  war/CWL commands should read from the same store rather than creating
+  parallel tracking files.
 
 ## Discord Command Registration
 
@@ -174,95 +128,6 @@ workflow.
   Moderate Members, but Discord role hierarchy still applies. If mute/bench
   must affect high-role users, move the mavebot role above those users/roles in
   Discord server role settings.
-
-## Discord Codex Workflow
-
-- Discord `#codex` channel ID: `1523893930993778698`.
-- Discord `#codex` is the only remote control surface. Any non-bot user in
-  that channel can ask for code changes, explanations, screenshot review,
-  command work, deploy verification, or context maintenance.
-- The active code path is Discord `#codex` to the server-side `codex-worker`
-  compose profile. Normal `#codex` messages become JSON jobs in
-  `/opt/urba-apps/discord-bot/shared/codex-worker/jobs`; the worker runs Codex
-  CLI in `/opt/urba-apps/discord-bot/shared/codex-worker/repo`, commits,
-  pushes `origin/main`, triggers the private deploy webhook when configured,
-  then waits for the live app checkout and runtime health to verify the change.
-- Discord `#codex` requires the Discord Developer Portal Message Content
-  Intent because users are not tagging mavebot. Discord can report this enabled
-  setting as either the full `GatewayMessageContent` application flag or the
-  `GatewayMessageContentLimited` flag; both mean the bot may request
-  `MessageContent`.
-- Live adjacent Discord messages are debounced by channel and author, so one
-  user can send multiple text messages and screenshots as one prompt without
-  merging simultaneous prompts from other users.
-- Discord attachments are downloaded immediately into
-  `/opt/urba-apps/discord-bot/shared/codex-worker/context/discord-files/` and
-  passed to Codex as local files.
-- Discord `#codex` keeps a bounded durable nearby-channel context log at
-  `/opt/urba-apps/discord-bot/shared/codex-worker/context/discord-channel-context.jsonl`
-  by default. `DISCORD_CODEX_CONTEXT_LOG_PATH` can override the path and
-  `DISCORD_CODEX_CONTEXT_LOG_MAX_ROWS` controls the retained tail.
-- `DISCORD_CODEX_CONTEXT_BACKFILL_LIMIT` controls how many recent Discord
-  messages are fetched on startup to refresh the durable context log.
-  `DISCORD_CODEX_CATCHUP_LIMIT` controls how many recent messages are eligible
-  to enqueue as missed work.
-- When a job is queued, recent same-channel rows from the durable log and live
-  cache that are not part of the active burst are included as `nearbyText`,
-  `nearbyContextMessages`, and `nearbyFiles`.
-- Discord restart catch-up groups still-unhandled adjacent messages into the
-  same worker job instead of replaying each recent message separately.
-- Short queue checks such as `status`, `queue`, `are you busy`, and `what are
-  you working on?` answer immediately from runtime queue/auth state. They write
-  completed immediate records so restart catch-up does not replay them.
-
-## Worker Memory And Auth
-
-- Worker-side durable context is stored under
-  `/opt/urba-apps/discord-bot/shared/codex-worker/context/`:
-  `transcript.jsonl` is normalized history, while `summary.md`, `recent.md`,
-  and `session.md` are regenerated after each turn to keep prompts bounded.
-- Completed worker job JSON records in `done/` include sanitized
-  `codexMessage` and `finalMessage` fields. Use these for audits of what the
-  inner Codex subprocess answered versus what mavebot posted to the channel.
-- Completed and failed worker job JSON records include `finishedAt`,
-  `durationMs`, and `workerTiming.stages`. Use those fields to debug slow
-  responses before changing queue or deploy behavior.
-- While a job is in `processing`, the worker persists `currentStage` plus the
-  in-progress `workerTiming` into that job record. The Discord bot `/healthz`
-  response exposes `discordCodexWorkerQueue` with queue counts and safe
-  current-stage previews.
-- When `codex exec` fails with a Codex auth error, the worker moves the request
-  into `/opt/urba-apps/discord-bot/shared/codex-worker/auth-blocked/`. The
-  worker periodically checks `codex login status`; when that looks logged in,
-  it runs a tiny `codex exec` auth probe before requeueing saved jobs.
-- The worker refreshes `context/auth-retry-state.json` on startup and on a
-  heartbeat with `codex login status`, even when there are no blocked jobs.
-- `codex login status` can still say "Logged in using ChatGPT" after the
-  refresh token has been revoked. Verify auth with a tiny no-code `codex exec`
-  smoke inside `urba-codex-worker`; `HTTP 401`, `token_invalidated`, or
-  `refresh_token_invalidated` means the server must be logged in again.
-- Current server Codex auth is stored under
-  `/opt/urba-apps/discord-bot/codex-home`. To switch the server worker to a
-  different ChatGPT/Codex account, pause or drain the worker, back up that
-  `codex-home`, run an interactive `codex login` or device-auth flow inside
-  the worker/container using the new account, restart `urba-codex-worker`, then
-  run a no-code Discord `#codex` smoke job. Do not print, commit, or copy auth
-  files.
-
-## Context Loading
-
-- When the server-side worker works on this repo, it should read
-  `docs/context/README.md` first, then this file, then
-  `docs/context/discord-session.md`, then
-  `docs/context/remote-codex-session.md`, then `docs/context/code-map.md`,
-  then any relevant focused context file such as
-  `docs/context/base-marketplace.md`,
-  `docs/context/clash-database-guidance.md` or
-  `docs/context/clash-ui-guidance.md`, then inspect the current code before
-  changing behavior.
-- Do not ask Allen for generic setup context already captured here. Ask only
-  for missing secrets or external UI actions that cannot be done from the repo
-  or server.
 
 ## Safety
 

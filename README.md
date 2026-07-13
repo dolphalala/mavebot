@@ -1,19 +1,22 @@
 # Discord Bot Foundation
 
-Minimal Dockerized Discord bot foundation for the shared `urba-chatwoot` host.
+Dockerized Discord bot for the shared `urba-chatwoot` host.
 
 ## What It Includes
 
 - `discord.js` v14 bot process.
 - `/lana` slash command with a generated heart PNG and randomized Lana/Allen embeds.
 - `/loveu` slash command with a generated heart PNG and randomized love poem.
-- `/player` slash command for Clash of Clans player lookups.
-- `/legends` slash command for Legend League tracking.
+- Clash of Clans commands: `/player`, `/legends`, `/track`, `/history`, `/roster`, `/warstats`, `/activity`, `/summary`, `/config`, and `/link`.
 - `/pictionary`, `/elder`, `/mute`, and `/bench` feature commands.
 - Slash command registration script.
 - Local-only `/healthz` HTTP endpoint on port `4188`.
-- Discord `#codex` control channel support backed by the server-side Codex worker.
 - Docker Compose service named `urba-discord-bot`.
+
+Use Codex Desktop to make code changes, then push to `origin/main`. This repo
+is intentionally just the Discord bot now; it does not include chat-control
+bridges, server-side coding workers, extra website services, or extra database
+sidecars.
 
 ## Local Checks
 
@@ -27,21 +30,15 @@ npm run check
 ```text
 /opt/urba-apps/discord-bot/
   .env
-  codex-worker.env
-  codex-home/
   shared/
-    codex-worker/
-      context/
-        discord-files/
-      jobs/
-      processing/
-      done/
-      failed/
-      auth-blocked/
+    legends-tracking.json
+    clash-history.json
+    elder-votes.json
+    pictionary-leaderboard.json
+    logs/
   app/
     docker-compose.yml
     Dockerfile
-    Dockerfile.worker
     package.json
     src/
     scripts/
@@ -49,21 +46,17 @@ npm run check
 
 ## Auto Deploy
 
-GitHub deploys are handled by a server-local private deploy webhook triggered
-by the worker after it pushes `origin/main`. The 30-second server polling timer
-remains the fallback.
+The server-local `urba-discord-poll-deploy.timer` polls `origin/main` and runs
+`scripts/deploy-server.sh` when the GitHub repo advances.
 
 ```text
-Discord #codex request
-  -> codex-worker job
-  -> Codex CLI edits repo checkout
-  -> npm run check when needed
+Codex Desktop or local edit
   -> commit and push origin/main
-  -> private deploy webhook, or poll timer fallback
+  -> server poll timer
   -> scripts/deploy-server.sh
   -> register slash commands when Discord credentials exist
   -> restart only urba-discord-bot
-  -> verify /healthz
+  -> verify /healthz and Chatwoot reachability
 ```
 
 If Discord credentials are incomplete, the deploy script pulls and builds the
@@ -78,7 +71,6 @@ DISCORD_TOKEN=
 DISCORD_CLIENT_ID=1519063290058117170
 DISCORD_GUILD_ID=
 DISCORD_CLEAR_GUILD_COMMANDS_ID=
-DISCORD_CODEX_CHANNEL_ID=1523893930993778698
 COC_API_BASE_URL=https://api.clashofclans.com/v1
 COC_API_TOKEN=
 ```
@@ -95,7 +87,7 @@ Then register commands and start the bot:
 cd /opt/urba-apps/discord-bot/app
 docker compose build
 docker compose run --rm discord-bot npm run register
-docker compose up -d
+docker compose up -d --remove-orphans discord-bot
 docker compose ps
 curl -i http://127.0.0.1:4188/healthz
 ```
@@ -104,52 +96,3 @@ Global command registration can take longer to appear in Discord.
 
 The Clash of Clans developer API token must be created for the server public IP
 `5.78.127.221` and stored only in the server `.env` file.
-
-## Discord Codex Worker
-
-The Discord `#codex` control path requires Discord Developer Portal Message
-Content Intent because users type normal messages without tagging mavebot. The
-bot auto-detects whether that intent is enabled and stays online with a setup
-note if it is off.
-
-Normal human messages in Discord `#codex` are saved as jobs under
-`/opt/urba-apps/discord-bot/shared/codex-worker/jobs`. The worker container
-uses Codex CLI auth from `/opt/urba-apps/discord-bot/codex-home`, not an
-OpenAI API key. It works in its own checkout, runs checks, commits, pushes
-`origin/main`, triggers deploy, waits for the live checkout, and posts the
-final answer back into the channel.
-
-Adjacent `#codex` messages are debounced into one worker job so users can send
-several messages and screenshots as context before mavebot starts the task.
-Discord attachments are downloaded immediately to
-`/shared/codex-worker/context/discord-files` and passed to the worker as local
-file paths. Supported image files are also attached to `codex exec` with
-`--image` so screenshots are available as visual context.
-
-The worker keeps durable context in:
-
-- `/opt/urba-apps/discord-bot/shared/codex-worker/context/transcript.jsonl`
-- `/opt/urba-apps/discord-bot/shared/codex-worker/context/summary.md`
-- `/opt/urba-apps/discord-bot/shared/codex-worker/context/recent.md`
-- `/opt/urba-apps/discord-bot/shared/codex-worker/context/session.md`
-- `/opt/urba-apps/discord-bot/shared/codex-worker/context/discord-files/`
-
-`transcript.jsonl` is normalized history; low-signal smoke/status rows are
-pruned after verification. `summary.md` and `recent.md` are regenerated after
-each turn so prompts stay bounded while the channel still has memory.
-Repo-side durable guidance starts at `docs/context/README.md`, then
-`docs/context/operating-memory.md`, `docs/context/discord-session.md`,
-`docs/context/remote-codex-session.md`, `docs/context/code-map.md`, and focused
-domain files such as `docs/context/clash-ui-guidance.md`.
-
-Start or update the worker service manually after code changes to the worker
-itself:
-
-```bash
-cd /opt/urba-apps/discord-bot/app
-docker compose --profile codex-worker up -d --build codex-worker
-```
-
-The normal deploy script avoids killing an active worker request. If a worker
-job is currently processing, deploy writes a restart-needed marker and the
-worker is recreated after the queue is clear.
