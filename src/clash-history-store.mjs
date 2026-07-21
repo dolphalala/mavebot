@@ -16,7 +16,7 @@ export const DEFAULT_CLASH_HISTORY_INTERVAL_MS = 2 * 60 * 1000;
 export const DEFAULT_CLASH_HISTORY_PLAYER_INTERVAL_MS = 10 * 60 * 1000;
 export const DEFAULT_CLASH_HISTORY_CLAN_INTERVAL_MS = 5 * 60 * 1000;
 export const DEFAULT_CLASH_HISTORY_WAR_INTERVAL_MS = 2 * 60 * 1000;
-const MAX_PLAYER_SNAPSHOTS = 3000;
+const MAX_PLAYER_SNAPSHOTS = 720;
 const MAX_CLAN_SNAPSHOTS = 1000;
 const MAX_ERRORS = 40;
 let storeQueue = Promise.resolve();
@@ -113,6 +113,16 @@ function normalizeStore(parsed) {
     link.updatedAt = link.updatedAt || null;
   }
   store.players = objectMap(store.players);
+  for (const [tag, record] of Object.entries(store.players)) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      delete store.players[tag];
+      continue;
+    }
+    record.snapshots = (Array.isArray(record.snapshots) ? record.snapshots : [])
+      .map(compactPlayerHistorySnapshot)
+      .filter(Boolean)
+      .slice(-MAX_PLAYER_SNAPSHOTS);
+  }
   store.clans = objectMap(store.clans);
   store.wars = objectMap(store.wars);
   store.cwlGroups =
@@ -304,6 +314,40 @@ export function playerSnapshotFromApi(player, now = new Date()) {
   };
 }
 
+function compactPlayerHistorySnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    return null;
+  }
+  return {
+    at: snapshot.at || null,
+    tag: normalizeMaybePlayerTag(snapshot.tag),
+    name: textOrNull(snapshot.name) || 'Unknown player',
+    townHallLevel: numericOrNull(snapshot.townHallLevel),
+    expLevel: numericOrNull(snapshot.expLevel),
+    trophies: numericOrNull(snapshot.trophies),
+    bestTrophies: numericOrNull(snapshot.bestTrophies),
+    builderBaseTrophies: numericOrNull(snapshot.builderBaseTrophies),
+    warStars: numericOrNull(snapshot.warStars),
+    attackWins: numericOrNull(snapshot.attackWins),
+    defenseWins: numericOrNull(snapshot.defenseWins),
+    donations: numericOrNull(snapshot.donations),
+    donationsReceived: numericOrNull(snapshot.donationsReceived),
+    clan: snapshot.clan
+      ? {
+          tag: normalizeMaybeClanTag(snapshot.clan.tag),
+          name: textOrNull(snapshot.clan.name)
+        }
+      : null,
+    role: textOrNull(snapshot.role),
+    league: snapshot.league
+      ? {
+          id: numericOrNull(snapshot.league.id),
+          name: textOrNull(snapshot.league.name) || 'Unknown'
+        }
+      : null
+  };
+}
+
 function snapshotComparable(snapshot) {
   const { at: _at, ...rest } = snapshot;
   return JSON.stringify(rest);
@@ -354,14 +398,15 @@ function recordPlayerClanHistory(record, snapshot, now = new Date()) {
 
 export function recordPlayerSnapshotInStore(store, player, { now = new Date(), source = 'collector' } = {}) {
   const snapshot = playerSnapshotFromApi(player, now);
+  const historySnapshot = compactPlayerHistorySnapshot(snapshot);
   const record = ensurePlayerRecord(store, snapshot.tag, now);
   const previous = record.snapshots.at(-1) || null;
-  const appended = shouldAppendSnapshot(record.snapshots, snapshot);
+  const appended = shouldAppendSnapshot(record.snapshots, historySnapshot);
   record.name = snapshot.name;
   record.lastSeenAt = snapshot.at;
   record.current = snapshot;
   if (appended) {
-    record.snapshots.push(snapshot);
+    record.snapshots.push(historySnapshot);
     if (record.snapshots.length > MAX_PLAYER_SNAPSHOTS) {
       record.snapshots = record.snapshots.slice(-MAX_PLAYER_SNAPSHOTS);
     }

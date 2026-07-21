@@ -163,12 +163,7 @@ const discordMessageContentIntentRequested =
 const activePictionaryGames = new Map();
 
 const app = express();
-app.get('/healthz', async (_req, res) => {
-  let clashHistoryScheduler = null;
-  try {
-    const clashHistoryStore = await readClashHistoryStore(clashHistoryStorePath());
-    clashHistoryScheduler = clashHistoryStore.scheduler || null;
-  } catch {}
+app.get('/healthz', (_req, res) => {
   res.status(ready ? 200 : 503).json({
     ok: ready,
     botUser: readyUser,
@@ -181,7 +176,6 @@ app.get('/healthz', async (_req, res) => {
     clashHistoryPlayerIntervalMs,
     clashHistoryClanIntervalMs,
     clashHistoryWarIntervalMs,
-    clashHistoryScheduler,
     uptimeSec: Math.floor(process.uptime())
   });
 });

@@ -205,7 +205,48 @@ test('recordClashPlayerSnapshot stores current player data and trophy deltas', a
   assert.equal(second.trophyDelta, 32);
   assert.equal(second.record.snapshots.length, 2);
   assert.equal(second.record.current.heroes[0].name, 'Archer Queen');
+  assert.equal(second.record.snapshots[1].heroes, undefined);
+  assert.equal(second.record.snapshots[1].troops, undefined);
+  assert.equal(second.record.snapshots[1].league.iconUrl, undefined);
   assert.deepEqual(second.store.tracked.players['#AAA111'].sources, ['lookup']);
+});
+
+test('readClashHistoryStore compacts legacy full player snapshots', async (t) => {
+  const storePath = await tempStore(t);
+  const legacySnapshot = {
+    ...player('#AAA111', 5600),
+    at: '2026-07-01T00:00:00.000Z',
+    league: {
+      id: 29000022,
+      name: 'Legend League',
+      iconUrl: 'https://example.test/legend.png'
+    }
+  };
+  await writeFile(
+    storePath,
+    JSON.stringify({
+      version: 1,
+      players: {
+        '#AAA111': {
+          tag: '#AAA111',
+          current: legacySnapshot,
+          snapshots: [legacySnapshot]
+        }
+      }
+    }),
+    'utf8'
+  );
+
+  const store = await readClashHistoryStore(storePath);
+  const [snapshot] = store.players['#AAA111'].snapshots;
+
+  assert.equal(snapshot.trophies, 5600);
+  assert.equal(snapshot.heroes, undefined);
+  assert.equal(snapshot.heroEquipment, undefined);
+  assert.equal(snapshot.troops, undefined);
+  assert.equal(snapshot.spells, undefined);
+  assert.deepEqual(snapshot.league, { id: 29000022, name: 'Legend League' });
+  assert.equal(store.players['#AAA111'].current.heroes[0].name, 'Archer Queen');
 });
 
 test('trackClashHistoryPlayer seeds a command-backed player snapshot', async (t) => {

@@ -33,6 +33,17 @@ test('player runtime replies before hydrating the heavier army image', async () 
   assert.match(source, /void hydratePlayerArmyCard\(view, player, tag\)/);
 });
 
+test('health endpoint does not parse the full Clash history store', async () => {
+  const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
+  const healthRoute = source.slice(
+    source.indexOf("app.get('/healthz'"),
+    source.indexOf('const healthServer')
+  );
+
+  assert.doesNotMatch(healthRoute, /readClashHistoryStore/);
+  assert.doesNotMatch(healthRoute, /await/);
+});
+
 test('pictionary runtime handles normal message guesses without control-channel intake', async () => {
   const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
 

@@ -86,6 +86,9 @@ for that exact surface again.
   `/opt/urba-apps/discord-bot/shared/legends-tracking.json`.
 - Clash history collector store:
   `/opt/urba-apps/discord-bot/shared/clash-history.json`.
+- Player history keeps full current profiles but stores compact historical
+  metrics, capped at 720 snapshots per player. `/healthz` must never parse the
+  full Clash history file; Docker probes need to remain constant-memory.
 - Elder/vote moderation store:
   `/opt/urba-apps/discord-bot/shared/elder-votes.json`.
 - Pictionary leaderboard store:
