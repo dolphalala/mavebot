@@ -1,6 +1,6 @@
 # Discord Bot Foundation
 
-Dockerized Discord bot for the shared `urba-chatwoot` host.
+Dockerized Discord bot for the shared host reached through `mavebot-prod`.
 
 ## What It Includes
 

@@ -54,7 +54,7 @@ for that exact surface again.
 ## Deployment
 
 - GitHub repo: `dolphalala/mavebot`.
-- Production server alias: `urba-chatwoot`, host `5.78.127.221`.
+- Production server alias: `mavebot-prod`, host `5.78.127.221`.
 - Server app path: `/opt/urba-apps/discord-bot/app`.
 - Runtime env path: `/opt/urba-apps/discord-bot/.env`.
 - Docker Compose service/container: `discord-bot` / `urba-discord-bot`.
