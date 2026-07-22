@@ -1,7 +1,10 @@
 # Mavebot Operating Memory
 
-This repo backs the `mavebot` Discord bot. It is edited through Codex
-Desktop/local git work, then deployed by pushing to `origin/main`.
+This repo backs the `mavebot` Discord bot. It can be edited from a normal local
+clone or through the guarded server workspace. The other-computer default is:
+SSH to `mavebot-prod`, edit `/opt/urba-apps/discord-bot/workspace`, then run
+`mavebot-ship "description"`. Git remains an automatic rollback/deployment
+mechanism and does not need to be operated manually in that workflow.
 
 ## Product Context
 
@@ -46,16 +49,17 @@ Desktop/local git work, then deployed by pushing to `origin/main`.
 ## Scope Boundary
 
 This repo is intentionally back to a simple Discord bot. Future code changes
-should be requested through Codex Desktop/local git work, not through an
-in-channel coding bridge. Do not add chat-control bridges, server-side coding
-workers, website services, or database sidecars unless Allen explicitly asks
-for that exact surface again.
+may use Codex Desktop locally or the dedicated server editing workspace, never
+an in-channel coding bridge. Do not add chat-control bridges, autonomous
+server-side coding workers, website services, or database sidecars unless
+Allen explicitly asks for that exact surface again.
 
 ## Deployment
 
 - GitHub repo: `dolphalala/mavebot`.
 - Production server alias: `mavebot-prod`, host `5.78.127.221`.
 - Server app path: `/opt/urba-apps/discord-bot/app`.
+- Server editing path: `/opt/urba-apps/discord-bot/workspace`.
 - Runtime env path: `/opt/urba-apps/discord-bot/.env`.
 - Docker Compose service/container: `discord-bot` / `urba-discord-bot`.
 - Health endpoint: `http://127.0.0.1:4188/healthz`.
@@ -66,15 +70,23 @@ for that exact surface again.
   changes.
 - The production checkout is a deployment target, not an editing workspace.
   Both poll and manual deploy scripts abort when it has tracked or untracked
-  changes. Make command changes in a local clone, commit them, and push
-  `origin/main`; direct server edits do not rebuild the container or register
-  Discord commands.
-- Cross-computer Codex access uses the repository-scoped `github-mavebot` SSH
-  alias from the private handoff. Set an existing clone's `origin` to
-  `github-mavebot:dolphalala/mavebot.git` before pushing. Server SSH access by
-  itself does not grant GitHub write access.
-- The `github-mavebot` credential is a write-enabled GitHub deploy key scoped
-  only to `dolphalala/mavebot`; it is not Allen's general GitHub credential.
+  changes. Make server-side changes only in the dedicated `workspace`, then
+  run `mavebot-ship`; direct edits in `app` do not rebuild the container or
+  register Discord commands.
+- The other computer needs only the private server SSH handoff and the
+  `mavebot-prod` alias. There is no root password in this workflow; root login
+  uses its dedicated SSH key.
+- A repository-scoped write key lives only under
+  `/opt/urba-apps/discord-bot/ssh` on the server. It is used internally by the
+  guarded commands and must never be copied to a client computer or committed.
+- `mavebot-ship` backs up the source, synchronizes remote changes while
+  preserving edits, rejects likely credentials, runs `npm run check` in a
+  resource-limited Node Docker container, creates the Git rollback point,
+  pushes without force, triggers the existing poll deploy, and verifies
+  Mavebot, Chatwoot, and Bookkeeper.
+- `mavebot-sync` safely incorporates remote changes without deploying.
+  `mavebot-status` is read-only and shows workspace, production, and service
+  state.
 - `deploy-server.sh` builds only the Discord bot image, registers slash
   commands, starts `urba-discord-bot` with `--remove-orphans`, verifies
   `/healthz`, and checks Chatwoot reachability before/after deploy.
@@ -92,6 +104,9 @@ for that exact surface again.
   memory/pid/log limits, and verify Chatwoot after deploys.
 - Avoid adding sidecar services or databases unless the user explicitly asks
   and the server capacity is checked first.
+- Server-workspace checks are limited to 768 MB RAM, 1 CPU, 256 processes, and
+  low I/O/CPU priority. They wait for at least 600 MB available memory before
+  starting. Do not remove these safeguards.
 
 ## Durable State
 

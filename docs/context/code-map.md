@@ -18,6 +18,13 @@ It is a map, not a replacement for reading the current source.
   `urba-discord-bot`, and verifies `/healthz`.
 - `scripts/poll-deploy.sh`: server timer entrypoint that watches `origin/main`
   and runs `deploy-server.sh` when the repo advances.
+- `scripts/server-workspace.sh`: implementation behind `mavebot-status`,
+  `mavebot-sync`, and `mavebot-ship`; keeps server editing separate from the
+  production checkout and automates backup, tests, safe push, deploy, and
+  verification.
+- `scripts/install-server-workspace.sh`: verifies the server-only repository
+  key, creates the dedicated workspace, and installs the three exact command
+  symlinks.
 
 ## Feature Modules
 
@@ -53,10 +60,12 @@ database sidecars unless Allen explicitly asks for that exact surface again.
 2. Update the matching `InteractionCreate` handling in `src/index.mjs`.
 3. Add or update focused helper modules if the command has non-trivial logic.
 4. Add tests for command registration shape and feature logic.
-5. Run `npm run check`.
-6. Push to `origin/main`; the server polling timer deploys and registers
-   commands automatically.
-7. Verify the live command list and runtime behavior after deploy.
+5. From a local clone, run `npm run check`, commit, and push `origin/main`; or,
+   from the server workspace, run `mavebot-ship "describe the change"` to do
+   those steps automatically.
+6. The server polling service deploys and registers commands automatically.
+7. Verify the live command list and runtime behavior after deploy. The server
+   workflow also verifies process and shared-service health.
 
 Registering a command without a matching runtime handler causes Discord's
 "The application did not respond" error.

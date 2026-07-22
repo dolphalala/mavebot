@@ -13,10 +13,13 @@ Dockerized Discord bot for the shared host reached through `mavebot-prod`.
 - Local-only `/healthz` HTTP endpoint on port `4188`.
 - Docker Compose service named `urba-discord-bot`.
 
-Use Codex Desktop to make code changes, then push to `origin/main`. This repo
-is intentionally just the Discord bot now; it does not include chat-control
-bridges, server-side coding workers, extra website services, or extra database
-sidecars.
+The easiest remote workflow is to SSH to `mavebot-prod`, edit only
+`/opt/urba-apps/discord-bot/workspace`, then run
+`mavebot-ship "describe the change"`. The command handles Git internally so a
+second computer does not need GitHub credentials or manual commit/push work.
+This repo is intentionally just the Discord bot; it does not include
+chat-control bridges, autonomous coding workers, extra website services, or
+extra database sidecars.
 
 ## Local Checks
 
@@ -30,6 +33,7 @@ npm run check
 ```text
 /opt/urba-apps/discord-bot/
   .env
+  ssh/                 # server-only repository credential; never copy out
   shared/
     legends-tracking.json
     clash-history.json
@@ -42,7 +46,32 @@ npm run check
     package.json
     src/
     scripts/
+  workspace/           # the only server directory where Codex edits source
 ```
+
+`app` must remain clean and is never an editing directory.
+
+## Editing From Another Computer
+
+After installing the confidential server-only SSH handoff on that computer:
+
+```bash
+ssh mavebot-prod
+cd /opt/urba-apps/discord-bot/workspace
+# Ask Codex to make and test the Discord bot change here.
+mavebot-ship "Describe the Discord bot change"
+```
+
+Useful server commands:
+
+```bash
+mavebot-status  # workspace, production, and shared-service health
+mavebot-sync    # safely bring in outside changes without deploying
+```
+
+There is no root password to share. The `mavebot-prod` alias uses a dedicated
+SSH key. The server itself owns a separate, repository-only GitHub key used by
+the guarded commands.
 
 ## Auto Deploy
 
@@ -50,8 +79,8 @@ The server-local `urba-discord-poll-deploy.timer` polls `origin/main` and runs
 `scripts/deploy-server.sh` when the GitHub repo advances.
 
 ```text
-Codex Desktop or local edit
-  -> commit and push origin/main
+Server workspace edit
+  -> mavebot-ship (backup + tests + hidden commit/push)
   -> server poll timer
   -> scripts/deploy-server.sh
   -> register slash commands when Discord credentials exist
@@ -61,6 +90,10 @@ Codex Desktop or local edit
 
 If Discord credentials are incomplete, the deploy script pulls and builds the
 latest image but skips starting the bot.
+
+See `docs/context/server-edit-workflow.md` for the failure explanation,
+recovery behavior, exact safety boundaries, and a prompt for another Codex
+session.
 
 ## Server Setup
 

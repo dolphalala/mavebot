@@ -9,7 +9,9 @@ from Codex Desktop/local git work before changing commands or server behavior.
 2. This context map.
 3. `operating-memory.md`.
 4. `code-map.md`.
-5. Relevant focused context files:
+5. `server-edit-workflow.md` when working from another computer or directly on
+   the Mavebot server.
+6. Relevant focused context files:
    `clash-product-delivery.md`, `clash-operations-roadmap.md`,
    `clash-competitor-research.md`, `clash-database-guidance.md`, and
    `clash-ui-guidance.md`.
@@ -22,6 +24,8 @@ The source code and tests are the final authority when docs are stale.
 - `operating-memory.md`: app identity, server paths, deploy behavior, command
   registration rules, durable state, and safety boundaries.
 - `code-map.md`: source-file map and feature change recipes.
+- `server-edit-workflow.md`: server SSH editing path, guarded ship commands,
+  incident explanation, recovery behavior, and copy/paste instructions.
 - `clash-product-delivery.md`: acceptance contract for broad ClashKing,
   ClashPerk, roster, CWL, war-history, and scheduled-collection asks.
 - `clash-operations-roadmap.md`: concrete command roadmap for setup, linking,
@@ -34,8 +38,9 @@ The source code and tests are the final authority when docs are stale.
 
 ## Scope Boundary
 
-This project is intentionally just the Discord bot. Do not add chat-control
-bridges, server-side coding workers, website services, or database sidecars
+This project is intentionally just the Discord bot. The guarded server editing
+workspace is a deployment tool, not a chat-control bridge or autonomous coding
+worker. Do not add chat-control bridges, website services, or database sidecars
 unless Allen explicitly asks for that exact surface again.
 
 ## Maintenance Rules
