@@ -1,6 +1,6 @@
 # Mavebot Server Editing Workflow
 
-Last verified: 2026-07-22 through the guarded server workflow.
+Last verified: 2026-07-22 through a successful guarded production ship.
 
 This is the default guide for a Codex session on another computer. It covers
 only the Mavebot Discord bot. Lanawee is out of scope.
