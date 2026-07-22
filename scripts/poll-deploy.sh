@@ -25,6 +25,14 @@ if [ ! -d "$APP_ROOT/.git" ]; then
   exit 1
 fi
 
+working_tree_status="$(git -C "$APP_ROOT" status --porcelain --untracked-files=normal)"
+if [ -n "$working_tree_status" ]; then
+  echo "ERROR: refusing poll deploy because the production checkout has uncommitted changes."
+  echo "Edit a local clone, commit the change, and push origin/$BRANCH instead of editing $APP_ROOT directly."
+  printf '%s\n' "$working_tree_status"
+  exit 1
+fi
+
 git -C "$APP_ROOT" fetch origin "$BRANCH"
 
 local_sha="$(git -C "$APP_ROOT" rev-parse HEAD)"

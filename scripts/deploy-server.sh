@@ -38,6 +38,14 @@ if [ ! -f "$APP_ENV" ]; then
   exit 1
 fi
 
+working_tree_status="$(git -C "$APP_ROOT" status --porcelain --untracked-files=normal)"
+if [ -n "$working_tree_status" ]; then
+  echo "ERROR: refusing deploy because the production checkout has uncommitted changes."
+  echo "Edit a local clone, commit the change, and push origin/$BRANCH instead of editing $APP_ROOT directly."
+  printf '%s\n' "$working_tree_status"
+  exit 1
+fi
+
 env_has_value() {
   local file="$1"
   local key="$2"

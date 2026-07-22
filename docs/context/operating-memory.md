@@ -62,6 +62,15 @@ for that exact surface again.
 - The server-local `urba-discord-poll-deploy.timer` follows `origin/main` and
   runs `/opt/urba-apps/discord-bot/app/scripts/deploy-server.sh` when GitHub
   changes.
+- The production checkout is a deployment target, not an editing workspace.
+  Both poll and manual deploy scripts abort when it has tracked or untracked
+  changes. Make command changes in a local clone, commit them, and push
+  `origin/main`; direct server edits do not rebuild the container or register
+  Discord commands.
+- Cross-computer Codex access uses the repository-scoped `github-mavebot` SSH
+  alias from the private handoff. Set an existing clone's `origin` to
+  `github-mavebot:dolphalala/mavebot.git` before pushing. Server SSH access by
+  itself does not grant GitHub write access.
 - `deploy-server.sh` builds only the Discord bot image, registers slash
   commands, starts `urba-discord-bot` with `--remove-orphans`, verifies
   `/healthz`, and checks Chatwoot reachability before/after deploy.
