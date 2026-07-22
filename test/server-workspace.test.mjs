@@ -46,4 +46,5 @@ test("installer pins the server credential and installs only exact command links
   assert.match(installer, /install_link mavebot-sync/);
   assert.match(installer, /install_link mavebot-status/);
   assert.match(installer, /Mavebot Server Codex/);
+  assert.doesNotMatch(installer, /local name="\$1" link=/);
 });

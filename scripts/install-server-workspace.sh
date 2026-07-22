@@ -33,7 +33,8 @@ validate_paths() {
 }
 
 install_link() {
-  local name="$1" link="$BIN_ROOT/$name"
+  local name="$1"
+  local link="$BIN_ROOT/$name"
   if [ -e "$link" ] || [ -L "$link" ]; then
     [ -L "$link" ] || die "$link already exists and is not a symlink."
     [ "$(readlink -f "$link")" = "$(readlink -f "$WORKSPACE_TOOL")" ] || die "$link points somewhere unexpected."
