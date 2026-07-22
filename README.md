@@ -8,7 +8,7 @@ Dockerized Discord bot for the shared `urba-chatwoot` host.
 - `/lana` slash command with a generated heart PNG and randomized Lana/Allen embeds.
 - `/loveu` slash command with a generated heart PNG and randomized love poem.
 - Clash of Clans commands: `/player`, `/legends`, `/track`, `/history`, `/roster`, `/warstats`, `/activity`, `/summary`, `/config`, and `/link`.
-- `/pictionary`, `/elder`, `/mute`, and `/bench` feature commands.
+- `/allen`, `/pictionary`, `/elder`, `/mute`, and `/bench` feature commands.
 - Slash command registration script.
 - Local-only `/healthz` HTTP endpoint on port `4188`.
 - Docker Compose service named `urba-discord-bot`.

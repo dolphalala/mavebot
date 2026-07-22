@@ -19,6 +19,8 @@ Desktop/local git work, then deployed by pushing to `origin/main`.
 
 - `/lana`: draws a generated PNG heart image plus a randomized embed love note
   for Lana and Allen.
+- `/allen`: writes Allen a freshly shuffled love letter and attaches a newly
+  rendered heart image.
 - `/loveu`: accepts a Discord user, composes a randomized love poem from
   shuffled line pools for them, and attaches a freshly generated heart image.
 - `/player`: looks up a Clash of Clans player by tag using the server-side CoC
@@ -71,6 +73,8 @@ for that exact surface again.
   alias from the private handoff. Set an existing clone's `origin` to
   `github-mavebot:dolphalala/mavebot.git` before pushing. Server SSH access by
   itself does not grant GitHub write access.
+- The `github-mavebot` credential is a write-enabled GitHub deploy key scoped
+  only to `dolphalala/mavebot`; it is not Allen's general GitHub credential.
 - `deploy-server.sh` builds only the Discord bot image, registers slash
   commands, starts `urba-discord-bot` with `--remove-orphans`, verifies
   `/healthz`, and checks Chatwoot reachability before/after deploy.
