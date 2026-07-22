@@ -40,6 +40,7 @@ test("ship never uses destructive repository or Docker shortcuts", () => {
 
 test("installer pins the server credential and installs only exact command links", () => {
   assert.match(installer, /SHA256:A8fa1Lr3mfwt2HnjbPrDjL7SaqhiphGVwAaUj144Imk/);
+  assert.match(installer, /SHA256:\+DiY3wvvV6TuJJhbpZisF\/zLDA0zPMSvHdkr4UvCOqU/);
   assert.match(installer, /Official pinned GitHub ED25519 host key is missing/);
   assert.match(installer, /install_link mavebot-ship/);
   assert.match(installer, /install_link mavebot-sync/);

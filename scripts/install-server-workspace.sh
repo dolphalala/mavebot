@@ -9,6 +9,7 @@ SSH_ROOT="${SSH_ROOT:-$BOT_ROOT/ssh}"
 GITHUB_KEY="${GITHUB_KEY:-$SSH_ROOT/github-write}"
 GITHUB_KNOWN_HOSTS="${GITHUB_KNOWN_HOSTS:-$SSH_ROOT/github_known_hosts}"
 EXPECTED_KEY_FINGERPRINT="${EXPECTED_KEY_FINGERPRINT:-SHA256:A8fa1Lr3mfwt2HnjbPrDjL7SaqhiphGVwAaUj144Imk}"
+EXPECTED_GITHUB_HOST_FINGERPRINT="${EXPECTED_GITHUB_HOST_FINGERPRINT:-SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU}"
 REPOSITORY="${REPOSITORY:-git@github.com:dolphalala/mavebot.git}"
 BRANCH="${BRANCH:-main}"
 BIN_ROOT="${BIN_ROOT:-/usr/local/bin}"
@@ -51,7 +52,9 @@ validate_paths
 
 actual_fingerprint="$(ssh-keygen -lf "$GITHUB_KEY.pub" | awk '{print $2}')"
 [ "$actual_fingerprint" = "$EXPECTED_KEY_FINGERPRINT" ] || die "Server repository key fingerprint mismatch."
-grep -F 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqHj6Q5U2eR4VWg3EclbCQ30V4b45wHhIVhgT7vwC' "$GITHUB_KNOWN_HOSTS" >/dev/null || die "Official pinned GitHub ED25519 host key is missing."
+if ! ssh-keygen -lf "$GITHUB_KNOWN_HOSTS" | awk -v expected="$EXPECTED_GITHUB_HOST_FINGERPRINT" '$2 == expected { found = 1 } END { exit found ? 0 : 1 }'; then
+  die "Official pinned GitHub ED25519 host key is missing."
+fi
 chmod 700 "$SSH_ROOT"
 chmod 600 "$GITHUB_KEY" "$GITHUB_KNOWN_HOSTS"
 chmod 644 "$GITHUB_KEY.pub"
