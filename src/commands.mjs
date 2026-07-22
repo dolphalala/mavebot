@@ -9,6 +9,12 @@ export const commands = [
     contexts: [0]
   },
   {
+    name: 'allen',
+    description: 'Writes a fresh, heartfelt love letter to Allen.',
+    integration_types: [0],
+    contexts: [0]
+  },
+  {
     name: 'loveu',
     description: 'Writes a random love poem and draws a fresh heart for someone.',
     integration_types: [0],

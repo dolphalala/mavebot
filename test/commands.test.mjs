@@ -17,6 +17,16 @@ test('lana command replaces the old iloveyou command', () => {
   assert.deepEqual(lana.contexts, [0]);
 });
 
+test('allen command is guild-install only and creates a fresh love letter', () => {
+  const allen = commands.find((command) => command.name === 'allen');
+
+  assert.ok(allen);
+  assert.match(allen.description, /fresh, heartfelt love letter/i);
+  assert.deepEqual(allen.integration_types, [0]);
+  assert.deepEqual(allen.contexts, [0]);
+  assert.equal(allen.options, undefined);
+});
+
 test('loveu command is guild-install only and selects a Discord user', () => {
   const loveu = commands.find((command) => command.name === 'loveu');
 

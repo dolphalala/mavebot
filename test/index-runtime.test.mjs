@@ -25,6 +25,21 @@ test('loveu runtime sends a generated heart attachment and poem helper', async (
   assert.match(source, /allowedMentions: \{ users: \[targetUser\.id\] \}/);
 });
 
+test('allen runtime is handled inside the Discord interaction listener', async () => {
+  const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
+  const listenerStart = source.indexOf('client.on(Events.InteractionCreate');
+  const listenerEnd = source.indexOf('async function shutdown', listenerStart);
+  const handlerIndex = source.indexOf("interaction.commandName === 'allen'");
+  const afterLogin = source.slice(source.indexOf('await client.login(token)'));
+
+  assert.ok(listenerStart >= 0, 'Discord interaction listener is missing');
+  assert.ok(listenerEnd > listenerStart, 'Discord interaction listener boundary is missing');
+  assert.ok(handlerIndex > listenerStart && handlerIndex < listenerEnd, '/allen handler is outside the listener');
+  assert.doesNotMatch(afterLogin, /interaction\.commandName/);
+  assert.match(source, /randomLoveuPoem\('Allen'\)/);
+  assert.match(source, /allen-heart\.png/);
+});
+
 test('player runtime replies before hydrating the heavier army image', async () => {
   const source = await readFile(new URL('../src/index.mjs', import.meta.url), 'utf8');
 

@@ -1181,6 +1181,30 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return;
   }
 
+  if (interaction.commandName === 'allen') {
+    const letter = randomLoveuPoem('Allen');
+    const heartPng = createLanaHeartPng({
+      variant: crypto.randomInt(1, 0x7fffffff)
+    });
+    const attachment = new AttachmentBuilder(heartPng, {
+      name: 'allen-heart.png'
+    });
+    const embed = new EmbedBuilder()
+      .setColor(0xe2557b)
+      .setTitle(letter.title)
+      .setDescription(['Dear Allen,', '', letter.body, '', ':heart: :sparkles: :two_hearts:'].join('\n'))
+      .addFields({
+        name: 'A little note',
+        value: letter.note
+      })
+      .setImage('attachment://allen-heart.png')
+      .setFooter({ text: 'A fresh letter and a new heart every time' })
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed], files: [attachment] });
+    return;
+  }
+
   if (interaction.commandName === 'loveu') {
     const targetUser = interaction.options.getUser('user', true);
     const targetMember = interaction.options.getMember?.('user');
