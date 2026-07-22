@@ -29,6 +29,10 @@ test("ship backs up, tests, scans, pushes safely, and verifies shared services",
   assert.match(workspaceTool, /CHATWOOT_HEALTH_URL/);
   assert.match(workspaceTool, /BOOKKEEPER_HEALTH_URL/);
   assert.match(workspaceTool, /State\.Health\.Status/);
+  assert.match(
+    workspaceTool,
+    /production_sha.*target_sha[\s\S]*State\.Health\.Status[\s\S]*verify_shared_services/,
+  );
 });
 
 test("ship never uses destructive repository or Docker shortcuts", () => {

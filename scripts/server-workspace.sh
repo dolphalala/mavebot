@@ -202,7 +202,9 @@ wait_for_deploy() {
   systemctl start urba-discord-poll-deploy.service || die "The Mavebot deploy service failed. See $SHARED_ROOT/logs/poll-deploy.log."
   while [ "$waited" -lt "$DEPLOY_WAIT_SECONDS" ]; do
     production_sha="$(git -C "$APP_ROOT" rev-parse HEAD)"
-    if [ "$production_sha" = "$target_sha" ] && curl --fail --silent --max-time 5 "$BOT_HEALTH_URL" >/dev/null; then
+    if [ "$production_sha" = "$target_sha" ] && \
+       curl --fail --silent --max-time 5 "$BOT_HEALTH_URL" >/dev/null && \
+       [ "$(docker inspect --format '{{.State.Health.Status}}' urba-discord-bot 2>/dev/null)" = "healthy" ]; then
       verify_shared_services
       return 0
     fi
